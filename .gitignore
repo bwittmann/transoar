@@ -5,6 +5,12 @@ data/
 *.npz
 *.npy
 
-
 # IDE
 .vscode/
+
+# PyCache
+__pycache__/
+*.pyc
+
+# Setup
+*egg-info

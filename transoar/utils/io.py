@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import yaml
+import nibabel as nib
 
 PATH_TO_CONFIG = Path("./config/")
 
@@ -28,6 +29,19 @@ def get_config():
 
     return config
 
+def load_nifti(path_to_file):
+    """Reads a .nii.gz file and extracts relevant informations.
+    
+    Returns:
+        A dict with the keys data, meta_data, and affine."""
+    nifti_img = nib.load(path_to_file)
+
+    # Extract relevant information
+    data = nifti_img.get_fdata()
+    affine = nifti_img.affine
+    meta_data = dict(nifti_img.header)
+
+    return {'data': data, 'meta_data': meta_data, 'affine': affine}
 
 
 if __name__ == "__main__":
