@@ -1,0 +1,2 @@
+# Main config file 
+include: [data.yaml, model.yaml]

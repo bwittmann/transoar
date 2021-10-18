@@ -1,0 +1,10 @@
+# Datasets
+data/
+*.nii.gz
+*.pkl
+*.npz
+*.npy
+
+
+# IDE
+.vscode/
