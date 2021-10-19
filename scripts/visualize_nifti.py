@@ -21,7 +21,8 @@ def show_images(images):
 
 
 if __name__ == "__main__":
-    PATH_TO_FILE = Path('/home/bastian/Downloads/CT_GC/10000006_1/10000006_1_CT_wb.nii.gz')
+    PATH_TO_FILE = Path('/home/bastian/Datasets/CT_GC/10000006_1/10000006_1_CT_wb.nii.gz')
+    # PATH_TO_FILE = Path('/home/bastian/Downloads/Task007_Pancreas/Task07_Pancreas/imagesTr/pancreas_004.nii.gz')
 
     # Load data from nifti
     data = load_nifti(PATH_TO_FILE)['data']
