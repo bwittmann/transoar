@@ -10,22 +10,23 @@ import numpy as np
 from tqdm import tqdm
 
 from transoar.utils.io import load_case
+from transoar.preprocessing.processor import Preprocessor
+from transoar.preprocessing.analyser import DataSetAnalyser
 
 # TODO: Add multiprocessing
 
 def prepare_set(name, path_to_dataset, path_to_splits, cases):
     logging.info(f'Preparing {name} set.')
     for case in tqdm(cases):
-        try:
-            loaded_case = load_case([path.absolute() for path in Path(path_to_dataset / case).glob('**/*')])
-        except RuntimeError:
-            logging.warning(f'Skipped case {case}.')
+        loaded_case = load_case([path.absolute() for path in Path(path_to_dataset / case).glob('**/*')])
+        
+        if loaded_case == None:
             continue
 
         # Save actual data and meta data
-        np.savez_compressed(path_to_splits / name / f"{case}.npz", data=loaded_case['data'])
-        with open(path_to_splits / name / f"{case}.pkl", 'wb') as f:
-            pickle.dump(loaded_case['meta_data'], f)
+        # np.savez_compressed(path_to_splits / name / f"{case}.npz", data=loaded_case['data'])
+        # with open(path_to_splits / name / f"{case}.pkl", 'wb') as f:
+        #     pickle.dump(loaded_case['meta_data'], f)
 
 if __name__ == "__main__":
     random.seed(5)  # Set arbitrary seed to make experiments reproducible
@@ -38,14 +39,24 @@ if __name__ == "__main__":
 
     path_to_splits = Path(f"./data/{DATASET_NAME}_{MODALITY}")
 
-    # Get names of cases of GC set and shuffle them
-    cases_gc = os.listdir(PATH_TO_GC_DATASET)
+    # Get paths to cases in GC and SC dataset
+    cases_sc = [path for path in Path(PATH_TO_SC_DATASET).iterdir()]
+    cases_gc = [path for path in Path(PATH_TO_GC_DATASET).iterdir()]
     random.shuffle(cases_gc)
 
-    # Split shuffled GC set into test and val set
+    # Create test, val, and train split
     test_set = cases_gc[:int(len(cases_gc)/2)]
     val_set = cases_gc[int(len(cases_gc)/2):]
-    train_set = os.listdir(PATH_TO_SC_DATASET)
+    train_set = cases_sc
+
+    # Analyse properties of dataset like spacing and intensity properties
+    analyser = DataSetAnalyser(paths_to_cases=train_set + val_set)
+    dataset_analysis = analyser.analyse()
+
+
+
+
+
 
     # Prepare SC dataset (train) and GC dataset (test and val)
     dataset_infos = zip(

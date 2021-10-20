@@ -1,13 +1,14 @@
 """Helper functions for input/output."""
 
+import logging
 from pathlib import Path
 
 import numpy as np
 import yaml
 import SimpleITK as sitk
-from scipy.ndimage import binary_fill_holes
 
 PATH_TO_CONFIG = Path("./config/")
+logging.basicConfig(level=logging.INFO)
 
 def get_config():
     """Loads .yaml files specified in ./config/main.yaml.
@@ -49,6 +50,7 @@ def load_nifti(path_to_file):
 
     return {'data': data, 'meta_data': meta_data}
 
+
 def load_case(case_paths):
     """ Loads relevant data from a complete case consisting of the 
     data and the segmentation labels.
@@ -63,9 +65,14 @@ def load_case(case_paths):
     case_paths.sort(key=lambda x: len(str(x)))
 
     data = []
-    for path in case_paths:
-        loaded_case = load_nifti(path)
-        data.append(loaded_case['data'])
+
+    try:
+        for path in case_paths:
+            loaded_case = load_nifti(path)
+            data.append(loaded_case['data'])
+    except RuntimeError:
+        logging.warning(f'Skipped case {path}.')
+        return None
 
     # Cat data and labels to store efficiently
     loaded_case['data'] = np.stack(data)
