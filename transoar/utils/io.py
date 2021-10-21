@@ -65,7 +65,6 @@ def load_case(case_paths):
     case_paths.sort(key=lambda x: len(str(x)))
 
     data = []
-
     try:
         for path in case_paths:
             loaded_case = load_nifti(path)

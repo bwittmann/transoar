@@ -22,8 +22,9 @@ def show_images(images):
 
 if __name__ == "__main__":
     # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_GC/10000006_1/10000006_1_CT_wb.nii.gz')
-    PATH_TO_FILE = Path('/home/bastian/Downloads/Task10_Colon/Task10_Colon/labelsTr/colon_011.nii.gz')
+    # PATH_TO_FILE = Path('/home/bastian/Downloads/Task10_Colon/Task10_Colon/labelsTr/colon_011.nii.gz')
     # PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task000D3_Example/raw_splitted/labelsTr/case_7_0000.nii.gz')
+    PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task101_OrganDet/raw_splitted/imagesTr/case_000_0000.nii.gz')
     
 
     # Load data from nifti

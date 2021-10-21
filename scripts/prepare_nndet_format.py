@@ -91,8 +91,8 @@ if __name__ == "__main__":
     for target_dir in targe_dirs:
         os.makedirs(target_dir)
 
-    # train_set = train_set[:50]
-    # test_set = test_set[:10]
+    # train_set = train_set[:10]
+    # test_set = test_set[:5]
 
     logging.info('Preparing dataset to match nndet format.')
     for idx, case in enumerate(tqdm((train_set + test_set))):
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         except RuntimeError:
             continue
 
-        shutil.copy(data_path, target_dir_labels / ('case_' + f'{idx:03}' + '.nii.gz'))
+        shutil.copy(labels_path, target_dir_labels / ('case_' + f'{idx:03}' + '.nii.gz'))
         with open(target_dir_labels / ('case_' + f'{idx:03}' + '.json'), 'w') as outfile:
             json.dump(instances, outfile, indent=3)
         

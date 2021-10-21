@@ -30,7 +30,7 @@ class DataSetAnalyser:
             if loaded_case == None:
                 continue
 
-            self._shapes.append(loaded_case['data'].shape)
+            self._shapes.append(loaded_case['data'].shape[1:])
             self._spacings.append(loaded_case['meta_data']['spacing'])
 
             # Get voxels from foreground
