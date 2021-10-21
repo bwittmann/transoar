@@ -22,12 +22,14 @@ def show_images(images):
 
 if __name__ == "__main__":
     # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_GC/10000006_1/10000006_1_CT_wb.nii.gz')
-    # PATH_TO_FILE = Path('/home/bastian/Downloads/Task007_Pancreas/Task07_Pancreas/imagesTr/pancreas_004.nii.gz')
-    PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task000D3_Example/raw_splitted/labelsTr/case_7_0000.nii.gz')
+    PATH_TO_FILE = Path('/home/bastian/Downloads/Task10_Colon/Task10_Colon/labelsTr/colon_011.nii.gz')
+    # PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task000D3_Example/raw_splitted/labelsTr/case_7_0000.nii.gz')
+    
 
     # Load data from nifti
     data = load_nifti(PATH_TO_FILE)['data']
-    # print('Labels: ', np.unique(data))
+    print('Shape: ', data.shape)
+    print('Labels: ', np.unique(data))
 
     # March through volume in all three directions
     images = defaultdict(list)
@@ -45,4 +47,4 @@ if __name__ == "__main__":
     image_axis_1 = normalize(np.concatenate(images['axis_1'], axis=1))
     image_axis_2 = normalize(np.concatenate(images['axis_2'], axis=1))
 
-    show_images([image_axis_0, image_axis_1, image_axis_2])
+    # show_images([image_axis_0, image_axis_1, image_axis_2])

@@ -28,7 +28,7 @@ if __name__ == "__main__":
     PATH_TO_GC_DATASET = Path('/home/bastian/Datasets/CT_GC')   # GC dataset for test and val set
     PATH_TO_SC_DATASET = Path('/home/bastian/Datasets/CT_SC')   # SC dataset for train
 
-    PATH_TO_NEW_DATASET = Path('/home/bastian/Datasets/nndetection')
+    PATH_TO_NEW_DATASET = Path(os.environ['det_data'])
     NEW_NAME = 'Task101_OrganDet'
 
     DATASET_INFO = {
@@ -91,11 +91,10 @@ if __name__ == "__main__":
     for target_dir in targe_dirs:
         os.makedirs(target_dir)
 
-    train_set = train_set[:2]
-    test_set = test_set[:2]
+    # train_set = train_set[:50]
+    # test_set = test_set[:10]
 
-
-    logging.info('Preparing dataset.')
+    logging.info('Preparing dataset to match nndet format.')
     for idx, case in enumerate(tqdm((train_set + test_set))):
         case_paths = list(case.iterdir())
         case_paths.sort(key=lambda x: len(str(x)))
@@ -107,7 +106,6 @@ if __name__ == "__main__":
         else:
             target_dir_data = target_dir_ts_data
             target_dir_labels = target_dir_ts_labels
-
 
         # Copy labels and generate instances json
         try:
