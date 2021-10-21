@@ -40,8 +40,8 @@ if __name__ == "__main__":
     path_to_splits = Path(f"./data/{DATASET_NAME}_{MODALITY}")
 
     # Get paths to cases in GC and SC dataset
-    cases_sc = [path for path in Path(PATH_TO_SC_DATASET).iterdir()]
-    cases_gc = [path for path in Path(PATH_TO_GC_DATASET).iterdir()]
+    cases_sc = list(Path(PATH_TO_SC_DATASET).iterdir())
+    cases_gc = list(Path(PATH_TO_GC_DATASET).iterdir())
     random.shuffle(cases_gc)
 
     # Create test, val, and train split
