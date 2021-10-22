@@ -60,7 +60,6 @@ def write_nifti(data, meta_data, file_path):
 
     sitk.WriteImage(data_itk, str(file_path))
 
-
 def load_case(case_paths):
     """ Loads relevant data from a complete case consisting of the 
     data and the segmentation labels.
@@ -98,7 +97,3 @@ def load_case(case_paths):
     }
 
     return loaded_case
-
-
-if __name__ == "__main__":
-    pass  

@@ -14,3 +14,6 @@ __pycache__/
 
 # Setup
 *egg-info
+
+# Testing / debugging files
+tester.py

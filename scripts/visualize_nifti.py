@@ -22,7 +22,7 @@ def show_images(images):
 
 if __name__ == "__main__":
     # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_GC/10000106_1/10000106_1_CTce_ThAb.nii.gz')  # ce thorax
-    PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000004_1/10000004_1_CT_wb.nii.gz')  # wb
+    PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000028_1/10000028_1_CT_wb.nii.gz')  # wb
     # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000161_1/10000161_1_CTce_ThAb.nii.gz')
     # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000028_1/10000028_1_CT_wb.nii.gz')
     # PATH_TO_FILE = Path('/home/bastian/Downloads/Task10_Colon/Task10_Colon/labelsTr/colon_011.nii.gz')
