@@ -9,16 +9,27 @@ import random
 import shutil
 
 import numpy as np
+import SimpleITK as sitk
 from tqdm import tqdm
 
-from transoar.utils.io import load_nifti
+from transoar.utils.io import load_nifti, write_nifti
 
 
 def get_instances(labels_path):
-    labels = load_nifti(labels_path)['data']
+    loaded_labels = load_nifti(labels_path)
+    labels = loaded_labels['data']
+    label_meta_data = loaded_labels['meta_data']
+
     classes = np.unique(labels)[1:] - 1 # Because classes should start from 0
-    instances = {str(idx): int(class_) for idx, class_ in zip(range(1, len(classes) + 1), classes)}
-    return {'instances': instances}
+    instances = list(range(1, len(classes) + 1))
+
+    instances2classes = {str(idx): int(class_) for idx, class_ in zip(instances, classes)}
+
+    # Change annotation to represent instance rather than a specific class
+    for instance, class_ in instances2classes.items():
+        labels[labels == (class_ + 1)] = int(instance)
+
+    return {'instances': instances2classes}, labels, label_meta_data
 
 
 if __name__ == "__main__":
@@ -91,8 +102,8 @@ if __name__ == "__main__":
     for target_dir in targe_dirs:
         os.makedirs(target_dir)
 
-    # train_set = train_set[:10]
-    # test_set = test_set[:5]
+    # train_set = train_set[:5]
+    # test_set = test_set[:2]
 
     logging.info('Preparing dataset to match nndet format.')
     for idx, case in enumerate(tqdm((train_set + test_set))):
@@ -109,15 +120,16 @@ if __name__ == "__main__":
 
         # Copy labels and generate instances json
         try:
-            instances = get_instances(labels_path)
+            instances, labels, labels_meta_data = get_instances(labels_path)
         except RuntimeError:
             continue
 
-        shutil.copy(labels_path, target_dir_labels / ('case_' + f'{idx:03}' + '.nii.gz'))
+        # Write labels
+        write_nifti(labels, labels_meta_data, target_dir_labels / ('case_' + f'{idx:03}' + '.nii.gz'))
         with open(target_dir_labels / ('case_' + f'{idx:03}' + '.json'), 'w') as outfile:
             json.dump(instances, outfile, indent=3)
         
-        # Copy data
+        # Write data
         shutil.copy(data_path, target_dir_data / ('case_' + f'{idx:03}' + '_0000.nii.gz'))
 
     # Dump dataset info json

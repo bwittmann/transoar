@@ -21,16 +21,21 @@ def show_images(images):
 
 
 if __name__ == "__main__":
-    # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_GC/10000006_1/10000006_1_CT_wb.nii.gz')
+    # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_GC/10000106_1/10000106_1_CTce_ThAb.nii.gz')  # ce thorax
+    PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000004_1/10000004_1_CT_wb.nii.gz')  # wb
+    # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000161_1/10000161_1_CTce_ThAb.nii.gz')
+    # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000028_1/10000028_1_CT_wb.nii.gz')
     # PATH_TO_FILE = Path('/home/bastian/Downloads/Task10_Colon/Task10_Colon/labelsTr/colon_011.nii.gz')
     # PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task000D3_Example/raw_splitted/labelsTr/case_7_0000.nii.gz')
-    PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task101_OrganDet/raw_splitted/imagesTr/case_000_0000.nii.gz')
+    # PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task101_OrganDet/raw_splitted/labelsTr/case_000.nii.gz')
     
-
     # Load data from nifti
-    data = load_nifti(PATH_TO_FILE)['data']
+    loaded_nifit = load_nifti(PATH_TO_FILE)
+    data, meta_data = loaded_nifit['data'], loaded_nifit['meta_data']
+
     print('Shape: ', data.shape)
-    print('Labels: ', np.unique(data))
+    print('Spacing: ', meta_data['original_spacing'])
+    # print('Labels: ', np.unique(data))
 
     # March through volume in all three directions
     images = defaultdict(list)
@@ -48,4 +53,4 @@ if __name__ == "__main__":
     image_axis_1 = normalize(np.concatenate(images['axis_1'], axis=1))
     image_axis_2 = normalize(np.concatenate(images['axis_2'], axis=1))
 
-    # show_images([image_axis_0, image_axis_1, image_axis_2])
+    show_images([image_axis_0, image_axis_1, image_axis_2])

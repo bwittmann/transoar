@@ -43,12 +43,22 @@ def load_nifti(path_to_file):
     data = sitk.GetArrayFromImage(data_itk).astype(np.float32)
     
     meta_data = {
-        'origin': data_itk.GetOrigin(), # TODO: swaped dims?
-        'spacing': data_itk.GetSpacing(),
-        'direction': data_itk.GetDirection(),
+        'original_size_of_data': data.shape,
+        'original_spacing': np.array(data_itk.GetSpacing())[[2, 1, 0]],
+        'itk_origin': data_itk.GetOrigin(),
+        'itk_spacing': data_itk.GetSpacing(),
+        'itk_direction': data_itk.GetDirection(),
     }
 
     return {'data': data, 'meta_data': meta_data}
+
+def write_nifti(data, meta_data, file_path):
+    data_itk = sitk.GetImageFromArray(data)
+    data_itk.SetOrigin(meta_data['itk_origin'])
+    data_itk.SetSpacing(meta_data['itk_spacing'])
+    data_itk.SetDirection(meta_data['itk_direction'])
+
+    sitk.WriteImage(data_itk, str(file_path))
 
 
 def load_case(case_paths):
@@ -77,19 +87,14 @@ def load_case(case_paths):
     loaded_case['data'] = np.stack(data)
 
     # Add label -1 for voxels that do not store data
-    loaded_case['data'][1][(loaded_case['data'][1] == 0.) & (loaded_case['data'][0] == 0.)] = -1.
+    # loaded_case['data'][1][(loaded_case['data'][1] == 0.) & (loaded_case['data'][0] == 0.)] = -1.
 
     # Add additional information to meta data
-    loaded_case['meta_data']['classes'] = np.unique(loaded_case['data'][1])
+    loaded_case['meta_data']['classes'] = [int(class_) for class_ in np.unique(loaded_case['data'][1])][1:]
     num_classes = len(loaded_case['meta_data']['classes'])
 
-    if -1 in loaded_case['meta_data']['classes']:   # Remove -1, since it is not an instance
-        classes = loaded_case['meta_data']['classes'][2:]
-    else:
-        classes = loaded_case['meta_data']['classes'][1:]
-
     loaded_case['meta_data']['instances'] = {
-        str(key): int(value) for key, value in zip(range(1, num_classes+1), classes)
+        str(key): int(value) for key, value in zip(range(1, num_classes+1), loaded_case['meta_data']['classes'])
     }
 
     return loaded_case

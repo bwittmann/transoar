@@ -1,4 +1,4 @@
-"""Module to analyse properties of the dataset."""
+"""Module to analyze properties of the dataset."""
 
 import logging
 
@@ -10,8 +10,8 @@ from transoar.utils.io import load_case
 
 logging.basicConfig(level=logging.INFO)
 
-class DataSetAnalyser:
-    """Analyser to analyse properties of dataset."""
+class DataSetAnalyzer:
+    """Analyzer to analyze properties of dataset."""
 
     def __init__(self, paths_to_cases):
         self._paths_to_cases = paths_to_cases
@@ -22,8 +22,8 @@ class DataSetAnalyser:
         self._foreground_voxels = []
 
 
-    def analyse(self):
-        logging.info('Analyse dataset properties.')
+    def analyze(self):
+        logging.info('Analyze dataset properties.')
         # Loop over cases and determine properties
         for case in tqdm(self._paths_to_cases):
             loaded_case = load_case(list(case.iterdir()))
@@ -31,7 +31,7 @@ class DataSetAnalyser:
                 continue
 
             self._shapes.append(loaded_case['data'].shape[1:])
-            self._spacings.append(loaded_case['meta_data']['spacing'])
+            self._spacings.append(loaded_case['meta_data']['original_spacing'])
 
             # Get voxels from foreground
             voxels_foreground = self._get_foreground_voxels(loaded_case['data'])

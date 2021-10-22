@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from transoar.utils.io import load_case
 from transoar.preprocessing.processor import Preprocessor
-from transoar.preprocessing.analyser import DataSetAnalyser
+from transoar.preprocessing.analyzer import DataSetAnalyzer
 
 # TODO: Add multiprocessing
 
@@ -49,9 +49,9 @@ if __name__ == "__main__":
     val_set = cases_gc[int(len(cases_gc)/2):]
     train_set = cases_sc
 
-    # Analyse properties of dataset like spacing and intensity properties
-    analyser = DataSetAnalyser(paths_to_cases=train_set + val_set)
-    dataset_analysis = analyser.analyse()
+    # Analyze properties of dataset like spacing and intensity properties
+    analyzer = DataSetAnalyzer(paths_to_cases=train_set + val_set)
+    dataset_analyzis = analyzer.analyze()
 
 
 
