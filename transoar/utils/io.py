@@ -1,6 +1,8 @@
 """Helper functions for input/output."""
 
+import json
 import logging
+import pickle
 from pathlib import Path
 
 import numpy as np
@@ -43,10 +45,11 @@ def get_config(config_name):
     return config
 
 def load_nifti(path_to_file):
-    """Reads a .nii.gz file and extracts relevant informations.
+    """Reads a .nii.gz file and extracts relevant information.
     
     Returns:
-        A dict containing the data in form of a np.ndarray and the meta data."""
+        A dict containing the data in form of a np.ndarray and the meta data.
+    """
     data_itk = sitk.ReadImage(str(path_to_file))
 
     # Extract relevant information
@@ -109,5 +112,10 @@ def load_case(case_paths):
 
     return loaded_case
 
-def write_pkl():
-    pass
+def write_pkl(data, file_path):
+    with open(file_path, 'wb') as file:
+        pickle.dump(data, file)
+
+def write_json(data, file_path):
+    with open(file_path, 'w') as file:
+        json.dump(data, file, indent=3)
