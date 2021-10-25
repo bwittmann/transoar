@@ -108,3 +108,6 @@ def load_case(case_paths):
     }
 
     return loaded_case
+
+def write_pkl():
+    pass
