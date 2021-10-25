@@ -10,7 +10,7 @@ import SimpleITK as sitk
 PATH_TO_CONFIG = Path("./config/")
 logging.basicConfig(level=logging.INFO)
 
-def get_config():
+def get_complete_config():
     """Loads .yaml files specified in ./config/main.yaml.
 
     Returns:
@@ -20,16 +20,26 @@ def get_config():
     config = {}
 
     # Load includes
-    with open(PATH_TO_CONFIG / 'main.yaml', 'r') as stream:
-        main = yaml.safe_load(stream)
+    main = get_config('main')
 
     # Add includes
-    for config_file in main['include']:
-        with open(PATH_TO_CONFIG / config_file, 'r') as stream:
-            config_to_include = yaml.safe_load(stream)
+    for config_file in main:
+        config_to_include = get_config(config_file)
+        config[config_file] = config_to_include
 
-        config[config_file[:config_file.index('.')]] = config_to_include
+    return config
 
+def get_config(config_name):
+    """Loads a .yaml file from ./config corresponding to the name arg.
+
+    Args:
+        config_name: A string referring to the .yaml file to load.
+
+    Returns:
+        A container including the information of the referred .yaml file.
+    """
+    with open(PATH_TO_CONFIG / (config_name + '.yaml'), 'r') as stream:
+        config = yaml.safe_load(stream)
     return config
 
 def load_nifti(path_to_file):
@@ -92,6 +102,7 @@ def load_case(case_paths):
     loaded_case['meta_data']['classes'] = [int(class_) for class_ in np.unique(loaded_case['data'][1])][1:]
     num_classes = len(loaded_case['meta_data']['classes'])
 
+    # Maps the individual instances to the corresponding class
     loaded_case['meta_data']['instances'] = {
         str(key): int(value) for key, value in zip(range(1, num_classes+1), loaded_case['meta_data']['classes'])
     }

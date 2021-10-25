@@ -1,2 +1,4 @@
 # Main config file 
-include: [data.yaml, model.yaml]
+- data
+- model
+- training
