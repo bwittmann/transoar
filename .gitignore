@@ -1,5 +1,4 @@
 # Datasets
-data/
 *.nii.gz
 *.pkl
 *.npz
