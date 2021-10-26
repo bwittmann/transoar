@@ -1,56 +1,36 @@
 """Script to visualize data of the NIfTI format."""
 
 from pathlib import Path
-from collections import defaultdict
 
-import cv2
-import numpy as np
+from monai.transforms import (
+    EnsureChannelFirstd,
+    Compose,
+    LoadImaged,
+    Orientationd,
+    Spacingd
+)
 
-from transoar.utils.io import load_nifti
+from transoar.utils.visualization import visualize_voxel_grid
 
-def normalize(image):
-    norm_img = cv2.normalize(
-        image, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U
-    )
-    return norm_img
+NUMBER = '077'
+SET = 'SC'
+PATH_TO_DATA = Path(f'/home/bastian/Datasets/CT_{SET}/10000{NUMBER}_1/10000{NUMBER}_1_CT_wb.nii.gz')
+PATH_TO_SEG = Path(f'/home/bastian/Datasets/CT_{SET}/10000{NUMBER}_1/10000{NUMBER}_1_CT_wb_seg.nii.gz')
+# PATH_TO_DATA = Path(f'/home/bastian/Datasets/CT_{SET}/10000{NUMBER}_1/10000{NUMBER}_1_CTce_ThAb.nii.gz')
+# PATH_TO_SEG = Path(f'/home/bastian/Datasets/CT_{SET}/10000{NUMBER}_1/10000{NUMBER}_1_CTce_ThAb_seg.nii.gz')
 
-def show_images(images):
-    for image in images:
-        cv2.imshow('Raw NIfTI', image)
-        cv2.waitKey()
+data_dicts = {"image": PATH_TO_DATA, "label": PATH_TO_SEG}
 
+prep_transforms = Compose(
+    [
+        LoadImaged(keys=["image", "label"]),
+        EnsureChannelFirstd(keys=["image", "label"]),
+        Spacingd(keys=["image", "label"], pixdim=(
+            1, 1, 1), mode=("bilinear", "nearest")),
+        Orientationd(keys=["image", "label"], axcodes="RAS"),
+    ]
+)
 
-if __name__ == "__main__":
-    # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_GC/10000106_1/10000106_1_CTce_ThAb.nii.gz')  # ce thorax
-    PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000028_1/10000028_1_CT_wb.nii.gz')  # wb
-    # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000161_1/10000161_1_CTce_ThAb.nii.gz')
-    # PATH_TO_FILE = Path('/home/bastian/Datasets/CT_SC/10000028_1/10000028_1_CT_wb.nii.gz')
-    # PATH_TO_FILE = Path('/home/bastian/Downloads/Task10_Colon/Task10_Colon/labelsTr/colon_011.nii.gz')
-    # PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task000D3_Example/raw_splitted/labelsTr/case_7_0000.nii.gz')
-    # PATH_TO_FILE = Path('/home/bastian/Datasets/nndetection/Task101_OrganDet/raw_splitted/labelsTr/case_000.nii.gz')
-    
-    # Load data from nifti
-    loaded_nifit = load_nifti(PATH_TO_FILE)
-    data, meta_data = loaded_nifit['data'], loaded_nifit['meta_data']
-
-    print('Shape: ', data.shape)
-    print('Spacing: ', meta_data['original_spacing'])
-    # print('Labels: ', np.unique(data))
-
-    # March through volume in all three directions
-    images = defaultdict(list)
-
-    for layer in [int(x) for x in np.linspace(0, data.shape[0] - 1 , 5)]:
-        images['axis_0'].append(data[layer, :, :])
-
-    for layer in [int(x) for x in np.linspace(0, data.shape[1] - 1, 5)]:
-        images['axis_1'].append(data[:, layer, :])
-
-    for layer in [int(x) for x in np.linspace(0, data.shape[2] - 1, 5)]:
-        images['axis_2'].append(data[:, :, layer])
-
-    image_axis_0 = normalize(np.concatenate(images['axis_0'], axis=1))
-    image_axis_1 = normalize(np.concatenate(images['axis_1'], axis=1))
-    image_axis_2 = normalize(np.concatenate(images['axis_2'], axis=1))
-
-    show_images([image_axis_0, image_axis_1, image_axis_2])
+loaded_image = prep_transforms(data_dicts)
+print(loaded_image['image'].shape)
+visualize_voxel_grid(loaded_image['image'])
