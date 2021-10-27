@@ -1,6 +1,12 @@
 # Config file for data related params
 
-# Dataset
+# General
+dataset_name: transoar
+modality: CT
+path_to_gc_dataset: /home/bastian/Datasets/CT_GC
+path_to_sc_dataset: /home/bastian/Datasets/CT_SC
+
+# Dataset specific
 labels:
   1: liver
   2: spleen
@@ -25,5 +31,9 @@ labels:
 
 # Preprocessing
 normalization: 'foreground' # ['foreground', 'all']
-target_spacing: [4, 4, 4]
+target_spacing: null #[4, 4, 4] # if null: use estimated target spacing
 bbox_padding: 1
+
+anisotropy_threshold: 3
+resample_anisotropy_threshold: 3
+target_spacing_percentile: 50

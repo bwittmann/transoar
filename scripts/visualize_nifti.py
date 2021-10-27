@@ -7,12 +7,13 @@ from monai.transforms import (
     Compose,
     LoadImaged,
     Orientationd,
-    Spacingd
+    Spacingd,
+    CropForegroundd
 )
 
 from transoar.utils.visualization import visualize_voxel_grid
 
-NUMBER = '077'
+NUMBER = '009'
 SET = 'SC'
 PATH_TO_DATA = Path(f'/home/bastian/Datasets/CT_{SET}/10000{NUMBER}_1/10000{NUMBER}_1_CT_wb.nii.gz')
 PATH_TO_SEG = Path(f'/home/bastian/Datasets/CT_{SET}/10000{NUMBER}_1/10000{NUMBER}_1_CT_wb_seg.nii.gz')
@@ -25,9 +26,11 @@ prep_transforms = Compose(
     [
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
-        Spacingd(keys=["image", "label"], pixdim=(
-            1, 1, 1), mode=("bilinear", "nearest")),
+        # Spacingd(keys=["image", "label"], pixdim=(
+        #     1, 1, 1), mode=("bilinear", "nearest")),
         Orientationd(keys=["image", "label"], axcodes="RAS"),
+        CropForegroundd(keys=["image", "label"], source_key="image")
+
     ]
 )
 
