@@ -16,3 +16,4 @@ __pycache__/
 
 # Testing / debugging files
 tester.py
+./scripts/visualize_nifty.py

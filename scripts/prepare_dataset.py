@@ -5,8 +5,8 @@ from pathlib import Path
 import random
 
 from transoar.utils.io import get_config
-from transoar.preprocessing.processor import Preprocessor
-from transoar.preprocessing.analyzer import DataSetAnalyzer
+from transoar.data.processor import Preprocessor
+from transoar.data.analyzer import DataSetAnalyzer
 
 # TODO: Add multiprocessing
 
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     PATH_TO_GC_DATASET = Path(data_config['path_to_gc_dataset'])   # GC dataset for test and val set
     PATH_TO_SC_DATASET = Path(data_config['path_to_sc_dataset'])   # SC dataset for train
 
-    path_to_splits = Path(f"./data/{DATASET_NAME}_{MODALITY}")
+    path_to_splits = Path(f"./dataset/{DATASET_NAME}_{MODALITY}")
 
     # Get paths to cases in GC and SC dataset
     cases_sc = list(Path(PATH_TO_SC_DATASET).iterdir())
@@ -35,11 +35,11 @@ if __name__ == "__main__":
     train_set = cases_sc
 
     # Analyze properties of dataset like spacing and intensity properties
-    analyzer = DataSetAnalyzer(train_set[:2] + val_set[:2], data_config)
+    analyzer = DataSetAnalyzer(train_set + val_set, data_config)
     dataset_analysis = analyzer.analyze()
 
     # Prepare dataset based o dataset analysis
     preprocessor = Preprocessor(
-        train_set, val_set, test_set, data_config, path_to_splits, None #dataset_analysis
+        train_set, val_set, test_set, data_config, path_to_splits, dataset_analysis
     )
     preprocessor.prepare_sets()

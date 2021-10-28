@@ -30,10 +30,14 @@ labels:
   20: left_rectus_abdominis
 
 # Preprocessing
-normalization: 'foreground' # ['foreground', 'all']
-target_spacing: null #[4, 4, 4] # if null: use estimated target spacing
+foreground_normalization: False
+target_spacing: False #[False, [x, x, x]]; if False: use estimated target spacing
+
 bbox_padding: 1
 
+cropping: False
+key: label # [image, label]
+margin: 2
+
 anisotropy_threshold: 3
-resample_anisotropy_threshold: 3
 target_spacing_percentile: 50

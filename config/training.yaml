@@ -1,2 +1,2 @@
 # Config file for params related to training
-test: True
+batch_size: 4
