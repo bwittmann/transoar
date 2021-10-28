@@ -36,8 +36,10 @@ target_spacing: False #[False, [x, x, x]]; if False: use estimated target spacin
 bbox_padding: 1
 
 cropping: False
-key: label # [image, label]
+key: image # [image, label]
 margin: 2
+
+orientation: RAS
 
 anisotropy_threshold: 3
 target_spacing_percentile: 50

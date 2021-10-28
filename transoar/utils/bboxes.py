@@ -3,12 +3,11 @@
 import numpy as np
 
 
-def segmentation2bbox(loaded_case, padding):
+def segmentation2bbox(segmentation_map, padding):
     """Converts a segmentation map to a list of bounding boxes.
     
     Args:
-        loaded_case: A dict containing the data and meta data of a loaded case
-            To load a case please refer to transoar/utils/io.py.
+        segmentation_map: a np.ndarray representing the segmentation of the case.
         padding: An integer that allows to adust the padding of the bounding boxes.
 
     Returns:
@@ -16,9 +15,14 @@ def segmentation2bbox(loaded_case, padding):
         'bbox' refers to the (x1, y1, z1, x2, y2, z2) component and the key 'label' to the
         corresponding class.
     """
+    if segmentation_map.ndim > 3:
+        segmentation_map = segmentation_map.squeeze()
+
+    classes = [int(class_) for class_ in np.unique(segmentation_map)][1:]
+
     bboxes = []
-    for class_ in loaded_case['meta_data']['classes']:
-        class_indices = np.argwhere(loaded_case['data'][1] == class_)
+    for class_ in classes:
+        class_indices = np.argwhere(segmentation_map == class_)
 
         min_values = np.min(class_indices, axis=0)  # x, y, z
         max_values = np.max(class_indices, axis=0)
