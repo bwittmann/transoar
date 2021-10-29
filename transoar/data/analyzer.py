@@ -59,7 +59,7 @@ class DataSetAnalyzer:
         voxel_statistics = self._get_voxel_statistics()
 
         if self._data_config['target_spacing']:
-            target_spacing = self._data_config['target_spacing']
+            target_spacing = np.array(self._data_config['target_spacing'])
         else:
             target_spacing = self._get_target_spacing()
 

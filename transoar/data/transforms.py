@@ -56,3 +56,8 @@ class NormalizeClipd(MapTransform):
         data[key] = np.clip(data[key], self._clip_min, self._clip_max)
         data[key] = (data[key] - self._mean) / self._std
         return data
+
+
+def get_transforms(split):
+    if split == 'train':
+        pass

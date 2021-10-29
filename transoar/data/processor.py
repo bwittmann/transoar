@@ -7,7 +7,8 @@ import numpy as np
 
 from transoar.data.transforms import transform_preprocessing
 from transoar.utils.bboxes import segmentation2bbox
-from transoar.utils.io import write_pkl
+from transoar.utils.io import write_pkl, write_nifti
+from transoar.utils.visualization import visualize_voxel_grid
 
 
 logging.basicConfig(level=logging.INFO)
@@ -22,9 +23,12 @@ class Preprocessor:
         self._data_config = data_config
         self._path_to_splits = path_to_splits
         self._analysis = analysis
+
         self._preprocessing_transform = transform_preprocessing(
             margin=data_config['margin'], crop_key=data_config['key'], orientation=data_config['orientation'],
-            target_spacing=(1, 1, 1), clip_min=-1000, clip_max=1000, std=200, mean=0   #TODO
+            target_spacing=analysis['target_spacing'][[2, 1, 0]], clip_min=analysis['statistics']['percentile_00_5'],
+            clip_max=analysis['statistics']['percentile_99_5'], std=analysis['statistics']['std'],
+            mean=analysis['statistics']['mean'],
         )
 
         self._splits = {
@@ -47,13 +51,17 @@ class Preprocessor:
 
                 preprocessed_case = self._preprocessing_transform(case_dict)
                 image, label = preprocessed_case['image'], preprocessed_case['label']
-                bboxes = segmentation2bbox(label, self._data_config['bbox_padding'])
+                # bboxes = segmentation2bbox(label, self._data_config['bbox_padding'])
+
+                # visualize_voxel_grid(image)
+                # visualize_voxel_grid(label)
                 
                 logging.info(f'Successfull prepared case {case.name} of shape {image.shape}.')
-                
+
                 path_to_case = self._path_to_splits / split_name / case.name
                 os.makedirs(path_to_case)
-                np.savez_compressed(
-                    str(path_to_case / 'data.npz'), image=image, label=label,
-                )
-                write_pkl(bboxes, path_to_case / 'bboxes.pkl')
+                # write_nifti(image.squeeze(), {'itk_spacing': [1, 1, 1]}, str(path_to_case / 'data.nii.gz'))
+                # write_nifti(label.squeeze(), {'itk_spacing': [1, 1, 1]}, str(path_to_case / 'label.nii.gz'))
+                np.save(str(path_to_case / 'data.npy'), image.astype(np.float32))
+                np.save(str(path_to_case / 'label.npy'), label.astype(np.int32))
+                # write_pkl(bboxes, path_to_case / 'bboxes.pkl')
