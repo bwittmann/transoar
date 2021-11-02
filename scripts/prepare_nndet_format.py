@@ -102,8 +102,10 @@ if __name__ == "__main__":
     for target_dir in targe_dirs:
         os.makedirs(target_dir)
 
-    # train_set = train_set[:5]
-    # test_set = test_set[:2]
+    # random.shuffle(train_set)
+    # random.shuffle(test_set)
+    # train_set = train_set[:20]
+    # test_set = test_set[:5]
 
     logging.info('Preparing dataset to match nndet format.')
     for idx, case in enumerate(tqdm((train_set + test_set))):

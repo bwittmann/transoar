@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import numpy as np
-import torch
 from torch.utils.data import Dataset
 
 from transoar.data.transforms import get_transforms
@@ -19,7 +18,7 @@ class TransoarDataset(Dataset):
         self._path_to_split = data_dir / (self._data_config['dataset_name'] + '_' + self._data_config['modality']) / split
         self._data = [data_path.name for data_path in self._path_to_split.iterdir()]
 
-        self._augmentation = get_transforms(split)
+        self._augmentation = get_transforms(split, data_config)
 
     def __len__(self):
         return len(self._data)
@@ -34,11 +33,11 @@ class TransoarDataset(Dataset):
 
         if self._data_config['use_augmentation']:
             data_dict = {
-                'image': data,
-                'label': label
+                'image': data[None],
+                'label': label[None]
             }
 
-        # Create bboxes
+            data_transformed = self._augmentation(**data_dict)
+            data, label = data_transformed['image'], data_transformed['label']
 
-
-        k = 12
+        return data.squeeze(0), label.squeeze(0)

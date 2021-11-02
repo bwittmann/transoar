@@ -30,9 +30,9 @@ if __name__ == "__main__":
     random.shuffle(cases_gc)
 
     # Create test, val, and train split
-    test_set = cases_gc[:int(len(cases_gc)/2)]
-    val_set = cases_gc[int(len(cases_gc)/2):]
-    train_set = cases_sc
+    test_set = cases_gc[:int(len(cases_gc)/2)][:10]
+    val_set = cases_gc[int(len(cases_gc)/2):][:10]
+    train_set = cases_sc[:10]
 
     # Analyze properties of dataset like spacing and intensity properties
     analyzer = DataSetAnalyzer(train_set + val_set, data_config)

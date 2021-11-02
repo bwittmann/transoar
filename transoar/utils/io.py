@@ -67,9 +67,9 @@ def load_nifti(path_to_file):
 
 def write_nifti(data, meta_data, file_path):
     data_itk = sitk.GetImageFromArray(data)
-    data_itk.SetOrigin(meta_data['itk_origin'])
+    # data_itk.SetOrigin(meta_data['itk_origin'])
     data_itk.SetSpacing(meta_data['itk_spacing'])
-    data_itk.SetDirection(meta_data['itk_direction'])
+    # data_itk.SetDirection(meta_data['itk_direction'])
 
     sitk.WriteImage(data_itk, str(file_path))
 
