@@ -1,15 +1,37 @@
 """Module containing dataloader related functionality."""
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from transoar.data.dataset import TransoarDataset
 
-def get_train_loader(data_config):
-    data_set = TransoarDataset(data_config, 'train')
 
-def get_val_loader(data_config):
-    data_set = TransoarDataset(data_config, 'val')
+def get_loader(data_config, split):
+    dataset = TransoarDataset(data_config, split)
+    dataloader = DataLoader(
+        dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+        num_workers=data_config['num_workers'], collate_fn=pad_collate
+    )
+    return dataloader
 
-def get_test_loader(data_config):
-    data_set = TransoarDataset(data_config, 'test')
+def pad_collate(batch):
+    with torch.no_grad():
+    # Estimate max shape for padding
+        shapes = []
+        for image, _ in batch:
+            shapes.append(image.shape)
+
+        max_shape = torch.max(torch.tensor(shapes), axis=0)[0]
+        
+        batch_images = []
+        batch_labels = []
+        batch_masks = []
+        for image, label in batch:
+            to_pad = max_shape - torch.tensor(image.shape)
+            padding = [0, to_pad[-1], 0, to_pad[-2], 0, to_pad[-3]]
+            batch_images.append(F.pad(image, padding, 'constant', 0))
+            batch_labels.append(F.pad(label, padding, 'constant', 0))
+            batch_masks.append(F.pad(torch.zeros_like(image), padding, 'constant', -1))
+
+    return torch.stack(batch_images), torch.stack(batch_labels), torch.stack(batch_masks)
