@@ -1,48 +1,37 @@
 """Helper functions for handling bounding boxes."""
 
+import torch
 import numpy as np
 
 
-def segmentation2bbox(segmentation_map, padding):
-    """Converts a segmentation map to a list of bounding boxes.
-    
-    Args:
-        segmentation_map: a np.ndarray representing the segmentation of the case.
-        padding: An integer that allows to adust the padding of the bounding boxes.
+def segmentation2bbox(segmentation_maps, padding):
+    batch_bboxes = []
+    batch_classes = []
+    for map_ in segmentation_maps:
+        assert map_.ndim == 4
 
-    Returns:
-        A list of dicts. Each dict describes a specific bounding box, where the key
-        'bbox' refers to the (x1, y1, z1, x2, y2, z2) component and the key 'label' to the
-        corresponding class.
-    """
-    if segmentation_map.ndim > 3:
-        segmentation_map = segmentation_map.squeeze()
+        bboxes = []
+        classes = [int(class_) for class_ in map_.unique(sorted=True)][1:]
+        batch_classes.append(classes)
 
-    classes = [int(class_) for class_ in np.unique(segmentation_map)][1:]
+        for class_ in classes:
+            class_indices = (map_ == class_).nonzero(as_tuple=False)
 
-    bboxes = []
-    for class_ in classes:
-        class_indices = np.argwhere(segmentation_map == class_)
+            min_values = class_indices.min(dim=0)[0][1:]    # x, y, z
+            max_values = class_indices.max(dim=0)[0][1:]
 
-        min_values = np.min(class_indices, axis=0)  # x, y, z
-        max_values = np.max(class_indices, axis=0)
+            # Apply padding to bounding boxes
+            min_values -= padding
+            max_values += padding
 
-        # Apply padding to bounding boxes
-        min_values -= padding
-        max_values += padding
+            assert min_values[0] < max_values[0]
+            assert min_values[1] < max_values[1]
+            assert min_values[2] < max_values[2]
 
-        assert min_values[0] < max_values[0]
-        assert min_values[1] < max_values[1]
-        assert min_values[2] < max_values[2]
+            bboxes.append(torch.hstack((min_values, max_values)))   # x1, y1, z1, x2, y2, z2
+        batch_bboxes.append(torch.vstack(bboxes))
 
-        bbox = {
-            'bbox': np.hstack((min_values, max_values)),
-            'label': class_
-        }
-
-        bboxes.append(bbox)
-
-    return bboxes
+    return batch_bboxes, batch_classes
 
 def iou_3d(bboxes1, bboxes2):
     """Determines the intersection over union (IoU) for two sets of

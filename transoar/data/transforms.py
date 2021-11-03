@@ -83,7 +83,7 @@ def get_transforms(split, data_config):
                     do_rotation=True, angle_x=rotate_range, angle_y=rotate_range,
                     angle_z=rotate_range, do_scale=True, scale=data_config['scale_range'],
                     order_data=3, border_mode_data='constant', border_cval_data=0, order_seg=0,
-                    border_mode_seg='constant', border_cval_seg=-1, random_crop=False,
+                    border_mode_seg='constant', border_cval_seg=0, random_crop=False,
                     p_scale_per_sample=data_config['p_scale'], p_rot_per_sample=data_config['p_rotation'],
                     independent_scale_for_each_axis=False, data_key='image', label_key='label'
                 ),
