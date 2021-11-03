@@ -54,3 +54,51 @@ def visualize_voxel_grid(data):
     image_axis_2 = normalize(np.concatenate(images['axis_2'], axis=1))
 
     show_images([image_axis_0, image_axis_1, image_axis_2])
+
+def visualize_bboxes(labels, data=None, seg_map=None, standalone=True, value=None):
+    # Generate volume to add bboxes
+    if standalone:
+        if data is not None:
+            bboxes_volume = np.zeros_like(data).squeeze()
+        elif seg_map is not None:
+            bboxes_volume = np.zeros_like(seg_map).squeeze()
+        else:
+            raise RuntimeError('Please input either the data or the seg_map.')
+    elif data is not None:
+        bboxes_volume = data.numpy().squeeze()
+    elif seg_map is not None:
+        bboxes_volume = seg_map.numpy().squeeze()
+
+    bboxes = labels[0].split(1)
+    classes = labels[1]
+    for bbox, class_ in zip(bboxes, classes):
+        x1, y1, z1, x2, y2, z2 = bbox[0].tolist()
+
+        if value:
+            bbox_val = value
+        else:
+            bbox_val = class_
+
+        for y, z in [(y1, z1), (y1, z2), (y2, z1), (y2, z2)]:
+            for x_val in range(x1, x2 + 1):
+                bboxes_volume[x_val, y, z] = bbox_val
+
+        for x, z in [(x1, z1), (x1, z2), (x2, z1), (x2, z2)]:
+            for y_val in range(y1, y2 + 1):
+                bboxes_volume[x, y_val, z] = bbox_val
+
+        for x, y in [(x1, y1), (x1, y2), (x2, y1), (x2, y2)]:
+            for z_val in range(z1, z2 + 1):
+                bboxes_volume[x, y, z_val] = bbox_val
+
+    return bboxes_volume
+        
+
+            
+
+
+
+        
+    
+    
+
