@@ -55,7 +55,23 @@ def visualize_voxel_grid(data):
 
     show_images([image_axis_0, image_axis_1, image_axis_2])
 
-def visualize_bboxes(labels, data=None, seg_map=None, standalone=True, value=None):
+def convert_bboxes(labels, data=None, seg_map=None, standalone=True, value=None):
+    """Converts bounding boxes to a 3D volume.
+
+    This makes it possible to visualize bboxes of the format x1, y1, z1, x2, y2, z2
+    with a tool like ITK-SNAP.
+    
+    Args:
+        labels: A tuple consisting of a torch.tensor of the shape [N, 6] representing bboxes
+            and a list of length N representing the respective classes.
+        data: A torch.tensor representing the the image data.
+        seg_map: A torch.tensor representing the segmentation labels.
+        standalone: If True, add bounding boxes to a np.ndarray full of zeros.
+        value: If not None, the bboxes will have this value in the array.
+
+    Returns:
+        A np.ndarray containing the bboxes in a visualizable format.
+    """
     # Generate volume to add bboxes
     if standalone:
         if data is not None:
