@@ -37,13 +37,14 @@ cropping: True
 key: image # [image, label]
 margin: 2
 orientation: RAS
+min_num_organs: 12
 anisotropy_threshold: 3
 target_spacing_percentile: 50
 
 # Augmentation
 use_augmentation: True
 p_rotation: 0.2
-rotation: [-30, -30]
+rotation: [-30, 30]
 p_scale: 0.2
 scale_range: [0.7, 1.4]
 p_gamma: 0.3

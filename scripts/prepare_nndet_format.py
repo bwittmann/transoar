@@ -33,17 +33,17 @@ def get_instances(labels_path):
 
 
 if __name__ == "__main__":
-    random.seed(5)  # Set arbitrary seed to make experiments reproducible
+    random.seed(10)  # Set arbitrary seed to make experiments reproducible
     logging.basicConfig(level=logging.INFO)
 
-    PATH_TO_GC_DATASET = Path('/home/bastian/Datasets/CT_GC')   # GC dataset for test and val set
-    PATH_TO_SC_DATASET = Path('/home/bastian/Datasets/CT_SC')   # SC dataset for train
+    path_to_gc_dataset = Path('/home/bastian/Datasets/CT_GC')   # GC dataset for test and val set
+    path_to_sc_dataset = Path('/home/bastian/Datasets/CT_SC')   # SC dataset for train
 
-    PATH_TO_NEW_DATASET = Path(os.environ['det_data'])
-    NEW_NAME = 'Task101_OrganDet'
+    path_to_new_dataset = Path(os.environ['det_data'])
+    new_name = 'Task101_OrganDet'
 
-    DATASET_INFO = {
-        "task": NEW_NAME,
+    dataset_info = {
+        "task": new_name,
 
         "name": "OrganDet",
         "dim": 3,
@@ -80,8 +80,8 @@ if __name__ == "__main__":
     }
 
     # Get paths to cases in GC and SC dataset
-    cases_sc = list(Path(PATH_TO_SC_DATASET).iterdir())
-    cases_gc = list(Path(PATH_TO_GC_DATASET).iterdir())
+    cases_sc = list(Path(path_to_sc_dataset).iterdir())
+    cases_gc = list(Path(path_to_gc_dataset).iterdir())
     random.shuffle(cases_gc)
 
     # Create test, val, and train split
@@ -93,17 +93,17 @@ if __name__ == "__main__":
     train_set += val_set
 
     # Create target dirs
-    target_dir_tr_data = PATH_TO_NEW_DATASET / NEW_NAME / 'raw_splitted' / 'imagesTr'
-    target_dir_tr_labels = PATH_TO_NEW_DATASET / NEW_NAME / 'raw_splitted' / 'labelsTr'
-    target_dir_ts_data = PATH_TO_NEW_DATASET / NEW_NAME / 'raw_splitted' / 'imagesTs'
-    target_dir_ts_labels = PATH_TO_NEW_DATASET / NEW_NAME / 'raw_splitted' / 'labelsTs'
+    target_dir_tr_data = path_to_new_dataset / new_name / 'raw_splitted' / 'imagesTr'
+    target_dir_tr_labels = path_to_new_dataset / new_name / 'raw_splitted' / 'labelsTr'
+    target_dir_ts_data = path_to_new_dataset / new_name / 'raw_splitted' / 'imagesTs'
+    target_dir_ts_labels = path_to_new_dataset / new_name / 'raw_splitted' / 'labelsTs'
 
     targe_dirs = [target_dir_tr_data, target_dir_tr_labels, target_dir_ts_data, target_dir_ts_labels]
     for target_dir in targe_dirs:
         os.makedirs(target_dir)
 
-    # random.shuffle(train_set)
-    # random.shuffle(test_set)
+    random.shuffle(train_set)
+    random.shuffle(test_set)
     # train_set = train_set[:20]
     # test_set = test_set[:5]
 
@@ -135,5 +135,5 @@ if __name__ == "__main__":
         shutil.copy(data_path, target_dir_data / ('case_' + f'{idx:03}' + '_0000.nii.gz'))
 
     # Dump dataset info json
-    with open(PATH_TO_NEW_DATASET / NEW_NAME / 'dataset.json', 'w') as outfile:
-        json.dump(DATASET_INFO, outfile, indent=3)
+    with open(path_to_new_dataset / new_name / 'dataset.json', 'w') as outfile:
+        json.dump(dataset_info, outfile, indent=3)

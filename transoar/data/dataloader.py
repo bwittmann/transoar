@@ -40,4 +40,4 @@ def pad_collate(batch):
     # Generate bboxes and corresponding class labels
     batch_bboxes, batch_classes = segmentation2bbox(torch.stack(batch_labels), data_config['bbox_padding'])
 
-    return torch.stack(batch_images), torch.stack(batch_masks), zip(batch_bboxes, batch_classes)
+    return torch.stack(batch_images), torch.stack(batch_masks), list(zip(batch_bboxes, batch_classes)), torch.stack(batch_labels)

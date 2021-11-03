@@ -9,7 +9,7 @@ from transoar.data.transforms import get_transforms
 
 
 class TransoarDataset(Dataset):
-
+    """Dataset class of the transoar project."""
     def __init__(self, data_config, split):
         assert split in ['train', 'val', 'test']
         self._data_config = data_config
@@ -37,6 +37,7 @@ class TransoarDataset(Dataset):
                 'label': label[None]
             }
 
+            # Apply data augmentation
             data_transformed = self._augmentation(**data_dict)
             data, label = data_transformed['image'], data_transformed['label']
 

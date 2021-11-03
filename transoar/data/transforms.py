@@ -51,6 +51,10 @@ def transform_preprocessing(
     margin, crop_key, orientation, target_spacing, clip_min, 
     clip_max, std, mean
 ):
+    def crop_air(x):
+        # To not crop fat which is -120 to -90
+        return x > -500
+
     transform = Compose(
         [
             LoadImaged(keys=["image", "label"]),
@@ -60,13 +64,13 @@ def transform_preprocessing(
                  mode=("bilinear", "nearest")
             ),
             Orientationd(keys=["image", "label"], axcodes=orientation),
+            CropForegroundd(
+                keys=["image", "label"], source_key=crop_key, 
+                margin=margin, select_fn=crop_air
+            ),
             NormalizeClipd(
                 keys=['image'], clip_min=clip_min, clip_max=clip_max, 
                 std=std, mean=mean
-            ),
-            CropForegroundd(
-                keys=["image", "label"], source_key=crop_key, 
-                margin=margin
             )
         ]
     )
@@ -78,15 +82,6 @@ def get_transforms(split, data_config):
         rotate_range = [i / 180 * np.pi for i in data_config['rotation']]
         transform = BGCompose(
             [
-                SpatialTransform(
-                    None, patch_center_dist_from_border=None, do_elastic_deform=False,
-                    do_rotation=True, angle_x=rotate_range, angle_y=rotate_range,
-                    angle_z=rotate_range, do_scale=True, scale=data_config['scale_range'],
-                    order_data=3, border_mode_data='constant', border_cval_data=0, order_seg=0,
-                    border_mode_seg='constant', border_cval_seg=0, random_crop=False,
-                    p_scale_per_sample=data_config['p_scale'], p_rot_per_sample=data_config['p_rotation'],
-                    independent_scale_for_each_axis=False, data_key='image', label_key='label'
-                ),
                 GaussianNoiseTransform(p_per_sample=0.1, data_key='image'),
                 GaussianBlurTransform(
                     (0.5, 1.), different_sigma_per_channel=True, p_per_sample=0.2,
@@ -103,6 +98,15 @@ def get_transforms(split, data_config):
                 GammaTransform(
                     data_config['gamma_range'], False, True, retain_stats=True, 
                     p_per_sample=data_config['p_gamma'], data_key='image'
+                ),
+                SpatialTransform(
+                    None, patch_center_dist_from_border=None, do_elastic_deform=False,
+                    do_rotation=True, angle_x=rotate_range, angle_y=rotate_range,
+                    angle_z=rotate_range, do_scale=True, scale=data_config['scale_range'],
+                    order_data=3, border_mode_data='constant', border_cval_data=0, order_seg=0,
+                    border_mode_seg='constant', border_cval_seg=0, random_crop=False,
+                    p_scale_per_sample=data_config['p_scale'], p_rot_per_sample=data_config['p_rotation'],
+                    independent_scale_for_each_axis=False, data_key='image', label_key='label'
                 ),
                 MirrorTransform(data_config['mirror_axes'], data_key='image', label_key='label'),
                 NumpyToTensor(['image', 'label'], 'float')

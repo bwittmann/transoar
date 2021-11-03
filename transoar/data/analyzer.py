@@ -13,7 +13,6 @@ logging.basicConfig(level=logging.INFO)
 
 class DataSetAnalyzer:
     """Analyzer to analyze properties of dataset."""
-
     def __init__(self, paths_to_cases, data_config):
         self._paths_to_cases = paths_to_cases
         self._data_config = data_config

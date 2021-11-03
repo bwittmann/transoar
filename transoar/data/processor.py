@@ -6,16 +6,12 @@ import os
 import numpy as np
 
 from transoar.data.transforms import transform_preprocessing
-from transoar.utils.bboxes import segmentation2bbox
-from transoar.utils.io import write_pkl, write_nifti
-from transoar.utils.visualization import visualize_voxel_grid
 
 
 logging.basicConfig(level=logging.INFO)
 
 class Preprocessor:
     """Preprocessor to pre-process raw data samples."""
-
     def __init__(
         self, paths_to_train, paths_to_val, paths_to_test, data_config, 
         path_to_splits, analysis
@@ -37,8 +33,9 @@ class Preprocessor:
             'test': paths_to_test
         }
 
-
     def prepare_sets(self):
+        min_num_organs = self._data_config['min_num_organs']
+
         for split_name, split_paths in self._splits.items():
             logging.info(f'Preparing {split_name} set.')
             for case in (split_paths):
@@ -52,14 +49,14 @@ class Preprocessor:
                 preprocessed_case = self._preprocessing_transform(case_dict)
                 image, label = preprocessed_case['image'], preprocessed_case['label']
 
-                # visualize_voxel_grid(image)
-                # visualize_voxel_grid(label)
-                
+                # Skip cases with a small amount of labels
+                if np.unique(label).size < min_num_organs:
+                    logging.info(f'Skipped case {case.name} with less than {min_num_organs} organs.')
+                    continue
+
                 logging.info(f'Successfull prepared case {case.name} of shape {image.shape}.')
 
                 path_to_case = self._path_to_splits / split_name / case.name
                 os.makedirs(path_to_case)
-                # write_nifti(label.squeeze(), {'itk_spacing': [1, 1, 1]}, '/home/bastian/Downloads/label.nii.gz')
-                # write_nifti(image.squeeze(), {'itk_spacing': [1, 1, 1]}, '/home/bastian/Downloads/image.nii.gz')
                 np.save(str(path_to_case / 'data.npy'), image.astype(np.float32))
                 np.save(str(path_to_case / 'label.npy'), label.astype(np.int32))
