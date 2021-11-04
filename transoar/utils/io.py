@@ -128,7 +128,7 @@ def load_json(file_path):
 def set_root_logger(file_path):
     logging.basicConfig(
         level=logging.DEBUG,
-        format="%(asctime)s : %(levelname)s [%(module)s] %(message)s",
+        format="%(asctime)s : %(levelname)s [%(module)s, %(lineno)d] %(message)s",
         handlers=[
             logging.FileHandler(file_path, 'w'),
             logging.StreamHandler(sys.stdout)

@@ -26,7 +26,6 @@ class DataSetAnalyzer:
         )
 
     def analyze(self):
-        logging.info('Analyze dataset properties.')
         # Loop over cases and determine properties
         for case in tqdm(self._paths_to_cases):
             loaded_case = load_case(list(case.iterdir()))
@@ -66,7 +65,6 @@ class DataSetAnalyzer:
             'spacing': self._spacings,
             'target_spacing': target_spacing
         }
-
         return ret_dict
 
     def _get_target_spacing(self):
