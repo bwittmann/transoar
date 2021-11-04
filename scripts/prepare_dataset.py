@@ -1,10 +1,12 @@
 """Script to prepare dataset."""
 
 import logging
+import sys
+
 from pathlib import Path
 import random
 
-from transoar.utils.io import get_config
+from transoar.utils.io import get_config, set_root_logger
 from transoar.data.processor import Preprocessor
 from transoar.data.analyzer import DataSetAnalyzer
 
@@ -12,8 +14,11 @@ from transoar.data.analyzer import DataSetAnalyzer
 
 if __name__ == "__main__":
     random.seed(10)  # Set arbitrary seed to make experiments reproducible
-    logging.basicConfig(level=logging.INFO)
-
+    
+    # Set config of root logger
+    set_root_logger('./logs/prepare_dataset.log')
+    logging.info('Started preparing dataset.')
+    
     # Load data config
     data_config = get_config('data')
 

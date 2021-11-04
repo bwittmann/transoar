@@ -4,13 +4,13 @@ import json
 import logging
 import pickle
 from pathlib import Path
+import sys
 
 import numpy as np
 import yaml
 import SimpleITK as sitk
 
 PATH_TO_CONFIG = Path("./config/")
-logging.basicConfig(level=logging.INFO)
 
 def get_complete_config():
     """Loads .yaml files specified in ./config/main.yaml.
@@ -124,3 +124,13 @@ def load_json(file_path):
     with open(file_path) as json_file:
         data = json.load(json_file)
     return data
+
+def set_root_logger(file_path):
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s : %(levelname)s [%(module)s] %(message)s",
+        handlers=[
+            logging.FileHandler(file_path, 'w'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )

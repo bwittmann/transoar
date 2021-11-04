@@ -9,8 +9,6 @@ from transoar.data.transforms import transform_crop
 from transoar.utils.io import load_case
 
 
-logging.basicConfig(level=logging.INFO)
-
 class DataSetAnalyzer:
     """Analyzer to analyze properties of dataset."""
     def __init__(self, paths_to_cases, data_config):

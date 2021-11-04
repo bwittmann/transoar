@@ -8,8 +8,6 @@ import numpy as np
 from transoar.data.transforms import transform_preprocessing
 
 
-logging.basicConfig(level=logging.INFO)
-
 class Preprocessor:
     """Preprocessor to pre-process raw data samples."""
     def __init__(
