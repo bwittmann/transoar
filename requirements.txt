@@ -1,3 +1,13 @@
 torch==1.7.1+cu101
 torchvision==0.8.2+cu101
-monai
+tqdm==4.62.3
+monai==0.7.0
+batchgenerators==0.23
+pyyaml==6.0
+SimpleITK==2.1.1
+nibabel==3.2.1
+
+# swin
+timm==0.4.12
+einops==0.3.2
+
