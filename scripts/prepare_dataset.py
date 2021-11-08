@@ -1,7 +1,6 @@
 """Script to prepare dataset."""
 
 import logging
-import sys
 
 from pathlib import Path
 import random
@@ -36,9 +35,9 @@ if __name__ == "__main__":
     random.shuffle(cases_sc)
 
     # Create test, val, and train split
-    test_set = cases_gc[:int(len(cases_gc)/2)][:10]
-    val_set = cases_gc[int(len(cases_gc)/2):][:10]
-    train_set = cases_sc[:30]
+    test_set = cases_gc[:int(len(cases_gc)/2)][:5]
+    val_set = cases_gc[int(len(cases_gc)/2):][:5]
+    train_set = cases_sc[:20]
 
     logging.info(f'Preparing dataset {dataset_name}_{modality}.')
     logging.info(f'len train: {len(train_set)}, len val: {len(val_set)}, len test: {len(test_set)}.')

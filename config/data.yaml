@@ -3,8 +3,8 @@
 # General
 dataset_name: transoar
 modality: CT
-path_to_gc_dataset: /home/bastian/Datasets/CT_GC
-path_to_sc_dataset: /home/bastian/Datasets/CT_SC
+path_to_gc_dataset: /home/bastian/datasets/CT_GC
+path_to_sc_dataset: /home/bastian/datasets/CT_SC
 
 # Dataset specific
 labels:

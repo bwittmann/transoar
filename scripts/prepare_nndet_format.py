@@ -4,12 +4,10 @@ import json
 import logging
 import os
 from pathlib import Path
-import pickle
 import random
 import shutil
 
 import numpy as np
-import SimpleITK as sitk
 from tqdm import tqdm
 
 from transoar.utils.io import load_nifti, write_nifti
