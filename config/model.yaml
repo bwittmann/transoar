@@ -1,2 +1,16 @@
 # Config file for model related params
-test: True
+
+# Backbones
+swin_tiny:
+  patch_size: [4,4,4]
+  embed_dim: 96
+  depths: [2, 2, 6, 2]
+  num_heads: [3, 6, 12, 24]
+  window_size: (8,7,7)
+  mlp_ratio: 4.
+  qkv_bias: True
+  qk_scale: null
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.2
+  patch_norm: True
