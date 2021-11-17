@@ -1,4 +1,4 @@
-# Config file for model related params
+# Config file for parameters corresponding to exchangable parts of the model
 
 # Backbones
 swin_tiny:

@@ -26,8 +26,18 @@ def get_complete_config():
 
     # Add includes
     for config_file in main:
-        config_to_include = get_config(config_file)
-        config[config_file] = config_to_include
+        if config_file != 'model_main':
+            config_to_include = get_config(config_file)
+        else:
+            models_to_select = get_config(config_file)
+            complete_model_config = get_config('models')
+
+            config_to_include = {
+                'backbone': complete_model_config[models_to_select['backbone']],
+                'neck': complete_model_config[models_to_select['neck']]
+            }
+
+        config[config_file.split('_')[0]] = config_to_include
 
     return config
 

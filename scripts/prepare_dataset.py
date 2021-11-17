@@ -19,7 +19,7 @@ if __name__ == "__main__":
     logging.info('Started preparing dataset.')
     
     # Load data config
-    data_config = get_config('data')
+    data_config = get_config('data_main')
 
     dataset_name = data_config['dataset_name']
     modality = data_config['modality']

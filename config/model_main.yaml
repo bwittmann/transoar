@@ -1,0 +1,4 @@
+# Config file to select parts like the backbone for the model
+
+backbone: swin_tiny
+neck: swin_tiny

@@ -8,7 +8,7 @@ from transoar.data.dataset import TransoarDataset
 from transoar.utils.io import get_config
 from transoar.utils.bboxes import segmentation2bbox
 
-data_config = get_config('data')
+data_config = get_config('data_main')
 
 def get_loader(data_config, split):
     dataset = TransoarDataset(data_config, split)
