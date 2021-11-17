@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_complete_config
-from transoar.models.main_net import TransoarNet
+from transoar.models.transoarnet import TransoarNet
 
 
 def train(config):
