@@ -11,9 +11,11 @@ from transoar.models.transoarnet import TransoarNet
 
 def train(config):
     loader = get_loader(config['data'], 'train')
-    model = TransoarNet(config['model']['swin_tiny'])
-
+    model = TransoarNet(config['model']).to(device=config['training']['device'])
+    
     for data, mask, bboxes, seg_labels in tqdm(loader):
+        data = data.to(device=config['training']['device'])
+
         out = model(data)
         
 

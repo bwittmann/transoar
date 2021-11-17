@@ -1,1 +1,3 @@
 # Config file for params related to training
+
+device: 'cpu' #'cuda:0'

@@ -5,6 +5,7 @@ import logging
 import pickle
 from pathlib import Path
 import sys
+from typing_extensions import ParamSpecArgs
 
 import numpy as np
 import yaml
@@ -33,9 +34,12 @@ def get_complete_config():
             complete_model_config = get_config('models')
 
             config_to_include = {
-                'backbone': complete_model_config[models_to_select['backbone']],
-                'neck': complete_model_config[models_to_select['neck']]
+                'backbone': complete_model_config['backbones'][models_to_select['backbone']],
+                'neck': complete_model_config['necks'][models_to_select['neck']]
             }
+
+            config_to_include['backbone']['name'] = models_to_select['backbone']
+            config_to_include['neck']['name'] = models_to_select['neck']
 
         config[config_file.split('_')[0]] = config_to_include
 
