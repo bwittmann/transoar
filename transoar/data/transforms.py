@@ -27,6 +27,10 @@ from batchgenerators.transforms.noise_transforms import (
 from batchgenerators.transforms.utility_transforms import NumpyToTensor
 
 
+def crop_air(x):
+    # To not crop fat which is -120 to -90
+    return x > -500
+
 class NormalizeClipd(MapTransform):
     def __init__(self, keys, clip_min, clip_max, std, mean):
         self._key = keys
@@ -41,40 +45,39 @@ class NormalizeClipd(MapTransform):
         data[key] = (data[key] - self._mean) / self._std
         return data
 
-def transform_crop(margin, crop_key):
-    transform = CropForegroundd(
-        keys=['image', 'label'], source_key=crop_key, margin=margin
-    )
-    return transform
+def transform_crop(margin, crop_key, orientation):
+    transform_list = [
+        Orientationd(keys=["image", "label"], axcodes=orientation),
+        CropForegroundd(
+            keys=['image', 'label'], source_key=crop_key, 
+            margin=margin, select_fn=crop_air
+        )
+    ]
+    return Compose(transform_list)
 
 def transform_preprocessing(
     margin, crop_key, orientation, target_spacing, clip_min, 
     clip_max, std, mean
 ):
-    def crop_air(x):
-        # To not crop fat which is -120 to -90
-        return x > -500
+    transform_list = [
+        LoadImaged(keys=["image", "label"]),
+        EnsureChannelFirstd(keys=["image", "label"]),
+        Spacingd(
+            keys=["image", "label"], pixdim=target_spacing,
+            mode=("bilinear", "nearest")
+        ),
+        Orientationd(keys=["image", "label"], axcodes=orientation),
+        CropForegroundd(
+            keys=["image", "label"], source_key=crop_key, 
+            margin=margin, select_fn=crop_air
+        ),
+        NormalizeClipd(
+            keys=['image'], clip_min=clip_min, clip_max=clip_max, 
+            std=std, mean=mean
+        )
+    ]
 
-    transform = Compose(
-        [
-            LoadImaged(keys=["image", "label"]),
-            EnsureChannelFirstd(keys=["image", "label"]),
-            Spacingd(
-                keys=["image", "label"], pixdim=target_spacing,
-                 mode=("bilinear", "nearest")
-            ),
-            Orientationd(keys=["image", "label"], axcodes=orientation),
-            CropForegroundd(
-                keys=["image", "label"], source_key=crop_key, 
-                margin=margin, select_fn=crop_air
-            ),
-            NormalizeClipd(
-                keys=['image'], clip_min=clip_min, clip_max=clip_max, 
-                std=std, mean=mean
-            )
-        ]
-    )
-    return transform
+    return Compose(transform_list)
 
 
 def get_transforms(split, data_config):

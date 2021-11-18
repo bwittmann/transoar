@@ -6,6 +6,7 @@ import os
 import numpy as np
 
 from transoar.data.transforms import transform_preprocessing
+from transoar.utils.io import write_json
 
 
 class Preprocessor:
@@ -20,9 +21,9 @@ class Preprocessor:
 
         self._preprocessing_transform = transform_preprocessing(
             margin=data_config['margin'], crop_key=data_config['key'], orientation=data_config['orientation'],
-            target_spacing=analysis['target_spacing'][[2, 1, 0]], clip_min=analysis['statistics']['percentile_00_5'],
-            clip_max=analysis['statistics']['percentile_99_5'], std=analysis['statistics']['std'],
-            mean=analysis['statistics']['mean'],
+            target_spacing=analysis['target_spacing'][[2, 1, 0]], clip_min=analysis['voxel_statistics']['percentile_00_5'],
+            clip_max=analysis['voxel_statistics']['percentile_99_5'], std=analysis['voxel_statistics']['std'],
+            mean=analysis['voxel_statistics']['mean']
         )
 
         self._splits = {
@@ -32,8 +33,7 @@ class Preprocessor:
         }
 
     def prepare_sets(self):
-        min_num_organs = self._data_config['min_num_organs']
-
+        shapes = []
         for split_name, split_paths in self._splits.items():
             logging.info(f'Preparing {split_name} set.')
             for case in (split_paths):
@@ -46,10 +46,11 @@ class Preprocessor:
 
                 preprocessed_case = self._preprocessing_transform(case_dict)
                 image, label = preprocessed_case['image'], preprocessed_case['label']
+                shapes.append(image.shape)
 
                 # Skip cases with a small amount of labels
-                if np.unique(label).size < min_num_organs:
-                    logging.info(f'Skipped case {case.name} with less than {min_num_organs} organs.')
+                if np.unique(label).size < self._data_config['min_num_organs']:
+                    logging.info(f"Skipped case {case.name} with less than {self._data_config['min_num_organs']} organs.")
                     continue
 
                 logging.info(f'Successfull prepared case {case.name} of shape {image.shape}.')
@@ -58,3 +59,10 @@ class Preprocessor:
                 os.makedirs(path_to_case)
                 np.save(str(path_to_case / 'data.npy'), image.astype(np.float32))
                 np.save(str(path_to_case / 'label.npy'), label.astype(np.int32))
+            
+        if self._data_config['fixed_size']:
+            dict_to_save = {
+                'max_size': np.max(np.array(shapes), axis=0).tolist()
+            }
+            write_json(dict_to_save, self._path_to_splits / 'max_size.json')
+

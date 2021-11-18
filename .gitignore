@@ -3,6 +3,7 @@
 *.pkl
 *.npz
 *.npy
+*.json
 
 # IDE
 .vscode/

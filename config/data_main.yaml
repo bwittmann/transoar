@@ -30,6 +30,7 @@ labels:
   20: left_rectus_abdominis
 
 # Preprocessing
+fixed_size: True
 foreground_normalization: True
 target_spacing: [3, 3, 3] #[False, [x, x, x]]; if False: use estimated target spacing
 bbox_padding: 1

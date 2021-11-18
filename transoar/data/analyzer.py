@@ -21,8 +21,7 @@ class DataSetAnalyzer:
         self._norm_voxels = []
 
         self._cropper = transform_crop(
-            data_config['margin'],
-            data_config['key']
+            data_config['margin'], data_config['key'], data_config['orientation']
         )
 
     def analyze(self):
@@ -59,8 +58,11 @@ class DataSetAnalyzer:
         else:
             target_spacing = self._get_target_spacing()
 
+        shapes_statistics = self._get_shape_statistics(target_spacing)
+
         ret_dict = {
-            'statistics': voxel_statistics, 
+            'voxel_statistics': voxel_statistics, 
+            'shapes_statistics': shapes_statistics,
             'shapes': self._shapes,
             'spacing': self._spacings,
             'target_spacing': target_spacing
@@ -109,3 +111,19 @@ class DataSetAnalyzer:
             "percentile_00_5": np.percentile(self._norm_voxels, 0.5),
         }
         return voxel_statistics
+
+    def _get_shape_statistics(self, target_spacing):
+        shapes, spacings = np.array(self._shapes), np.array(self._spacings)
+
+        # Adjust shapes by normalizing according to their spacing and target_spacing
+        shapes_adjusted = np.ceil((shapes * spacings) / target_spacing).astype(np.int64)
+
+        shape_statistics = {
+            "median": np.median(shapes_adjusted, axis=0),
+            "mean": np.mean(shapes_adjusted, axis=0),
+            "min": np.min(shapes_adjusted, axis=0),
+            "max": np.max(shapes_adjusted, axis=0),
+            "percentile_99_5": np.percentile(shapes_adjusted, 99.5, axis=0),
+            "percentile_00_5": np.percentile(shapes_adjusted, 0.5, axis=0)
+        }
+        return shape_statistics

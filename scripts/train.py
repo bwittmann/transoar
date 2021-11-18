@@ -5,7 +5,7 @@ import torch
 from tqdm import tqdm
 
 from transoar.data.dataloader import get_loader
-from transoar.utils.io import get_complete_config
+from transoar.utils.io import get_complete_config, write_nifti
 from transoar.models.transoarnet import TransoarNet
 
 
@@ -15,7 +15,6 @@ def train(config):
     
     for data, mask, bboxes, seg_labels in tqdm(loader):
         data = data.to(device=config['training']['device'])
-
         out = model(data)
         
 
