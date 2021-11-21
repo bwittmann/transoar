@@ -1,6 +1,8 @@
 """Module containing functionality to build different parts of the model."""
 
 from transoar.utils.io import get_config
+from transoar.models.matcher import HungarianMatcher
+from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.necks.detr_transformer import DetrTransformer
 
@@ -37,3 +39,19 @@ def build_neck(neck_config):
         )
 
     return model
+
+def build_criterion(train_config):
+    matcher = HungarianMatcher(
+        cost_class=train_config['set_cost_class'],
+        cost_bbox=train_config['set_cost_bbox'],
+        cost_giou=train_config['set_cost_giou']
+    )
+
+    criterion = TransoarCriterion(
+        num_classes=data_config['num_classes'],
+        matcher=matcher,
+        weight_dict=train_config['loss_coefs'],
+        eos_coef=train_config['eos_coef']
+    )
+
+    return criterion

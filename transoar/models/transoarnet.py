@@ -40,7 +40,7 @@ class TransoarNet(nn.Module):
             mask,
             self._query_embed.weight,
             self._pos_enc(mask)
-        )[0]         
+        )[0]
 
         out = {
             'pred_logits': self._cls_head(x),

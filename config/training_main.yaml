@@ -1,3 +1,16 @@
 # Config file for params related to training
 
 device: 'cuda:2'
+
+# Hungarian matching
+set_cost_class: 1
+set_cost_bbox: 5
+set_cost_giou: 4
+
+# Losses
+eos_coef: 0.1
+loss_coefs:
+  mask_loss_coef: 1
+  dice_loss_coef: 1
+  bbox_loss_coef: 5
+  giou_loss_coef: 2
