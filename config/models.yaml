@@ -18,7 +18,7 @@ backbones:
   senet:
     in_chans: 1
     depths: [4, 4, 8, 8]
-    num_channels: 12 # TODO
+    num_channels: 2048
 
 necks:
   detr:

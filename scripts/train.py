@@ -6,13 +6,13 @@ from tqdm import tqdm
 
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_complete_config
-from transoar.models.build import build_model
+from transoar.models.transoarnet import TransoarNet
 
 
 def train(config):
-    loader = get_loader(config['data'], 'train')
     device = config['training']['device']
-    model = build_model(config['model']).to(device=device)
+    loader = get_loader(config['data'], 'train')
+    model = TransoarNet(config['model'], config['data']['num_classes']).to(device=device)
     
     for data, mask, bboxes, seg_labels in tqdm(loader):
         data, mask = data.to(device=device), mask.to(device=device)

@@ -1,18 +1,11 @@
 """Module containing functionality to build different parts of the model."""
 
 from transoar.utils.io import get_config
-from transoar.models.transoarnet import TransoarNet
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.necks.detr_transformer import DetrTransformer
 
 data_config = get_config('data_main')
 
-def build_model(config):
-    model = TransoarNet(
-        config,
-        data_config['num_classes']
-    )
-    return model
 
 def build_backbone(backbone_config):
     if backbone_config['name'] == 'senet':

@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Sequence, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from monai.networks.blocks.convolutions import Convolution
 from monai.networks.blocks.squeeze_and_excitation import SEBottleneck, SEResNetBottleneck, SEResNeXtBottleneck
@@ -207,15 +208,17 @@ class SENet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def features(self, x: torch.Tensor):
-        x = self.layer0(x)
+    def features(self, src: torch.Tensor, mask: torch.Tensor):
+        x = self.layer0(src)
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
-        return x
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.features(x)
-        # x = self.logits(x)
-        return x
+        # Adjust mask via interpolation - True: masked, False: not masked
+        mask = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool)
+        return x, mask
+
+    def forward(self, x: torch.Tensor, mask: torch.tensor):
+        x, mask = self.features(x, mask)
+        return x, mask
