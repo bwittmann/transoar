@@ -5,17 +5,20 @@ import torch
 from tqdm import tqdm
 
 from transoar.data.dataloader import get_loader
-from transoar.utils.io import get_complete_config, write_nifti
-from transoar.models.transoarnet import TransoarNet
+from transoar.utils.io import get_complete_config
+from transoar.models.build import build_model
 
 
 def train(config):
     loader = get_loader(config['data'], 'train')
-    model = TransoarNet(config['model']).to(device=config['training']['device'])
+    device = config['training']['device']
+    model = build_model(config['model']).to(device=device)
     
     for data, mask, bboxes, seg_labels in tqdm(loader):
-        data = data.to(device=config['training']['device'])
-        out = model(data)
+        data, mask = data.to(device=device), mask.to(device=device)
+        out = model(data, mask)
+
+        k = 12
         
 
 if __name__ == "__main__":

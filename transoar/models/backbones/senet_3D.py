@@ -51,8 +51,6 @@ class SENet(nn.Module):
             - For SENet154: True
             - For SE-ResNet models: False
             - For SE-ResNeXt models: False
-        num_classes: number of outputs in `last_linear` layer.
-            for all models: 1000
     """
 
     def __init__(
@@ -77,9 +75,6 @@ class SENet(nn.Module):
         pool_type: Type[Union[nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d]] = Pool[Pool.MAX, spatial_dims]
         norm_type: Type[Union[nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]] = Norm[Norm.BATCH, spatial_dims]
         dropout_type: Type[Union[nn.Dropout, nn.Dropout2d, nn.Dropout3d]] = Dropout[Dropout.DROPOUT, dropout_dim]
-        avg_pool_type: Type[Union[nn.AdaptiveAvgPool1d, nn.AdaptiveAvgPool2d, nn.AdaptiveAvgPool3d]] = Pool[
-            Pool.ADAPTIVEAVG, spatial_dims
-        ]
 
         self.inplanes = inplanes
         self.spatial_dims = spatial_dims

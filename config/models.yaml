@@ -18,7 +18,16 @@ backbones:
   senet:
     in_chans: 1
     depths: [4, 4, 8, 8]
+    num_channels: 12 # TODO
 
 necks:
-  none:
-    none: null
+  detr:
+    hidden_dim: 256
+    dropout: 0.1
+    nheads: 8
+    dim_feedforward: 2048
+    enc_layers: 6
+    dec_layers: 6
+    pre_norm: False   # double check
+    num_queries: 100
+    aux_loss: True    # double ckeck
