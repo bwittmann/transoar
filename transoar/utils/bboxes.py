@@ -35,7 +35,7 @@ def box_cxcyczwhd_to_xyzxyz(x):
 
     return torch.stack(b, dim=-1)
 
-def segmentation2bbox(segmentation_maps, padding):
+def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normalize=True):
     batch_bboxes = []
     batch_classes = []
     for map_ in segmentation_maps:
@@ -48,8 +48,8 @@ def segmentation2bbox(segmentation_maps, padding):
         for class_ in classes:
             class_indices = (map_ == class_).nonzero(as_tuple=False)
 
-            min_values = class_indices.min(dim=0)[0][1:]    # x, y, z
-            max_values = class_indices.max(dim=0)[0][1:]
+            min_values = class_indices.min(dim=0)[0][1:].to(torch.float)   # x, y, z
+            max_values = class_indices.max(dim=0)[0][1:].to(torch.float)
 
             # Apply padding to bounding boxes
             min_values -= padding
@@ -59,7 +59,19 @@ def segmentation2bbox(segmentation_maps, padding):
             assert min_values[1] < max_values[1]
             assert min_values[2] < max_values[2]
 
-            bboxes.append(torch.hstack((min_values, max_values)))   # x1, y1, z1, x2, y2, z2
+            if normalize:   # Put coords between 0 and 1; nec for sigmoid output
+                min_values /= torch.tensor(map_.shape[1:])
+                max_values /= torch.tensor(map_.shape[1:])
+
+            if box_format == 'xyzxyz':
+                bboxes.append(torch.hstack((min_values, max_values)))   # x1, y1, z1, x2, y2, z2
+            elif box_format == 'cxcyczwhd':
+                width, height, depth = max_values - min_values
+                cx, cy, cz = (max_values + min_values) / 2
+                bboxes.append(torch.tensor([cx, cy, cz, width, height, depth]))
+            else:
+                raise ValueError('Please select a valid box format.')
+
         batch_bboxes.append(torch.vstack(bboxes))
 
     return batch_bboxes, batch_classes

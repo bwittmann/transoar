@@ -19,11 +19,11 @@ def train(config):
 
     criterion = build_criterion(config['training']).to(device=device)
     
-    for data, mask, bboxes, seg_labels in tqdm(loader):
+    for data, mask, bboxes, _ in tqdm(loader):
+        # Put data to gpu
         data, mask = data.to(device=device), mask.to(device=device)
-        out = model(data, mask)
-
-        targets = []    # TODO integrate in colate fn
+        
+        targets = []
         for item in bboxes:
             target = {
                 'boxes': item[0].to(dtype=torch.float, device=device),
@@ -31,7 +31,10 @@ def train(config):
             }
             targets.append(target)
 
+        # Make prediction 
+        out = model(data, mask)
         loss = criterion(out, targets)
+        
         loss.backward()
 
         k = 12
