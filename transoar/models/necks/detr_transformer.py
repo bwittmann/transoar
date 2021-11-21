@@ -37,18 +37,17 @@ class DetrTransformer(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, src, mask, query_embed, pos_embed):
-        # flatten NxCxHxW to HWxNxC
-        bs, c, h, w = src.shape
-        src = src.flatten(2).permute(2, 0, 1)
-        pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
-        query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1)
+        bs, c, h, w, d = src.shape
+        src = src.flatten(2).permute(2, 0, 1)                   # [Patches, Batch, HiddenDim]
+        pos_embed = pos_embed.flatten(2).permute(2, 0, 1)       # [Patches, Batch, HiddenDim]
+        query_embed = query_embed.unsqueeze(1).repeat(1, bs, 1) # [NumQueries, Batch, HiddenDim]
         mask = mask.flatten(1)
 
-        tgt = torch.zeros_like(query_embed)
+        tgt = torch.zeros_like(query_embed) # encoder mask
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
-        return hs.transpose(1, 2), memory.permute(1, 2, 0).view(bs, c, h, w)
+        return hs.transpose(1, 2) #, memory.permute(1, 2, 0).view(bs, c, h, w)
 
 
 class TransformerEncoder(nn.Module):

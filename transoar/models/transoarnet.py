@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from transoar.models.build import build_backbone, build_neck
+from transoar.models.position_encoding import PositionEmbeddingSine3D
 
 class TransoarNet(nn.Module):
     def __init__(self, config, num_classes):
@@ -28,15 +29,18 @@ class TransoarNet(nn.Module):
         self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 
         # Get positional encoding
-        self._pos_enc = None  # TODO
+        self._pos_enc = PositionEmbeddingSine3D(channels=hidden_dim)
 
 
     def forward(self, x, mask):
         x, mask = self._backbone(x, mask)
 
-        x = self._neck(
-            self._input_proj(x), mask, self._query_embed.weight, self._pos_enc[-1]
-        )[0]
+        x = self._neck(             # [Batch, Queries, HiddenDim]         
+            self._input_proj(x),
+            mask,
+            self._query_embed.weight,
+            self._pos_enc(mask)
+        )[0]         
 
         out = {
             'pred_logits': self._cls_head(x),

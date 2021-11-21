@@ -216,7 +216,7 @@ class SENet(nn.Module):
         x = self.layer4(x)
 
         # Adjust mask via interpolation - True: masked, False: not masked
-        mask = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool)
+        mask = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool).squeeze(1)
         return x, mask
 
     def forward(self, x: torch.Tensor, mask: torch.tensor):
