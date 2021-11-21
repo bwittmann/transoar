@@ -44,7 +44,7 @@ class TransoarNet(nn.Module):
 
         out = {
             'pred_logits': self._cls_head(x),
-            'pred_bboxes': self._bbox_reg_head(x).sigmoid()
+            'pred_boxes': self._bbox_reg_head(x).sigmoid()
         }
 
         return out

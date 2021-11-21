@@ -17,11 +17,22 @@ def train(config):
     model = TransoarNet(config['model'], config['data']['num_classes']).to(device=device)
     model.train()
 
-    criterion = build_criterion(config['training'])
+    criterion = build_criterion(config['training']).to(device=device)
     
     for data, mask, bboxes, seg_labels in tqdm(loader):
         data, mask = data.to(device=device), mask.to(device=device)
         out = model(data, mask)
+
+        targets = []    # TODO integrate in colate fn
+        for item in bboxes:
+            target = {
+                'boxes': item[0].to(dtype=torch.float, device=device),
+                'labels': torch.tensor(item[1]).to(device=device)
+            }
+            targets.append(target)
+
+        loss = criterion(out, targets)
+        loss.backward()
 
         k = 12
         
