@@ -1,0 +1,1 @@
+"""Module containing the evaluator of the transoar project."""

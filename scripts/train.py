@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_complete_config
 from transoar.models.transoarnet import TransoarNet
@@ -12,32 +13,32 @@ from transoar.models.build import build_criterion
 
 def train(config):
     device = config['training']['device']
-    loader = get_loader(config['data'], 'train')
+
+    # Build necessary components
+    train_loader = get_loader(config['data'], 'train')
+    val_loader = get_loader(config['data'], 'train')
 
     model = TransoarNet(config['model'], config['data']['num_classes']).to(device=device)
-    model.train()
-
     criterion = build_criterion(config['training']).to(device=device)
-    
-    for data, mask, bboxes, _ in tqdm(loader):
-        # Put data to gpu
-        data, mask = data.to(device=device), mask.to(device=device)
-        
-        targets = []
-        for item in bboxes:
-            target = {
-                'boxes': item[0].to(dtype=torch.float, device=device),
-                'labels': torch.tensor(item[1]).to(device=device)
-            }
-            targets.append(target)
 
-        # Make prediction 
-        out = model(data, mask)
-        loss = criterion(out, targets)
-        
-        loss.backward()
+    param_dicts = [
+        {"params": [p for n, p in model.named_parameters() if "backbone" not in n and p.requires_grad]},
+        {
+            "params": [p for n, p in model.named_parameters() if "backbone" in n and p.requires_grad],
+            "lr": float(config['training']['lr_backbone'])
+        },
+    ]
 
-        k = 12
+    optim = torch.optim.AdamW(
+        param_dicts, lr=float(config['training']['lr']), weight_decay=float(config['training']['weight_decay'])
+    )
+    scheduler = torch.optim.lr_scheduler.StepLR(optim, config['training']['lr_drop'])
+
+    # Build trainer and start training
+    trainer = Trainer(
+        train_loader, val_loader, model, criterion, optim, scheduler, device, config
+    )
+    trainer.run()
         
 
 if __name__ == "__main__":
@@ -47,6 +48,5 @@ if __name__ == "__main__":
     np.random.seed(10)
 
     config = get_complete_config()
-
     train(config)
       
