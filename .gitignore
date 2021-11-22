@@ -18,5 +18,8 @@ __pycache__/
 # Logging
 *.log
 
+# Runs
+runs
+
 # Testing / debugging files
 backup

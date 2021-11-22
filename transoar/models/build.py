@@ -50,7 +50,6 @@ def build_criterion(train_config):
     criterion = TransoarCriterion(
         num_classes=data_config['num_classes'],
         matcher=matcher,
-        weight_dict=train_config['loss_coefs'],
         eos_coef=train_config['eos_coef']
     )
 

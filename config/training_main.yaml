@@ -9,6 +9,7 @@ lr_backbone: 1e-5
 weight_decay: 1e-4
 clip_max_norm: 0.1
 val_interval: 2
+log_iter: 1 # log not only epochs, but iterations
 
 # Scheduler
 lr_drop: 200

@@ -1,12 +1,14 @@
-"""Script for training."""
+"""Script for training the transoar project."""
+
+import os
+from pathlib import Path
 
 import numpy as np
 import torch
-from tqdm import tqdm
 
 from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
-from transoar.utils.io import get_complete_config
+from transoar.utils.io import get_complete_config, write_json
 from transoar.models.transoarnet import TransoarNet
 from transoar.models.build import build_criterion
 
@@ -34,9 +36,14 @@ def train(config):
     )
     scheduler = torch.optim.lr_scheduler.StepLR(optim, config['training']['lr_drop'])
 
+    # Init logging
+    path_to_run = Path(os.getcwd()) / 'runs' / config['training']['experiment_name']
+    path_to_run.mkdir(exist_ok=True)
+    write_json(config, path_to_run / 'config.json')
+
     # Build trainer and start training
     trainer = Trainer(
-        train_loader, val_loader, model, criterion, optim, scheduler, device, config
+        train_loader, val_loader, model, criterion, optim, scheduler, device, config, path_to_run
     )
     trainer.run()
         

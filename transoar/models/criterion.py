@@ -13,19 +13,17 @@ class TransoarCriterion(nn.Module):
         1) we compute hungarian assignment between ground truth boxes and the outputs of the model
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
-    def __init__(self, num_classes, matcher, weight_dict, eos_coef):
+    def __init__(self, num_classes, matcher, eos_coef):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
             matcher: module able to compute a matching between targets and proposals
-            weight_dict: dict containing as key the names of the losses and as values their relative weight.
             eos_coef: relative classification weight applied to the no-object category
             losses: list of all the losses to be applied. See get_loss for list of available losses.
         """
         super().__init__()
         self.num_classes = num_classes
         self.matcher = matcher
-        self.weight_dict = weight_dict
         self.eos_coef = eos_coef
         empty_weight = torch.ones(self.num_classes + 1)
         empty_weight[-1] = self.eos_coef
@@ -89,15 +87,8 @@ class TransoarCriterion(nn.Module):
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_boxes = sum(len(t["labels"]) for t in targets)
 
-        # Compute all the requested losses
+        # Compute losses
         loss_bbox, loss_giou = self.loss_bboxes(outputs, targets, indices, num_boxes)
-        loss_class = self.loss_class(outputs, targets, indices)
+        loss_cls = self.loss_class(outputs, targets, indices)
 
-        total_loss = sum([
-            self.weight_dict['bbox_loss_coef'] * loss_bbox,
-            self.weight_dict['giou_loss_coef'] * loss_giou,
-            self.weight_dict['cls_loss_coef'] * loss_class
-        ])
-
-        return total_loss
-
+        return loss_bbox, loss_giou, loss_cls
