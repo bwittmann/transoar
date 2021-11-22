@@ -17,6 +17,7 @@ __pycache__/
 
 # Logging
 *.log
+*.out
 
 # Runs
 runs

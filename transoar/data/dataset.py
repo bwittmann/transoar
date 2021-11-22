@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
 from transoar.data.transforms import get_transforms
@@ -24,6 +25,7 @@ class TransoarDataset(Dataset):
         return len(self._data)
 
     def __getitem__(self, idx):
+        idx = 10    # TODO delete
         case = self._data[idx]
         path_to_case = self._path_to_split / case
         data_path, label_path = sorted(list(path_to_case.iterdir()), key=lambda x: len(str(x)))
@@ -40,5 +42,7 @@ class TransoarDataset(Dataset):
             # Apply data augmentation
             data_transformed = self._augmentation(**data_dict)
             data, label = data_transformed['image'], data_transformed['label']
+        else:
+            data, label = torch.tensor(data[None]), torch.tensor(label[None])
 
         return data.squeeze(0), label.squeeze(0)
