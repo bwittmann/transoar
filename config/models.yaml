@@ -18,7 +18,7 @@ backbones:
   senet:
     in_chans: 1
     depths: [4, 4, 8, 8]
-    strides: [1, 1, 2, 2] # prev. [1, 2, 2, 2]
+    strides: [2, 2, 2, 2] # prev. [1, 2, 2, 2]
     num_channels: 2048  # [64, 256, 512, 1024, 2048]
     num_layers: 4 # [0, 1, 2, 3, 4]
     reduction: 16

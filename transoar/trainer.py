@@ -4,6 +4,8 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
+from transoar.evaluator import DetectionEvaluator
+
 class Trainer:
 
     def __init__(
@@ -21,6 +23,10 @@ class Trainer:
         self._train_config = config['training']
         self._writer = SummaryWriter(log_dir=path_to_run)
 
+        self._evaluator = DetectionEvaluator(
+            classes=list(config['data']['labels'].keys())
+        )
+
     def _train_one_epoch(self, num_epoch):
         self._model.train()
         for idx, (data, mask, bboxes, _) in enumerate(tqdm(self._train_loader)):
@@ -31,7 +37,7 @@ class Trainer:
             for item in bboxes:
                 target = {
                     'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': torch.tensor(item[1]).to(device=self._device) # TODO
+                    'labels': item[1].to(device=self._device)
                 }
                 targets.append(target)
 
@@ -82,7 +88,7 @@ class Trainer:
             for item in bboxes:
                 target = {
                     'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': torch.tensor(item[1]).to(device=self._device) # TODO
+                    'labels': item[1].to(device=self._device)
                 }
                 targets.append(target)
 

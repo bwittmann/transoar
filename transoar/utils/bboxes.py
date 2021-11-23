@@ -1,7 +1,7 @@
 """Helper functions for handling bounding boxes."""
 
 import torch
-
+import numpy as np
 
 def generalized_bbox_iou_3d(bboxes1, bboxes2):
     """
@@ -43,7 +43,7 @@ def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normal
 
         bboxes = []
         classes = [int(class_) for class_ in map_.unique(sorted=True)][1:]
-        batch_classes.append(classes)
+        batch_classes.append(torch.tensor(classes))
 
         for class_ in classes:
             class_indices = (map_ == class_).nonzero(as_tuple=False)
@@ -91,8 +91,7 @@ def iou_3d(bboxes1, bboxes2):
     Returns:
         A tensor of shape [N, M] containing the IoU values of all 
         bounding boxes to each other and a tensor of same shape containing
-        the pure union values between bboxes. Keep in mind that the diagonal
-        consists of ones.
+        the pure union values between bboxes.
     """
     volume_bbox1 = bboxes_volume(bboxes1)
     volume_bbox2 = bboxes_volume(bboxes2)
@@ -128,3 +127,37 @@ def bboxes_volume(bboxes):
     delta_y = bboxes[:, 4] - bboxes[:, 1]
     delta_z = bboxes[:, 5] - bboxes[:, 2]
     return delta_x * delta_y * delta_z
+
+def iou_3d_np(bboxes1, bboxes2):
+    """Determines the intersection over union (IoU) for two sets of
+    three dimensional bounding boxes.
+
+    Bounding boxes have to be in the format (x1, y1, z1, x2, y2, z2).
+
+    Args:
+        bboxes1: A np.array of the shape [N, 6] containing the first
+            set of bounding boxes.
+        bboxes2: A np.array of the shape [M, 6] containing the first
+            set of bounding boxes.
+
+    Returns:
+        A tensor of shape [N, M] containing the IoU values of all 
+        bounding boxes to each other.
+    """
+    volume_bbox1 = bboxes_volume(bboxes1)
+    volume_bbox2 = bboxes_volume(bboxes2)
+
+    x1 = np.maximum(bboxes1[:, None, 0], bboxes2[None, :, 0])
+    y1 = np.maximum(bboxes1[:, None, 1], bboxes2[None, :, 1])
+    z1 = np.maximum(bboxes1[:, None, 2], bboxes2[None, :, 2])
+    x2 = np.minimum(bboxes1[:, None, 3], bboxes2[None, :, 3])
+    y2 = np.minimum(bboxes1[:, None, 4], bboxes2[None, :, 4])
+    z2 = np.minimum(bboxes1[:, None, 5], bboxes2[None, :, 5])
+
+    delta_x = np.clip((x2 - x1), a_min=0, a_max=None)
+    delta_y = np.clip((y2 - y1), a_min=0, a_max=None)
+    delta_z = np.clip((z2 - z1), a_min=0, a_max=None)
+
+    intersection = delta_x * delta_y * delta_z
+    union = volume_bbox1[:, None] + volume_bbox2 - intersection
+    return intersection / union

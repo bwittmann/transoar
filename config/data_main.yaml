@@ -1,7 +1,7 @@
 # Config file for data related params
 
 # General
-dataset_name: transoar_spacing_orig_th
+dataset_name: transoar_spacing444_th
 modality: CT
 path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
 path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
@@ -44,7 +44,7 @@ anisotropy_threshold: 3
 target_spacing_percentile: 50
 
 # Augmentation
-use_augmentation: True
+use_augmentation: False
 p_rotation: 0.2
 rotation: [-30, 30]
 p_scale: 0.2
@@ -54,6 +54,6 @@ gamma_range: [0.7, 1.5]
 mirror_axes: [0, 1, 2]
 
 # Dataloader
-batch_size: 2
+batch_size: 1
 shuffle: False
 num_workers: 0
