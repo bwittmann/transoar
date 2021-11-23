@@ -1,7 +1,7 @@
 """Module containing the SENet backbone, adapted from the monai repo."""
 
 from collections import OrderedDict
-from typing import Any, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, List, Sequence, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from monai.networks.blocks.convolutions import Convolution
 from monai.networks.blocks.squeeze_and_excitation import SEBottleneck, SEResNetBottleneck, SEResNeXtBottleneck
-from monai.networks.layers.factories import Act, Conv, Dropout, Norm, Pool
+from monai.networks.layers.factories import Act, Conv, Norm, Pool
 
 class SENet(nn.Module):
     """
@@ -52,6 +52,7 @@ class SENet(nn.Module):
             - For SENet154: True
             - For SE-ResNet models: False
             - For SE-ResNeXt models: False
+        num_layers: number of layers in forward pass.
     """
 
     def __init__(
@@ -62,11 +63,11 @@ class SENet(nn.Module):
         layers: Sequence[int],
         groups: int,
         reduction: int,
-        dropout_prob: Optional[float] = 0.2,
-        dropout_dim: int = 1,
+        strides: List[int],
         inplanes: int = 128,
         downsample_kernel_size: int = 3,
-        input_3x3: bool = True
+        input_3x3: bool = True,
+        num_layers: int = -1
     ) -> None:
 
         super().__init__()
@@ -75,7 +76,6 @@ class SENet(nn.Module):
         conv_type: Type[Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]] = Conv[Conv.CONV, spatial_dims]
         pool_type: Type[Union[nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d]] = Pool[Pool.MAX, spatial_dims]
         norm_type: Type[Union[nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]] = Norm[Norm.BATCH, spatial_dims]
-        dropout_type: Type[Union[nn.Dropout, nn.Dropout2d, nn.Dropout3d]] = Dropout[Dropout.DROPOUT, dropout_dim]
 
         self.inplanes = inplanes
         self.spatial_dims = spatial_dims
@@ -113,41 +113,46 @@ class SENet(nn.Module):
             ]
 
         layer0_modules.append(("pool", pool_type(kernel_size=3, stride=2, ceil_mode=True)))
-        self.layer0 = nn.Sequential(OrderedDict(layer0_modules))
-        self.layer1 = self._make_layer(
-            block, planes=64, blocks=layers[0], groups=groups, reduction=reduction, downsample_kernel_size=1
+
+        layer0 = nn.Sequential(OrderedDict(layer0_modules))
+        layer1 = self._make_layer(
+            block,
+            planes=64,
+            blocks=layers[0],
+            stride=strides[0],
+            groups=groups,
+            reduction=reduction,
+            downsample_kernel_size=1
         )
-        self.layer2 = self._make_layer(
+        layer2 = self._make_layer(
             block,
             planes=128,
             blocks=layers[1],
-            stride=2,
+            stride=strides[1],
             groups=groups,
             reduction=reduction,
             downsample_kernel_size=downsample_kernel_size,
         )
-        self.layer3 = self._make_layer(
+        layer3 = self._make_layer(
             block,
             planes=256,
             blocks=layers[2],
-            stride=2,
+            stride=strides[2],
             groups=groups,
             reduction=reduction,
             downsample_kernel_size=downsample_kernel_size,
         )
-        self.layer4 = self._make_layer(
+        layer4 = self._make_layer(
             block,
             planes=512,
             blocks=layers[3],
-            stride=2,
+            stride=strides[3],
             groups=groups,
             reduction=reduction,
             downsample_kernel_size=downsample_kernel_size,
         )
-        # self.adaptive_avg_pool = avg_pool_type(1)
-        self.dropout = dropout_type(dropout_prob) if dropout_prob is not None else None
-        # self.last_linear = nn.Linear(512 * block.expansion, num_classes)
-        self.num_features = 512 * block.expansion
+        all_layers = [layer0, layer1, layer2, layer3, layer4]
+        self.layers = nn.ModuleList(all_layers[:num_layers + 1])
 
         for m in self.modules():
             if isinstance(m, conv_type):
@@ -208,12 +213,9 @@ class SENet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def features(self, src: torch.Tensor, mask: torch.Tensor):
-        x = self.layer0(src)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
+    def features(self, x: torch.Tensor, mask: torch.Tensor):
+        for layer in self.layers:
+            x = layer(x)
 
         # Adjust mask via interpolation - True: masked, False: not masked
         mask = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool).squeeze(1)

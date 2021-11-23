@@ -16,8 +16,10 @@ def build_backbone(backbone_config):
             spatial_dims=3,
             in_channels=backbone_config['in_chans'],
             layers=backbone_config['depths'],
+            num_layers=backbone_config['num_layers'],
             groups=1,
-            reduction=16,
+            reduction=backbone_config['reduction'],
+            strides=backbone_config['strides'],
             inplanes=64,
             downsample_kernel_size=1,
             input_3x3=False
