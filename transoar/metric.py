@@ -32,7 +32,7 @@ class Metric:
 
         iou_list = np.array(iou_list)
         _iou_range = np.linspace(iou_range[0], iou_range[1],
-                                 int(np.round((iou_range[1] - iou_range[0]) / iou_range[2])) + 1, endpoint=True)
+                                 int(np.round((iou_range[1] - iou_range[0]) / iou_range[2])) + 1, endpoint=True)    # TODO
         self.iou_thresholds = np.union1d(iou_list, _iou_range)
         self.iou_range = iou_range
 
@@ -45,6 +45,9 @@ class Metric:
 
         self.recall_thresholds = np.linspace(.0, 1.00, int(np.round((1.00 - .0) / .01)) + 1, endpoint=True)
         self.max_detections = max_detection
+
+    def __call__(self, *args, **kwargs):
+        return self.compute(*args, **kwargs)
 
     def get_iou_thresholds(self):
         """
@@ -81,7 +84,7 @@ class Metric:
 
         results = {}
         results.update(self.compute_ap(dataset_statistics))
-        results.update(self.compute_ar(dataset_statistics))
+        results.update(self.compute_ar(dataset_statistics)) # TODO
 
         return results, None
 
@@ -145,7 +148,7 @@ class Metric:
         results = {}
         for max_det_idx, max_det in enumerate(self.max_detections):  # mAR
             key = f"mAR_IoU_{self.iou_range[0]:.2f}_{self.iou_range[1]:.2f}_{self.iou_range[2]:.2f}_MaxDet_{max_det}"
-            results[key] = self.select_ar(dataset_statistics, max_det_idx=max_det_idx)
+            results[key] = self.select_ar(dataset_statistics, max_det_idx=max_det_idx, iou_idx=self.iou_range_idx)
 
             if self.per_class:
                 for cls_idx, cls_str in enumerate(self.classes):  # per class results
@@ -153,7 +156,7 @@ class Metric:
                            f"mAR_IoU_{self.iou_range[0]:.2f}_{self.iou_range[1]:.2f}_{self.iou_range[2]:.2f}_"
                            f"MaxDet_{max_det}")
                     results[key] = self.select_ar(dataset_statistics,
-                                                  cls_idx=cls_idx, max_det_idx=max_det_idx)
+                                                  cls_idx=cls_idx, max_det_idx=max_det_idx, iou_idx=self.iou_range_idx)
 
         for idx in self.iou_list_idx:   # AR@IoU
             key = f"AR_IoU_{self.iou_thresholds[idx]:.2f}_MaxDet_{self.max_detections[-1]}"
@@ -164,8 +167,8 @@ class Metric:
                     key = (f"{cls_str}_"
                            f"AR_IoU_{self.iou_thresholds[idx]:.2f}_"
                            f"MaxDet_{self.max_detections[-1]}")
-                    results[key] = self.select_ar(dataset_statistics, iou_idx=idx,
-                                                  cls_idx=cls_idx, max_det_idx=-1)
+                    results[key] = self.select_ar(dataset_statistics, 
+                                                 iou_idx=idx, cls_idx=cls_idx, max_det_idx=-1)
         return results
 
     @staticmethod
@@ -240,6 +243,18 @@ class Metric:
         else:
             rec = np.mean(rec[rec > -1])
         return rec
+    
+    def check_number_of_iou(self, *args) -> None:
+        """
+        Check if shape of input in first dimension is consistent with expected IoU values
+        (assumes IoU dimension is the first dimension)
+
+        Args:
+            args: array like inputs with shape function
+        """
+        num_ious = len(self.get_iou_thresholds())
+        for arg in args:
+            assert arg.shape[0] == num_ious
 
     def compute_statistics(self, results_list):
         """
@@ -279,18 +294,19 @@ class Metric:
 
         for cls_idx, cls_i in enumerate(self.classes):  # for each class
             for maxDet_idx, maxDet in enumerate(self.max_detections):  # for each maximum number of detections
-                results = [r[cls_idx] for r in results_list if cls_idx in r]
+                results = [r[cls_idx] for r in results_list if cls_idx in r]    # get results for each class
 
                 if len(results) == 0:
                     continue
 
-                dt_scores = np.concatenate([r['dtScores'][0:maxDet] for r in results])
+                dt_scores = np.concatenate([r['dtScores'][0:maxDet] for r in results])  # get class dt scores 
+
                 # different sorting method generates slightly different results.
                 # mergesort is used to be consistent as Matlab implementation.
                 inds = np.argsort(-dt_scores, kind='mergesort')
-                dt_scores_sorted = dt_scores[inds]
+                dt_scores_sorted = dt_scores[inds]  # scores sorte by value
 
-                # r['dtMatches'] [T, R], where R = sum(all detections)
+                # r['dtMatches'] [T, R], where R = sum(all detections) and T = iou_thresholds + sorted by score
                 dt_matches = np.concatenate([r['dtMatches'][:, 0:maxDet] for r in results], axis=1)[:, inds]
                 dt_ignores = np.concatenate([r['dtIgnore'][:, 0:maxDet] for r in results], axis=1)[:, inds]
                 self.check_number_of_iou(dt_matches, dt_ignores)
@@ -310,9 +326,8 @@ class Metric:
                     tp, fp = np.array(tp), np.array(fp)
                     r, p, s = compute_stats_single_threshold(tp, fp, dt_scores_sorted, self.recall_thresholds, num_gt)
                     recall[th_ind, cls_idx, maxDet_idx] = r
-                    precision[th_ind, :, cls_idx, maxDet_idx] = p
-                    # corresponding score thresholds for recall steps
-                    scores[th_ind, :, cls_idx, maxDet_idx] = s
+                    precision[th_ind, :, cls_idx, maxDet_idx] = p   # basically the precision recall curve
+                    scores[th_ind, :, cls_idx, maxDet_idx] = s      # corresponding score thresholds for recall steps
 
         return {
             'counts': [num_iou_th, num_recall_th, num_classes, num_max_detections],  # [4]
@@ -359,7 +374,7 @@ def compute_stats_single_threshold(
         recall = 0
 
     # array where precision values nearest to given recall th are saved
-    precision = np.zeros((num_recall_th,))
+    precision = np.zeros((num_recall_th,))  # precision-recall curve
     # save scores for corresponding recall value in here
     th_scores = np.zeros((num_recall_th,))
     # numpy is slow without cython optimization for accessing elements

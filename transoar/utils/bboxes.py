@@ -28,12 +28,19 @@ def generalized_bbox_iou_3d(bboxes1, bboxes2):
     vol = dx * dy * dz
     return iou - (vol - union) / vol
 
-def box_cxcyczwhd_to_xyzxyz(x):
-    x_c, y_c, z_c, w, h, d = x.unbind(-1)
+def box_cxcyczwhd_to_xyzxyz(bboxes):
+    if isinstance(bboxes, torch.Tensor):
+        x_c, y_c, z_c, w, h, d = bboxes.unbind(-1)
+    else:
+        x_c, y_c, z_c, w, h, d = bboxes.T
+
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h), (z_c - 0.5 * d),
          (x_c + 0.5 * w), (y_c + 0.5 * h), (z_c + 0.5 * d)]
 
-    return torch.stack(b, dim=-1)
+    if isinstance(bboxes, torch.Tensor):
+        return torch.stack(b, dim=-1)
+    else:
+        return np.stack(b, axis=-1)
 
 def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normalize=True):
     batch_bboxes = []
@@ -128,7 +135,7 @@ def bboxes_volume(bboxes):
     delta_z = bboxes[:, 5] - bboxes[:, 2]
     return delta_x * delta_y * delta_z
 
-def iou_3d_np(bboxes1, bboxes2):
+def iou_3d_np(bboxes1, bboxes2, format_='cxcyczwhd'):
     """Determines the intersection over union (IoU) for two sets of
     three dimensional bounding boxes.
 
@@ -144,6 +151,10 @@ def iou_3d_np(bboxes1, bboxes2):
         A tensor of shape [N, M] containing the IoU values of all 
         bounding boxes to each other.
     """
+    if format_ == 'cxcyczwhd':
+        bboxes1 = box_cxcyczwhd_to_xyzxyz(bboxes1)
+        bboxes2 = box_cxcyczwhd_to_xyzxyz(bboxes2)
+
     volume_bbox1 = bboxes_volume(bboxes1)
     volume_bbox2 = bboxes_volume(bboxes2)
 

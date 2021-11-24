@@ -31,9 +31,6 @@ class DetectionEvaluator:
 
         self.results_list = []  # store results of each image
 
-        self.iou_thresholds = self.get_unique_iou_thresholds()
-        self.iou_mapping = self.get_indices_of_iou_for_each_metric()
-
         self.metrics = [
             Metric(
                 classes=classes,
@@ -43,6 +40,9 @@ class DetectionEvaluator:
                 max_detection=(100, )
             )
         ]
+
+        self.iou_thresholds = self.get_unique_iou_thresholds()
+        self.iou_mapping = self.get_indices_of_iou_for_each_metric()
 
     def get_unique_iou_thresholds(self):
         """
@@ -88,7 +88,7 @@ class DetectionEvaluator:
         Returns
             dict: empty dict... detection metrics can only be evaluated at the end
         """
-        if gt_ignore is None:
+        if gt_ignore is None:   # only zeros -> don't ignore anything
             n = [0 if gt_boxes_img.size == 0 else gt_boxes_img.shape[0] for gt_boxes_img in gt_boxes]
             gt_ignore = [np.zeros(_n).reshape(-1) for _n in n]
 
@@ -170,7 +170,7 @@ def matching_batch(
 ):
     """
     Match boxes of a batch to corresponding ground truth for each category
-    independently
+    independently.
 
     Args:
         iou_fn: compute overlap for each pair
@@ -199,7 +199,8 @@ def matching_batch(
     results = []
     # iterate over images/batches
     for pboxes, pclasses, pscores, gboxes, gclasses, gignore in zip(
-        pred_boxes, pred_classes, pred_scores, gt_boxes, gt_classes, gt_ignore):
+        pred_boxes, pred_classes, pred_scores, gt_boxes, gt_classes, gt_ignore
+    ):
         img_classes = np.union1d(pclasses, gclasses)
         result = {}  # dict contains results for each class in one image
         for c in img_classes:
@@ -356,9 +357,9 @@ def _matching_single_image_single_class(
     """
     # filter for max_detections highest scoring predictions to speed up computation
     dt_ind = np.argsort(-pred_scores, kind='mergesort')
-    dt_ind = dt_ind[:max_detections]
+    dt_ind = dt_ind[:max_detections]    # only take up to max number of detections
 
-    pred_boxes = pred_boxes[dt_ind]
+    pred_boxes = pred_boxes[dt_ind] # sort by highest score
     pred_scores = pred_scores[dt_ind]
 
     # sort ignored ground truth to last positions
@@ -377,11 +378,11 @@ def _matching_single_image_single_class(
     for tind, t in enumerate(iou_thresholds):
         for dind, _d in enumerate(pred_boxes):  # iterate detections starting from highest scoring one
             # information about best match so far (m=-1 -> unmatched)
-            iou = min([t, 1-1e-10])
+            iou = min([t, 1-1e-10]) # iou threshold
             m = -1
 
             for gind, _g in enumerate(gt_boxes):  # iterate ground truth
-                # if this gt already matched, continue
+                # if this gt already matched, continue (no duplicate detections)
                 if gt_match[tind, gind] > 0:
                     continue
 

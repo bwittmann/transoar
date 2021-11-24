@@ -24,7 +24,7 @@ class Trainer:
         self._writer = SummaryWriter(log_dir=path_to_run)
 
         self._evaluator = DetectionEvaluator(
-            classes=list(config['data']['labels'].keys())
+            classes=list(config['data']['labels'].values())
         )
 
     def _train_one_epoch(self, num_epoch):
@@ -103,6 +103,39 @@ class Trainer:
                 ]
             )
 
+            # self._evaluator.add(
+            #     pred_boxes=[boxes.detach().cpu().numpy() for boxes in out['pred_boxes']],
+            #     pred_classes=[torch.max(labels, dim=-1)[1].detach().cpu().numpy() for labels in out['pred_logits']],
+            #     pred_scores=[torch.max(labels, dim=-1)[0].detach().cpu().numpy() for labels in out['pred_logits']],
+            #     gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
+            #     gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
+            # )
+
+            # TODO
+            # - check again num classes in detr
+            # - only feed non zero detections to eval
+            # - reduce labels by one to make it work
+            # - double check with different ious
+            # - check what pred_scored does
+            import numpy as np
+            pred_boxes = [target['boxes'].detach().cpu().numpy() for target in targets]
+            pred_boxes[0][:, -1] = pred_boxes[0][:, -1] / 1.98
+            # pred_boxes[0] = pred_boxes[0].repeat(2, 0)
+
+            pred_scores = [np.ones(target['labels'].shape) for target in targets]
+            # pred_scores[0] = pred_scores[0].repeat(2, 0)
+
+            pred_classes = [target['labels'].detach().cpu().numpy() - 1 for target in targets]
+            # pred_classes[0] = pred_classes[0].repeat(2, 0)
+
+            self._evaluator.add(
+                pred_boxes=pred_boxes,
+                pred_classes=pred_classes,
+                pred_scores=pred_scores,
+                gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
+                gt_classes=[target['labels'].detach().cpu().numpy() - 1 for target in targets]
+            )
+
             loss_agg += loss.item()
             loss_bbox_agg += loss_bbox.item()
             loss_giou_agg += loss_giou.item()
@@ -112,6 +145,8 @@ class Trainer:
         loss_bbox = loss_bbox_agg / len(self._val_loader)
         loss_giou = loss_giou_agg / len(self._val_loader)
         loss_cls = loss_cls_agg / len(self._val_loader)
+        metric_scores, metric_curves = self._evaluator.eval()
+        metric_ar = {k: v for k, v in metric_scores.items() if 'AR' in k}
 
         # Write to logger
         self._write_to_logger(
@@ -123,6 +158,7 @@ class Trainer:
         )
 
     def run(self):
+        self._validate(0)
         for epoch in range(1, self._train_config['epochs'] + 1):
             self._train_one_epoch(epoch)
 
