@@ -31,8 +31,9 @@ class Metric:
         self.per_class = per_class
 
         iou_list = np.array(iou_list)
-        _iou_range = np.linspace(iou_range[0], iou_range[1],
-                                 int(np.round((iou_range[1] - iou_range[0]) / iou_range[2])) + 1, endpoint=True)    # TODO
+        _iou_range = np.linspace(
+            iou_range[0], iou_range[1], int(np.round((iou_range[1] - iou_range[0]) / iou_range[2])) + 1, endpoint=True
+        )
         self.iou_thresholds = np.union1d(iou_list, _iou_range)
         self.iou_range = iou_range
 
@@ -84,7 +85,7 @@ class Metric:
 
         results = {}
         results.update(self.compute_ap(dataset_statistics))
-        results.update(self.compute_ar(dataset_statistics)) # TODO
+        results.update(self.compute_ar(dataset_statistics))
 
         return results, None
 

@@ -116,16 +116,22 @@ class Trainer:
             # - only feed non zero detections to eval
             # - reduce labels by one to make it work
             # - double check with different ious
-            # - check what pred_scored does
+            # - check open TODOs
+
+
             import numpy as np
             pred_boxes = [target['boxes'].detach().cpu().numpy() for target in targets]
             pred_boxes[0][:, -1] = pred_boxes[0][:, -1] / 1.98
+            pred_boxes[0][-1, 0] = pred_boxes[0][-1, 0] + 2
+            # pred_boxes[0] = pred_boxes[0][:-1]
             # pred_boxes[0] = pred_boxes[0].repeat(2, 0)
 
             pred_scores = [np.ones(target['labels'].shape) for target in targets]
+            # pred_scores[0] = pred_scores[0][:-1]
             # pred_scores[0] = pred_scores[0].repeat(2, 0)
 
             pred_classes = [target['labels'].detach().cpu().numpy() - 1 for target in targets]
+            # pred_classes[0] = pred_classes[0][:-1]
             # pred_classes[0] = pred_classes[0].repeat(2, 0)
 
             self._evaluator.add(
@@ -145,7 +151,7 @@ class Trainer:
         loss_bbox = loss_bbox_agg / len(self._val_loader)
         loss_giou = loss_giou_agg / len(self._val_loader)
         loss_cls = loss_cls_agg / len(self._val_loader)
-        metric_scores, metric_curves = self._evaluator.eval()
+        metric_scores = self._evaluator.eval()
         metric_ar = {k: v for k, v in metric_scores.items() if 'AR' in k}
 
         # Write to logger

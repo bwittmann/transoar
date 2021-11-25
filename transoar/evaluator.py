@@ -16,7 +16,7 @@ class DetectionEvaluator:
         self,
         classes,
         iou_fn=iou_3d_np,
-        max_detections=100
+        max_detections=1
     ):
         """
         Class for evaluate detection metrics
@@ -34,10 +34,10 @@ class DetectionEvaluator:
         self.metrics = [
             Metric(
                 classes=classes,
-                iou_list=np.arange(0.1, 1.0, 0.1),
-                iou_range=(0.1, 0.5, 0.05),
+                iou_list=np.arange(0.1, 1.0, 0.1),  # for individual APs
+                iou_range=(0.1, 0.5, 0.05), # for mAP - different from coco (0.5, 0.95, 0.05)
                 per_class=True,
-                max_detection=(100, )
+                max_detection=(1, ) # different from nndet (100, )
             )
         ]
 
@@ -111,7 +111,7 @@ class DetectionEvaluator:
         metric_curves = {}
         for metric_idx, metric in enumerate(self.metrics):
             _filter = partial(self.iou_filter, iou_idx=self.iou_mapping[metric_idx])
-            iou_filtered_results = list(map(_filter, self.results_list))
+            iou_filtered_results = list(map(_filter, self.results_list))    # no filtering
             
             score, curve = metric(iou_filtered_results)
             
@@ -120,7 +120,7 @@ class DetectionEvaluator:
             
             if curve is not None:
                 metric_curves.update(curve)
-        return metric_scores, metric_curves
+        return metric_scores
 
     @staticmethod
     def iou_filter(image_dict, iou_idx,
