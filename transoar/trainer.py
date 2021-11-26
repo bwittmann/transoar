@@ -1,6 +1,7 @@
 """Module containing the trainer of the transoar project."""
 
 import torch
+import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -103,43 +104,14 @@ class Trainer:
                 ]
             )
 
-            # self._evaluator.add(
-            #     pred_boxes=[boxes.detach().cpu().numpy() for boxes in out['pred_boxes']],
-            #     pred_classes=[torch.max(labels, dim=-1)[1].detach().cpu().numpy() for labels in out['pred_logits']],
-            #     pred_scores=[torch.max(labels, dim=-1)[0].detach().cpu().numpy() for labels in out['pred_logits']],
-            #     gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
-            #     gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
-            # )
-
-            # TODO
-            # - check again num classes in detr
-            # - only feed non zero detections to eval
-            # - reduce labels by one to make it work
-            # - double check with different ious
-            # - check open TODOs
-
-
-            import numpy as np
-            pred_boxes = [target['boxes'].detach().cpu().numpy() for target in targets]
-            pred_boxes[0][:, -1] = pred_boxes[0][:, -1] / 1.98
-            pred_boxes[0][-1, 0] = pred_boxes[0][-1, 0] + 2
-            # pred_boxes[0] = pred_boxes[0][:-1]
-            # pred_boxes[0] = pred_boxes[0].repeat(2, 0)
-
-            pred_scores = [np.ones(target['labels'].shape) for target in targets]
-            # pred_scores[0] = pred_scores[0][:-1]
-            # pred_scores[0] = pred_scores[0].repeat(2, 0)
-
-            pred_classes = [target['labels'].detach().cpu().numpy() - 1 for target in targets]
-            # pred_classes[0] = pred_classes[0][:-1]
-            # pred_classes[0] = pred_classes[0].repeat(2, 0)
-
+            # Evaluate validation predictions based on metric
+            pred_probs = F.softmax(out['pred_logits'], dim=-1)
             self._evaluator.add(
-                pred_boxes=pred_boxes,
-                pred_classes=pred_classes,
-                pred_scores=pred_scores,
+                pred_boxes=[boxes.detach().cpu().numpy() for boxes in out['pred_boxes']],
+                pred_classes=[torch.max(probs, dim=-1)[1].detach().cpu().numpy() for probs in pred_probs],
+                pred_scores=[torch.max(probs, dim=-1)[0].detach().cpu().numpy() for probs in pred_probs],
                 gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
-                gt_classes=[target['labels'].detach().cpu().numpy() - 1 for target in targets]
+                gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
             )
 
             loss_agg += loss.item()
@@ -152,7 +124,6 @@ class Trainer:
         loss_giou = loss_giou_agg / len(self._val_loader)
         loss_cls = loss_cls_agg / len(self._val_loader)
         metric_scores = self._evaluator.eval()
-        metric_ar = {k: v for k, v in metric_scores.items() if 'AR' in k}
 
         # Write to logger
         self._write_to_logger(
@@ -161,6 +132,20 @@ class Trainer:
             bbox_loss=loss_bbox,
             giou_loss=loss_giou,
             cls_loss=loss_cls
+        )
+
+        self._write_to_logger(
+            num_epoch, 'val_metric',
+            mAP=metric_scores['mAP_IoU_0.10_0.50_0.05_MaxDet_1'],
+            AP10=metric_scores['AP_IoU_0.10_MaxDet_1'],
+            AP20=metric_scores['AP_IoU_0.20_MaxDet_1'],
+            AP30=metric_scores['AP_IoU_0.30_MaxDet_1'],
+            AP40=metric_scores['AP_IoU_0.40_MaxDet_1'],
+            AP50=metric_scores['AP_IoU_0.50_MaxDet_1'],
+            AP60=metric_scores['AP_IoU_0.60_MaxDet_1'],
+            AP70=metric_scores['AP_IoU_0.70_MaxDet_1'],
+            AP80=metric_scores['AP_IoU_0.80_MaxDet_1'],
+            AP90=metric_scores['AP_IoU_0.90_MaxDet_1'],
         )
 
     def run(self):

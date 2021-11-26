@@ -364,7 +364,7 @@ def compute_stats_single_threshold(
     """
     num_recall_th = len(recall_thresholds)
 
-    rc = tp / num_gt
+    rc = tp / num_gt    # equal to def of: tp / (tp + fn)
     # np.spacing(1) is the smallest representable epsilon with float
     pr = tp / (fp + tp + np.spacing(1))
 
@@ -389,7 +389,7 @@ def compute_stats_single_threshold(
 
     # get indices to nearest given recall threshold (nn interpolation!)
     inds = np.searchsorted(rc, recall_thresholds, side='left')
-    try:
+    try:    # breaks bc of IndexError for array_index
         for save_idx, array_index in enumerate(inds):
             precision[save_idx] = pr[array_index]
             th_scores[save_idx] = dt_scores_sorted[array_index]
