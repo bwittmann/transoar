@@ -7,7 +7,7 @@ path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
 path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
 
 # Dataset specific
-num_classes: 21
+num_classes: 20
 labels:
   1: liver
   2: spleen

@@ -1,10 +1,9 @@
 # Config file for params related to training
 
 # General training
-experiment_name: test
+experiment_name: test #test_overfit_bbstrides1222_layer11_nomodeleval_q30
 device: cuda:0
-val_interval: 200000000
-log_iter: 1 # log not only epochs, but iterations
+val_interval: 1
 
 epochs: 300
 lr: 1e-4

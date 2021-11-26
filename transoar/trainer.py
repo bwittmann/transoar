@@ -30,7 +30,13 @@ class Trainer:
 
     def _train_one_epoch(self, num_epoch):
         self._model.train()
-        for idx, (data, mask, bboxes, _) in enumerate(tqdm(self._train_loader)):
+        # self._criterion.train()
+
+        loss_agg = 0
+        loss_bbox_agg = 0
+        loss_giou_agg = 0
+        loss_cls_agg = 0
+        for data, mask, bboxes, _ in tqdm(self._train_loader):
             # Put data to gpu
             data, mask = data.to(device=self._device), mask.to(device=self._device)
         
@@ -63,20 +69,29 @@ class Trainer:
 
             self._optimizer.step()
 
-            if idx % self._train_config['log_iter'] == 0:
-                # Write to logger
-                num_idx = (num_epoch - 1) * len(self._train_loader) + idx
-                self._write_to_logger(
-                    num_idx, 'train', 
-                    total_loss=loss.item(),
-                    bbox_loss=loss_bbox.item(),
-                    giou_loss=loss_giou.item(),
-                    cls_loss=loss_cls.item()
-                )
+            loss_agg += loss.item()
+            loss_bbox_agg += loss_bbox.item()
+            loss_giou_agg += loss_giou.item()
+            loss_cls_agg += loss_cls.item()
+
+        loss = loss_agg / len(self._train_loader)
+        loss_bbox = loss_bbox_agg / len(self._train_loader)
+        loss_giou = loss_giou_agg / len(self._train_loader)
+        loss_cls = loss_cls_agg / len(self._train_loader)
+
+        self._write_to_logger(
+            num_epoch, 'train', 
+            total_loss=loss,
+            bbox_loss=loss_bbox,
+            giou_loss=loss_giou,
+            cls_loss=loss_cls
+        )
 
     @torch.no_grad()
     def _validate(self, num_epoch):
-        self._model.eval()
+        # self._model.eval()
+        # self._criterion.eval()
+
         loss_agg = 0
         loss_bbox_agg = 0
         loss_giou_agg = 0
@@ -124,6 +139,7 @@ class Trainer:
         loss_giou = loss_giou_agg / len(self._val_loader)
         loss_cls = loss_cls_agg / len(self._val_loader)
         metric_scores = self._evaluator.eval()
+        self._evaluator.reset()
 
         # Write to logger
         self._write_to_logger(
