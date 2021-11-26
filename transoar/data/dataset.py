@@ -25,7 +25,9 @@ class TransoarDataset(Dataset):
         return len(self._data)
 
     def __getitem__(self, idx):
-        idx = 10    # TODO delete
+        if self._data_config['overfit']:
+            idx = 0
+
         case = self._data[idx]
         path_to_case = self._path_to_split / case
         data_path, label_path = sorted(list(path_to_case.iterdir()), key=lambda x: len(str(x)))

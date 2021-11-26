@@ -2,7 +2,7 @@
 
 backbones:
   swin_tiny:
-    patch_size: [4,4,4]
+    patch_size: [4, 4, 4]
     embed_dim: 96
     depths: [2, 2, 6, 2]
     num_heads: [3, 6, 12, 24]
@@ -18,8 +18,8 @@ backbones:
   senet:
     in_chans: 1
     depths: [4, 4, 8, 8]
-    strides: [2, 2, 2, 2] # prev. [1, 2, 2, 2]
-    num_channels: 2048  # [64, 256, 512, 1024, 2048]
+    strides: [1, 2, 2, 2] # prev. [1, 2, 2, 2]
+    num_channels: 2048 # [64, 256, 512, 1024, 2048]
     num_layers: 4 # [0, 1, 2, 3, 4]
     reduction: 16
 
@@ -29,8 +29,8 @@ necks:
     dropout: 0.1
     nheads: 8
     dim_feedforward: 2048
-    enc_layers: 2 #6
-    dec_layers: 2 #6
+    enc_layers: 1 #6
+    dec_layers: 1 #6
     pre_norm: False   # double check
-    num_queries: 20 #100
+    num_queries: 30 #100
     aux_loss: False # TODO implement

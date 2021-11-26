@@ -89,7 +89,7 @@ class Trainer:
 
     @torch.no_grad()
     def _validate(self, num_epoch):
-        # self._model.eval()
+        self._model.eval()
         # self._criterion.eval()
 
         loss_agg = 0

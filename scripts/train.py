@@ -18,7 +18,11 @@ def train(config):
 
     # Build necessary components
     train_loader = get_loader(config['data'], 'train')
-    val_loader = get_loader(config['data'], 'train')
+
+    if config['data']['overfit']:
+        val_loader = get_loader(config['data'], 'train')
+    else:
+        val_loader = get_loader(config['data'], 'val')
 
     model = TransoarNet(config['model'], config['data']['num_classes']).to(device=device)
     criterion = build_criterion(config['training']).to(device=device)
