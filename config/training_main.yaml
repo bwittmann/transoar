@@ -1,11 +1,13 @@
 # Config file for params related to training
 
 # General training
-experiment_name: test
+experiment_name: test # test_bbstrides1222_layer11_q100
 device: cuda:0
 val_interval: 1
+debug_mode: False  # doesn't save checkpoints
+seed: 10
 
-epochs: 300
+epochs: 300 # should be about ~300k train steps
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4

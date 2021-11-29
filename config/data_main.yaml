@@ -5,7 +5,7 @@ dataset_name: transoar_spacing444_th
 modality: CT
 path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
 path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
-overfit: False  # use same set consisting of one image for train and val
+overfit: True  # use same set consisting of one image for train and val
 
 # Dataset specific
 num_classes: 20

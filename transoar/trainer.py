@@ -11,7 +11,7 @@ class Trainer:
 
     def __init__(
         self, train_loader, val_loader, model, criterion, optimizer, scheduler,
-        device, config, path_to_run
+        device, config, path_to_run, epoch, metric_start_val
     ):
         self._train_loader = train_loader
         self._val_loader = val_loader
@@ -20,6 +20,8 @@ class Trainer:
         self._optimizer = optimizer
         self._scheduler = scheduler
         self._device = device
+        self._path_to_run = path_to_run
+        self._epoch_to_start = epoch
 
         self._train_config = config['training']
         self._writer = SummaryWriter(log_dir=path_to_run)
@@ -27,6 +29,10 @@ class Trainer:
         self._evaluator = DetectionEvaluator(
             classes=list(config['data']['labels'].values())
         )
+
+        # Init main metric for checkpoint
+        self._main_metric_key = 'mAP_IoU_0.10_0.50_0.05_MaxDet_1'
+        self._main_metric_max_val = metric_start_val
 
     def _train_one_epoch(self, num_epoch):
         self._model.train()
@@ -89,7 +95,7 @@ class Trainer:
 
     @torch.no_grad()
     def _validate(self, num_epoch):
-        self._model.eval()
+        # self._model.eval()
         # self._criterion.eval()
 
         loss_agg = 0
@@ -141,6 +147,15 @@ class Trainer:
         metric_scores = self._evaluator.eval()
         self._evaluator.reset()
 
+        # Check if new best checkpoint
+        if metric_scores[self._main_metric_key] >= self._main_metric_max_val \
+            and not self._train_config['debug_mode']:
+            self._main_metric_max_val = metric_scores[self._main_metric_key]
+            self._save_checkpoint(
+                num_epoch,
+                f'model_best_{metric_scores[self._main_metric_key]:.3f}.pt'
+            )
+
         # Write to logger
         self._write_to_logger(
             num_epoch, 'val', 
@@ -165,8 +180,10 @@ class Trainer:
         )
 
     def run(self):
-        self._validate(0)
-        for epoch in range(1, self._train_config['epochs'] + 1):
+        if self._epoch_to_start == 0:   # For initial performance estimation
+            self._validate(0)
+
+        for epoch in range(self._epoch_to_start + 1, self._train_config['epochs'] + 1):
             self._train_one_epoch(epoch)
 
             # Log learning rates
@@ -181,7 +198,23 @@ class Trainer:
 
             self._scheduler.step()
 
+            if not self._train_config['debug_mode']:
+                self._save_checkpoint(epoch, 'model_last.pt')
+
     def _write_to_logger(self, num_epoch, category, **kwargs):
         for key, value in kwargs.items():
             name = category + '/' + key
             self._writer.add_scalar(name, value, num_epoch)
+
+    def _save_checkpoint(self, num_epoch, name):
+        # Delete prior best checkpoint
+        if 'best' in name:
+            [path.unlink() for path in self._path_to_run.iterdir() if 'best' in str(path)]
+
+        torch.save({
+            'epoch': num_epoch,
+            'metric_max_val': self._main_metric_max_val,
+            'model_state_dict': self._model.state_dict(),
+            'optimizer_state_dict': self._optimizer.state_dict(),
+            'scheduler_state_dict': self._scheduler.state_dict(),
+        }, self._path_to_run / name)
