@@ -3,8 +3,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transoar.models.build import build_backbone, build_neck
-from transoar.models.position_encoding import PositionEmbeddingSine3D
+from transoar.models.build import build_backbone, build_neck, build_pos_enc
 
 class TransoarNet(nn.Module):
     def __init__(self, config, num_classes):
@@ -29,8 +28,7 @@ class TransoarNet(nn.Module):
         self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 
         # Get positional encoding
-        self._pos_enc = PositionEmbeddingSine3D(channels=hidden_dim)
-
+        self._pos_enc = build_pos_enc(config['neck'])
 
     def forward(self, x, mask):
         x, mask = self._backbone(x, mask)

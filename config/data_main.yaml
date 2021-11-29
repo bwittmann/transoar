@@ -57,4 +57,4 @@ mirror_axes: [0, 1, 2]
 # Dataloader
 batch_size: 1
 shuffle: False
-num_workers: 0
+num_workers: 2

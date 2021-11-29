@@ -25,12 +25,13 @@ backbones:
 
 necks:
   detr:
+    pos_encoding: sine
     hidden_dim: 256
     dropout: 0.1
     nheads: 8
     dim_feedforward: 2048
     enc_layers: 1 #6
     dec_layers: 1 #6
-    pre_norm: False   # double check
-    num_queries: 30 #100
+    pre_norm: False
+    num_queries: 20 #100
     aux_loss: False # TODO implement

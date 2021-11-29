@@ -1,10 +1,13 @@
 """Module containing functionality to build different parts of the model."""
 
+import numpy as np
+
 from transoar.utils.io import get_config
 from transoar.models.matcher import HungarianMatcher
 from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.necks.detr_transformer import DetrTransformer
+from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
 
 data_config = get_config('data_main')
 
@@ -56,3 +59,12 @@ def build_criterion(train_config):
     )
 
     return criterion
+
+def build_pos_enc(neck_config):
+    channels = neck_config['hidden_dim']
+    if neck_config['pos_encoding'] == 'sine':
+        return PositionEmbeddingSine3D(channels=channels)
+    elif neck_config['pos_encoding'] == 'learned':
+        return PositionEmbeddingLearned3D(channels=channels)
+    else:
+        raise ValueError('Please select a implemented pos. encoding.')
