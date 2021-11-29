@@ -20,18 +20,20 @@ backbones:
     depths: [4, 4, 8, 8]
     strides: [1, 2, 2, 2] # prev. [1, 2, 2, 2]
     num_channels: 2048 # [64, 256, 512, 1024, 2048]
+    feature_map_dim: [4, 4, 10]
     num_layers: 4 # [0, 1, 2, 3, 4]
     reduction: 16
 
 necks:
   detr:
+    skip_con: True # from backbone to heads
     pos_encoding: sine
-    hidden_dim: 256
+    hidden_dim: 256 # TODO increase and test
     dropout: 0.1
     nheads: 8
     dim_feedforward: 2048
     enc_layers: 1 #6
     dec_layers: 1 #6
     pre_norm: False
-    num_queries: 20 #100
+    num_queries: 100 # spine-trans use 25
     aux_loss: False # TODO implement

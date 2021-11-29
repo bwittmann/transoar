@@ -1,5 +1,6 @@
 """Main model of the transoar project."""
 
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -12,7 +13,15 @@ class TransoarNet(nn.Module):
         num_queries = config['neck']['num_queries']
         num_channels = config['backbone']['num_channels']
         num_classes = num_classes
-        
+
+        # Skip connection from backbone outputs to heads
+        self._skip_con = config['neck']['skip_con']
+        if self._skip_con:
+            self._skip_proj = nn.Linear(
+                np.prod(config['backbone']['feature_map_dim']), 
+                config['neck']['num_queries']
+            )
+
         # Get backbone
         self._backbone = build_backbone(config['backbone'])
 
@@ -31,18 +40,24 @@ class TransoarNet(nn.Module):
         self._pos_enc = build_pos_enc(config['neck'])
 
     def forward(self, x, mask):
-        x, mask = self._backbone(x, mask)
+        x_backbone, mask = self._backbone(x, mask)
+        x_backbone_proj = self._input_proj(x_backbone)
 
-        x = self._neck(             # [Batch, Queries, HiddenDim]         
-            self._input_proj(x),
+        x_neck = self._neck(             # [Batch, Queries, HiddenDim]         
+            x_backbone_proj,
             mask,
             self._query_embed.weight,
             self._pos_enc(mask)
         )[0]
 
+        if self._skip_con:
+            x_backbone_proj = x_backbone_proj.flatten(2)
+            x_backbone_skip_proj = self._skip_proj(x_backbone_proj).permute(0, 2, 1)
+            x_neck = x_neck + x_backbone_skip_proj
+
         out = {
-            'pred_logits': self._cls_head(x),
-            'pred_boxes': self._bbox_reg_head(x).sigmoid()
+            'pred_logits': self._cls_head(x_neck),
+            'pred_boxes': self._bbox_reg_head(x_neck).sigmoid()
         }
 
         return out
