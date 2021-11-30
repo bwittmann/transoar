@@ -19,4 +19,24 @@ def inference(out):
     pred_boxes = [pred[ids] for pred, ids in zip(pred_boxes, valid_ids)]
     pred_scores = [pred[ids] for pred, ids in zip(pred_scores, valid_ids)]
 
+    # Get detection with highest score for each class as final prediction
+    for idx, (batch_classes, batch_scores) in enumerate(zip(pred_classes, pred_scores)):
+        max_ids = []
+        unique_classes = np.unique(batch_classes)
+
+        for class_ in unique_classes:
+            class_idx = (batch_classes == class_).nonzero()[0]
+
+            if class_idx.size > 1:
+                class_scores = batch_scores[class_idx]
+                max_ids.append(class_idx[class_scores.argmax()])
+            else:
+                max_ids.append(class_idx.item())
+
+        pred_classes[idx] = pred_classes[idx][max_ids]
+        pred_scores[idx] = pred_scores[idx][max_ids]
+        pred_boxes[idx] = pred_boxes[idx][max_ids]
+
+        assert pred_classes[idx].size <= 20
+
     return pred_boxes, pred_classes, pred_scores
