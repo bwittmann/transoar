@@ -26,7 +26,7 @@ class TransoarCriterion(nn.Module):
         self.matcher = matcher
         self.eos_coef = eos_coef
         empty_weight = torch.ones(self.num_classes + 1)
-        empty_weight[-1] = self.eos_coef
+        empty_weight[0] = self.eos_coef
         self.register_buffer('empty_weight', empty_weight)
 
     def loss_class(self, outputs, targets, indices):
@@ -39,7 +39,7 @@ class TransoarCriterion(nn.Module):
         idx = self._get_src_permutation_idx(indices)
 
         target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
-        target_classes = torch.full(src_logits.shape[:2], self.num_classes,
+        target_classes = torch.full(src_logits.shape[:2], 0,
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
 
