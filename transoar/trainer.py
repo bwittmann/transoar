@@ -6,6 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from transoar.evaluator import DetectionEvaluator
+from transoar.inference import inference
 
 class Trainer:
 
@@ -95,7 +96,7 @@ class Trainer:
 
     @torch.no_grad()
     def _validate(self, num_epoch):
-        # self._model.eval()
+        self._model.eval()
         # self._criterion.eval()
 
         loss_agg = 0
@@ -126,11 +127,11 @@ class Trainer:
             )
 
             # Evaluate validation predictions based on metric
-            pred_probs = F.softmax(out['pred_logits'], dim=-1)
+            pred_boxes, pred_classes, pred_scores = inference(out)
             self._evaluator.add(
-                pred_boxes=[boxes.detach().cpu().numpy() for boxes in out['pred_boxes']],
-                pred_classes=[torch.max(probs, dim=-1)[1].detach().cpu().numpy() for probs in pred_probs],
-                pred_scores=[torch.max(probs, dim=-1)[0].detach().cpu().numpy() for probs in pred_probs],
+                pred_boxes=pred_boxes,
+                pred_classes=pred_classes,
+                pred_scores=pred_scores,
                 gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
                 gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
             )

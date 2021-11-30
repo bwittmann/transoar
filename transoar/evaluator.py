@@ -88,12 +88,6 @@ class DetectionEvaluator:
         Returns
             dict: empty dict... detection metrics can only be evaluated at the end
         """
-        # get rid of empty detections (class 0)
-        valid_ids = [np.nonzero(batch_elem_classes) for batch_elem_classes in pred_classes]
-        pred_classes = [pred[ids] for pred, ids in zip(pred_classes, valid_ids)]
-        pred_boxes = [pred[ids] for pred, ids in zip(pred_boxes, valid_ids)]
-        pred_scores = [pred[ids] for pred, ids in zip(pred_scores, valid_ids)]
-
         # reduce class ids by 1 to start with 0
         gt_classes = [batch_elem_classes -1 for batch_elem_classes in gt_classes]
         pred_classes = [batch_elem_classes -1 for batch_elem_classes in pred_classes]

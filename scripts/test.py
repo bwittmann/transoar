@@ -11,6 +11,7 @@ from transoar.utils.io import load_json, write_json
 from transoar.data.dataloader import get_loader
 from transoar.models.transoarnet import TransoarNet
 from transoar.evaluator import DetectionEvaluator
+from transoar.inference import inference
 
 class Tester:
 
@@ -46,6 +47,10 @@ class Tester:
         self._model.load_state_dict(checkpoint['model_state_dict'])
         self._model.eval()
 
+    def _postprocess_and_save(self, predictions, data_shape):
+        pass
+
+
     def run(self):
         with torch.no_grad():
             for data, mask, bboxes, _ in tqdm(self._test_loader):
@@ -63,12 +68,15 @@ class Tester:
                 # Make prediction
                 out = self._model(data, mask)
 
+                # Change val of bboxes from sigmoid range back to meaningful values and save results
+                # self._postprocess_and_save(out, data.shape)
+
                 # Add pred to evaluator
-                pred_probs = F.softmax(out['pred_logits'], dim=-1)
+                pred_boxes, pred_classes, pred_scores = inference(out)
                 self._evaluator.add(
-                    pred_boxes=[boxes.detach().cpu().numpy() for boxes in out['pred_boxes']],
-                    pred_classes=[torch.max(probs, dim=-1)[1].detach().cpu().numpy() for probs in pred_probs],
-                    pred_scores=[torch.max(probs, dim=-1)[0].detach().cpu().numpy() for probs in pred_probs],
+                    pred_boxes=pred_boxes,
+                    pred_classes=pred_classes,
+                    pred_scores=pred_scores,
                     gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
                     gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
                 )
@@ -88,6 +96,8 @@ if __name__ == "__main__":
     parser.add_argument('--last', action='store_true', help='Use model_last instead of model_best.')
     parser.add_argument('--save_preds', action='store_true', help='Save predictions.')
     args = parser.parse_args()
+
+    # TODO make batch_size 1?
 
     tester = Tester(args)
     tester.run()
