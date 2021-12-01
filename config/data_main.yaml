@@ -5,14 +5,14 @@ dataset_name: transoar_spacing444_th
 modality: CT
 path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
 path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
-overfit: True  # use same set consisting of one image for train and val
+overfit: False # use same set consisting of one image for train and val
 
 # Dataset specific
 num_classes: 20
 labels:
   1: liver
   2: spleen
-  3: pancreas,
+  3: pancreas
   4: gall_bladder
   5: urinary_bladder
   6: aorta
@@ -45,7 +45,7 @@ anisotropy_threshold: 3
 target_spacing_percentile: 50
 
 # Augmentation
-use_augmentation: False
+use_augmentation: True
 p_rotation: 0.2
 rotation: [-30, 30]
 p_scale: 0.2

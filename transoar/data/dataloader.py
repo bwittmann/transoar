@@ -19,10 +19,13 @@ try:
 except:
     max_shape = None
 
-def get_loader(data_config, split):
+def get_loader(data_config, split, batch_size=None):
+    if not batch_size:
+        batch_size = data_config['batch_size']
+
     dataset = TransoarDataset(data_config, split)
     dataloader = DataLoader(
-        dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+        dataset, batch_size=batch_size, shuffle=data_config['shuffle'],
         num_workers=data_config['num_workers'], collate_fn=pad_collate
     )
     return dataloader

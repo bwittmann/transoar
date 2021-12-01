@@ -148,3 +148,28 @@ def set_root_logger(file_path):
             logging.StreamHandler(sys.stdout)
         ]
     )
+
+def write_ply(verts, colors, indices, output_file):
+    if colors is None:
+        colors = np.zeros_like(verts)
+    if indices is None:
+        indices = []
+
+    file = open(output_file, 'w')
+    file.write('ply \n')
+    file.write('format ascii 1.0\n')
+    file.write('element vertex {:d}\n'.format(len(verts)))
+    file.write('property float x\n')
+    file.write('property float y\n')
+    file.write('property float z\n')
+    file.write('property uchar red\n')
+    file.write('property uchar green\n')
+    file.write('property uchar blue\n')
+    file.write('element face {:d}\n'.format(len(indices)))
+    file.write('property list uchar uint vertex_indices\n')
+    file.write('end_header\n')
+    for vert, color in zip(verts, colors):
+        file.write("{:f} {:f} {:f} {:d} {:d} {:d}\n".format(vert[0], vert[1], vert[2], int(color[0] * 255), int(color[1] * 255), int(color[2] * 255)))
+    for ind in indices:
+        file.write('3 {:d} {:d} {:d}\n'.format(ind[0], ind[1], ind[2]))
+    file.close()
