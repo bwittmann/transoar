@@ -192,10 +192,10 @@ def save_pred_visualization(
             bbox_mesh = pcd.get_axis_aligned_bounding_box()
             mesh = poisson_mesh.crop(bbox_mesh)
 
-            path_mesh = str(path_to_instance) + f'/{classes[str(class_)]}.ply'
+            path_mesh = str(path_to_instance) + f'/{classes[str(class_)]}_mesh.ply'
             o3d.io.write_triangle_mesh(path_mesh, mesh)
         else:
-            path_pc = str(path_to_instance) + f'/{classes[str(class_)]}.ply'
+            path_pc = str(path_to_instance) + f'/{classes[str(class_)]}_pc.ply'
             o3d.io.write_point_cloud(path_pc, pcd)
 
         # Gt bboxes
