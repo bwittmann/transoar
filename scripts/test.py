@@ -32,11 +32,6 @@ class Tester:
         else:
             path_to_ckpt = avail_checkpoints[-1]
 
-        # Create dir to store results
-        self._path_to_results = path_to_run / 'results' / path_to_ckpt.parts[-1][:-3]
-        path_to_vis = self._path_to_results / 'vis'
-        path_to_vis.mkdir(parents=True, exist_ok=True)
-
         # Build necessary components
         self._set_to_eval = 'val' if args.val else 'test'
         self._test_loader = get_loader(config['data'], self._set_to_eval, batch_size=1)
@@ -48,6 +43,11 @@ class Tester:
         checkpoint = torch.load(path_to_ckpt)
         self._model.load_state_dict(checkpoint['model_state_dict'])
         self._model.eval()
+
+        # Create dir to store results
+        self._path_to_results = path_to_run / 'results' / path_to_ckpt.parts[-1][:-3]
+        self._path_to_vis = self._path_to_results / ('vis_' + self._set_to_eval)
+        self._path_to_vis.mkdir(parents=True, exist_ok=True)
   
     def run(self):
         with torch.no_grad():
@@ -83,7 +83,7 @@ class Tester:
                 if self._save_preds:
                     save_pred_visualization(
                         pred_boxes[0], pred_classes[0], gt_boxes[0], gt_classes[0], seg_mask[0], 
-                        self._path_to_results, self._class_dict, idx
+                        self._path_to_vis, self._class_dict, idx
                     )
 
             # Get and store final results

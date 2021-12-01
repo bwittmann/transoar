@@ -168,7 +168,7 @@ def save_pred_visualization(
 
     # Create dir for current instance
     instance_name = 'case_' + str(idx)
-    path_to_instance = path / 'vis' / instance_name
+    path_to_instance = path / instance_name
     path_to_instance.mkdir(exist_ok=True)
 
     # Generate point cloud of each class and gt boxes
