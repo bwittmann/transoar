@@ -35,6 +35,9 @@ class Trainer:
         self._main_metric_key = 'mAP_IoU_0.10_0.50_0.05_MaxDet_1'
         self._main_metric_max_val = metric_start_val
 
+        # Create a dict for loss coefs
+        self._loss_coefs = config['training']['loss_coefs']
+
     def _train_one_epoch(self, num_epoch):
         self._model.train()
         # self._criterion.train()
@@ -57,17 +60,15 @@ class Trainer:
 
             # Make prediction 
             out = self._model(data, mask)
-            loss_bbox, loss_giou, loss_cls = self._criterion(out, targets)
-            loss = sum(
-                [
-                    loss_bbox * self._train_config['loss_coefs']['bbox_loss_coef'],
-                    loss_giou * self._train_config['loss_coefs']['giou_loss_coef'],
-                    loss_cls * self._train_config['loss_coefs']['cls_loss_coef'],
-                ]
-            )
+            loss_dict = self._criterion(out, targets)
+
+            # Create absolute loss and mult with loss coefficient
+            loss_abs = 0
+            for loss_key, loss_val in loss_dict.items():
+                loss_abs += loss_val * self._loss_coefs[loss_key.split('_')[0]]
 
             self._optimizer.zero_grad()
-            loss.backward()
+            loss_abs.backward()
 
             # Clip grads to counter exploding grads
             max_norm = self._train_config['clip_max_norm']
@@ -76,10 +77,10 @@ class Trainer:
 
             self._optimizer.step()
 
-            loss_agg += loss.item()
-            loss_bbox_agg += loss_bbox.item()
-            loss_giou_agg += loss_giou.item()
-            loss_cls_agg += loss_cls.item()
+            loss_agg += loss_abs.item()
+            loss_bbox_agg += loss_dict['bbox'].item()
+            loss_giou_agg += loss_dict['giou'].item()
+            loss_cls_agg += loss_dict['cls'].item()
 
         loss = loss_agg / len(self._train_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
@@ -117,14 +118,12 @@ class Trainer:
 
             # Make prediction 
             out = self._model(data, mask)
-            loss_bbox, loss_giou, loss_cls = self._criterion(out, targets)
-            loss = sum(
-                [
-                    loss_bbox * self._train_config['loss_coefs']['bbox_loss_coef'],
-                    loss_giou * self._train_config['loss_coefs']['giou_loss_coef'],
-                    loss_cls * self._train_config['loss_coefs']['cls_loss_coef'],
-                ]
-            )
+            loss_dict = self._criterion(out, targets)
+
+            # Create absolute loss and mult with loss coefficient
+            loss_abs = 0
+            for loss_key, loss_val in loss_dict.items():
+                loss_abs += loss_val * self._loss_coefs[loss_key.split('_')[0]]
 
             # Evaluate validation predictions based on metric
             pred_boxes, pred_classes, pred_scores = inference(out)
@@ -136,10 +135,10 @@ class Trainer:
                 gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
             )
 
-            loss_agg += loss.item()
-            loss_bbox_agg += loss_bbox.item()
-            loss_giou_agg += loss_giou.item()
-            loss_cls_agg += loss_cls.item()
+            loss_agg += loss_abs.item()
+            loss_bbox_agg += loss_dict['bbox'].item()
+            loss_giou_agg += loss_dict['giou'].item()
+            loss_cls_agg += loss_dict['cls'].item()
 
         loss = loss_agg / len(self._val_loader)
         loss_bbox = loss_bbox_agg / len(self._val_loader)

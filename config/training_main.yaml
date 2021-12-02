@@ -1,7 +1,7 @@
 # Config file for params related to training
 
 # General training
-experiment_name: test_bbstrides1222_layer22_q50_b3_h768_nodrop_noskip_realval
+experiment_name: test #test_bbstrides1222_layer22_q50_b3_h768_nodrop_noskip_realval
 device: cuda:3
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
@@ -24,6 +24,6 @@ set_cost_giou: 4
 # Losses
 eos_coef: 0.1
 loss_coefs:
-  cls_loss_coef: 1
-  bbox_loss_coef: 5
-  giou_loss_coef: 2
+  cls: 1
+  bbox: 5
+  giou: 2

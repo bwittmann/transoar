@@ -36,4 +36,4 @@ necks:
     dec_layers: 2 #6
     pre_norm: False
     num_queries: 50 # spine-trans use 25
-    aux_loss: False # TODO implement
+    aux_loss: True

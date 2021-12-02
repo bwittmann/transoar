@@ -91,4 +91,22 @@ class TransoarCriterion(nn.Module):
         loss_bbox, loss_giou = self.loss_bboxes(outputs, targets, indices, num_boxes)
         loss_cls = self.loss_class(outputs, targets, indices)
 
-        return loss_bbox, loss_giou, loss_cls
+        loss_dict = {
+            'bbox': loss_bbox,
+            'giou': loss_giou,
+            'cls': loss_cls
+        }
+
+        # Compute losses for the output of each intermediate layer
+        if 'aux_outputs' in outputs:
+            for i, aux_outputs in enumerate(outputs['aux_outputs']):
+                indices = self.matcher(aux_outputs, targets)
+
+                loss_bbox, loss_giou = self.loss_bboxes(aux_outputs, targets, indices, num_boxes)
+                loss_cls = self.loss_class(aux_outputs, targets, indices)
+
+                loss_dict[f'bbox_{i}'] = loss_bbox
+                loss_dict[f'giou_{i}'] = loss_giou
+                loss_dict[f'cls_{i}'] = loss_cls
+
+        return loss_dict

@@ -40,7 +40,7 @@ def build_neck(neck_config):
             num_encoder_layers=neck_config['enc_layers'],
             num_decoder_layers=neck_config['dec_layers'],
             normalize_before=neck_config['pre_norm'],
-            return_intermediate_dec=False
+            return_intermediate_dec=True
         )
 
     return model

@@ -1,6 +1,7 @@
 """Main model of the transoar project."""
 
 import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -13,6 +14,9 @@ class TransoarNet(nn.Module):
         num_queries = config['neck']['num_queries']
         num_channels = config['backbone']['num_channels']
         num_classes = num_classes
+
+        # Use auxiliary decoding losses if required
+        self._aux_loss = config['neck']['aux_loss']
 
         # Skip connection from backbone outputs to heads
         self._skip_con = config['neck']['skip_con']
@@ -48,19 +52,31 @@ class TransoarNet(nn.Module):
             mask,
             self._query_embed.weight,
             self._pos_enc(mask)
-        )[0]
+        )
 
         if self._skip_con:
             x_backbone_proj = x_backbone_proj.flatten(2)
             x_backbone_skip_proj = self._skip_proj(x_backbone_proj).permute(0, 2, 1)
             x_neck = x_neck + x_backbone_skip_proj
 
+        pred_logits = self._cls_head(x_neck)
+        pred_boxes = self._bbox_reg_head(x_neck).sigmoid()
+
         out = {
-            'pred_logits': self._cls_head(x_neck),
-            'pred_boxes': self._bbox_reg_head(x_neck).sigmoid()
+            'pred_logits': pred_logits[-1], # Take output of last layer
+            'pred_boxes': pred_boxes[-1]
         }
 
+        if self._aux_loss:
+            out['aux_outputs'] = self._set_aux_loss(pred_logits, pred_boxes)
+
         return out
+
+    @torch.jit.unused
+    def _set_aux_loss(self, pred_logits, pred_boxes):
+        # Hack to support dictionary with non-homogeneous values
+        return [{'pred_logits': a, 'pred_boxes': b}
+                for a, b in zip(pred_logits[:-1], pred_boxes[:-1])]
 
 
 class MLP(nn.Module):
