@@ -20,7 +20,7 @@ def train(config, args):
     # Build necessary components
     train_loader = get_loader(config['data'], 'train')
 
-    if True: #config['data']['overfit']:
+    if config['data']['overfit']:
         val_loader = get_loader(config['data'], 'train')
     else:
         val_loader = get_loader(config['data'], 'val')
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Add minimal amount of args (most args should be set in config files)
-    parser.add_argument("--resume", type=str, help="Path to checkpoint to use", default=None)
+    parser.add_argument("--resume", type=str, help="Path to checkpoint to use.", default=None)
     args = parser.parse_args()
 
     # Get relevant configs

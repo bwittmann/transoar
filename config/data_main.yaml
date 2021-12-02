@@ -55,6 +55,6 @@ gamma_range: [0.7, 1.5]
 mirror_axes: [0, 1, 2]
 
 # Dataloader
-batch_size: 1
+batch_size: 3
 shuffle: False
-num_workers: 2
+num_workers: 4
