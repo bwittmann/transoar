@@ -9,37 +9,37 @@ import torch
 
 from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
-from transoar.utils.io import get_complete_config, write_json
+from transoar.utils.io import get_config, write_json, get_meta_data
 from transoar.models.transoarnet import TransoarNet
 from transoar.models.build import build_criterion
 
 
 def train(config, args):
-    device = config['training']['device']
+    device = config['device']
 
     # Build necessary components
-    train_loader = get_loader(config['data'], 'train')
+    train_loader = get_loader(config, 'train')
 
-    if config['data']['overfit']:
-        val_loader = get_loader(config['data'], 'train')
+    if config['overfit']:
+        val_loader = get_loader(config, 'train')
     else:
-        val_loader = get_loader(config['data'], 'val')
+        val_loader = get_loader(config, 'val')
 
-    model = TransoarNet(config['model'], config['data']['num_classes']).to(device=device)
-    criterion = build_criterion(config['training']).to(device=device)
+    model = TransoarNet(config).to(device=device)
+    criterion = build_criterion(config).to(device=device)
 
     param_dicts = [
         {"params": [p for n, p in model.named_parameters() if "backbone" not in n and p.requires_grad]},
         {
             "params": [p for n, p in model.named_parameters() if "backbone" in n and p.requires_grad],
-            "lr": float(config['training']['lr_backbone'])
+            "lr": float(config['lr_backbone'])
         },
     ]
 
     optim = torch.optim.AdamW(
-        param_dicts, lr=float(config['training']['lr']), weight_decay=float(config['training']['weight_decay'])
+        param_dicts, lr=float(config['lr']), weight_decay=float(config['weight_decay'])
     )
-    scheduler = torch.optim.lr_scheduler.StepLR(optim, config['training']['lr_drop'])
+    scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
 
     # Load checkpoint if applicable
     if args.resume is not None:
@@ -56,8 +56,11 @@ def train(config, args):
         metric_start_val = 0
 
     # Init logging
-    path_to_run = Path(os.getcwd()) / 'runs' / config['training']['experiment_name']
+    path_to_run = Path(os.getcwd()) / 'runs' / config['experiment_name']
     path_to_run.mkdir(exist_ok=True)
+
+    # Get meta data and write config to run
+    config.update(get_meta_data())
     write_json(config, path_to_run / 'config.json')
 
     # Build trainer and start training
@@ -72,15 +75,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # Add minimal amount of args (most args should be set in config files)
+    parser.add_argument("--config", type=str, required=True, help="Config to use for training located in /config.")
     parser.add_argument("--resume", type=str, help="Path to checkpoint to use.", default=None)
     args = parser.parse_args()
 
     # Get relevant configs
-    config = get_complete_config()
+    config = get_config(args.config)
 
-    torch.manual_seed(config['training']['seed'])
-    np.random.seed(config['training']['seed'])
-    torch.backends.cudnn.deterministic = True
+    torch.manual_seed(config['seed'])
+    np.random.seed(config['seed'])
+    torch.backends.cudnn.deterministic = True   # TODO check
     torch.backends.cudnn.benchmark = False
 
     train(config, args)

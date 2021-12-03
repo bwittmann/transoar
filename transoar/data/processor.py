@@ -12,15 +12,16 @@ from transoar.utils.io import write_json
 class Preprocessor:
     """Preprocessor to pre-process raw data samples."""
     def __init__(
-        self, paths_to_train, paths_to_val, paths_to_test, data_config, 
+        self, paths_to_train, paths_to_val, paths_to_test, preprocessing_config, data_config,
         path_to_splits, analysis
     ):
+        self._preprocessing_config = preprocessing_config
         self._data_config = data_config
         self._path_to_splits = path_to_splits
         self._analysis = analysis
 
         self._preprocessing_transform = transform_preprocessing(
-            margin=data_config['margin'], crop_key=data_config['key'], orientation=data_config['orientation'],
+            margin=preprocessing_config['margin'], crop_key=preprocessing_config['key'], orientation=preprocessing_config['orientation'],
             target_spacing=analysis['target_spacing'][[2, 1, 0]], clip_min=analysis['voxel_statistics']['percentile_00_5'],
             clip_max=analysis['voxel_statistics']['percentile_99_5'], std=analysis['voxel_statistics']['std'],
             mean=analysis['voxel_statistics']['mean']
@@ -49,8 +50,8 @@ class Preprocessor:
                 shapes.append(image.shape)
 
                 # Skip cases with a small amount of labels
-                if np.unique(label).size < self._data_config['min_num_organs']:
-                    logging.info(f"Skipped case {case.name} with less than {self._data_config['min_num_organs']} organs.")
+                if np.unique(label).size < self._preprocessing_config['min_num_organs']:
+                    logging.info(f"Skipped case {case.name} with less than {self._preprocessing_config['min_num_organs']} organs.")
                     continue
 
                 logging.info(f'Successfull prepared case {case.name} of shape {image.shape}.')
@@ -60,9 +61,11 @@ class Preprocessor:
                 np.save(str(path_to_case / 'data.npy'), image.astype(np.float32))
                 np.save(str(path_to_case / 'label.npy'), label.astype(np.int32))
             
-        if self._data_config['fixed_size']:
+        if self._preprocessing_config['fixed_size']:
             dict_to_save = {
                 'max_size': np.max(np.array(shapes), axis=0).tolist()
             }
-            write_json(dict_to_save, self._path_to_splits / 'max_size.json')
+            self._data_config.update(dict_to_save)
 
+        # Save relevant information of dataset and preprocessing
+        write_json(self._data_config, self._path_to_splits / 'data_info.json')

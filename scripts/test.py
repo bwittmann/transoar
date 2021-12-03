@@ -4,7 +4,6 @@ import argparse
 from pathlib import Path
 
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 
 from transoar.utils.io import load_json, write_json
@@ -21,7 +20,7 @@ class Tester:
         config = load_json(path_to_run / 'config.json')
 
         self._save_preds = args.save_preds
-        self._class_dict = config['data']['labels']
+        self._class_dict = config['labels']
         self._device = 'cuda:' + str(args.num_gpu)
 
         # Get path to checkpoint
@@ -34,10 +33,10 @@ class Tester:
 
         # Build necessary components
         self._set_to_eval = 'val' if args.val else 'test'
-        self._test_loader = get_loader(config['data'], self._set_to_eval, batch_size=1)
+        self._test_loader = get_loader(config, self._set_to_eval, batch_size=1)
 
-        self._evaluator = DetectionEvaluator(classes=list(config['data']['labels'].values()))
-        self._model = TransoarNet(config['model'], config['data']['num_classes']).to(device=self._device)
+        self._evaluator = DetectionEvaluator(classes=list(config['labels'].values()))
+        self._model = TransoarNet(config).to(device=self._device)
 
         # Load checkpoint
         checkpoint = torch.load(path_to_ckpt)

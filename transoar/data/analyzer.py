@@ -11,9 +11,9 @@ from transoar.utils.io import load_case
 
 class DataSetAnalyzer:
     """Analyzer to analyze properties of dataset."""
-    def __init__(self, paths_to_cases, data_config):
+    def __init__(self, paths_to_cases, preprocessing_config):
         self._paths_to_cases = paths_to_cases
-        self._data_config = data_config
+        self._preprocessing_config = preprocessing_config
 
         # Init structures to collect properties
         self._shapes = []
@@ -21,7 +21,7 @@ class DataSetAnalyzer:
         self._norm_voxels = []
 
         self._cropper = transform_crop(
-            data_config['margin'], data_config['key'], data_config['orientation']
+            preprocessing_config['margin'], preprocessing_config['key'], preprocessing_config['orientation']
         )
 
     def analyze(self):
@@ -31,7 +31,7 @@ class DataSetAnalyzer:
             if loaded_case == None:
                 continue
 
-            if self._data_config['cropping']:
+            if self._preprocessing_config['cropping']:
                 case_dict = {
                     'image': loaded_case['data'][0][None],
                     'label': loaded_case['data'][1][None]
@@ -40,7 +40,7 @@ class DataSetAnalyzer:
                 case_cropped = self._cropper(case_dict)
                 loaded_case['data'] = np.concatenate((case_cropped['image'], case_cropped['label']))
 
-            if self._data_config['foreground_normalization']:
+            if self._preprocessing_config['foreground_normalization']:
                 voxels_foreground = self._get_foreground_voxels(loaded_case)
                 self._norm_voxels += voxels_foreground
             else:
@@ -53,8 +53,8 @@ class DataSetAnalyzer:
         logging.info('Calculating properties based on analysis of dataset.')
         voxel_statistics = self._get_voxel_statistics()
 
-        if self._data_config['target_spacing']:
-            target_spacing = np.array(self._data_config['target_spacing'])
+        if self._preprocessing_config['target_spacing']:
+            target_spacing = np.array(self._preprocessing_config['target_spacing'])
         else:
             target_spacing = self._get_target_spacing()
 
@@ -71,16 +71,16 @@ class DataSetAnalyzer:
 
     def _get_target_spacing(self):
         """Adapted from nndet"""
-        target_spacing = np.percentile(np.vstack(self._spacings), self._data_config['target_spacing_percentile'], 0)
-        target_shape = np.percentile(np.vstack(self._shapes), self._data_config['target_spacing_percentile'], 0)
+        target_spacing = np.percentile(np.vstack(self._spacings), self._preprocessing_config['target_spacing_percentile'], 0)
+        target_shape = np.percentile(np.vstack(self._shapes), self._preprocessing_config['target_spacing_percentile'], 0)
 
         worst_spacing_axis = np.argmax(target_spacing)
         other_axes = [i for i in range(len(target_spacing)) if i != worst_spacing_axis]
         other_spacings = [target_spacing[i] for i in other_axes]
         other_sizes = [target_shape[i] for i in other_axes]
 
-        has_aniso_spacing = target_spacing[worst_spacing_axis] > (self._data_config['anisotropy_threshold'] * min(other_spacings))
-        has_aniso_voxels = target_shape[worst_spacing_axis] * self._data_config['anisotropy_threshold'] < min(other_sizes)
+        has_aniso_spacing = target_spacing[worst_spacing_axis] > (self._preprocessing_config['anisotropy_threshold'] * min(other_spacings))
+        has_aniso_voxels = target_shape[worst_spacing_axis] * self._preprocessing_config['anisotropy_threshold'] < min(other_sizes)
 
         if has_aniso_spacing and has_aniso_voxels:
             spacings_of_that_axis = np.vstack(self._spacings)[:, worst_spacing_axis]

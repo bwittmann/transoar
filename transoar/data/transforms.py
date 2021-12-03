@@ -80,9 +80,9 @@ def transform_preprocessing(
     return Compose(transform_list)
 
 
-def get_transforms(split, data_config):
+def get_transforms(split, config):
     if split == 'train':
-        rotate_range = [i / 180 * np.pi for i in data_config['rotation']]
+        rotate_range = [i / 180 * np.pi for i in config['rotation']]
         transform = BGCompose(
             [
                 GaussianNoiseTransform(p_per_sample=0.1, data_key='image'),
@@ -95,23 +95,23 @@ def get_transforms(split, data_config):
                 ),
                 ContrastAugmentationTransform(p_per_sample=0.15, data_key='image'),
                 GammaTransform(
-                    data_config['gamma_range'], True, True, retain_stats=True, p_per_sample=0.1,
+                    config['gamma_range'], True, True, retain_stats=True, p_per_sample=0.1,
                     data_key='image'
                 ),
                 GammaTransform(
-                    data_config['gamma_range'], False, True, retain_stats=True, 
-                    p_per_sample=data_config['p_gamma'], data_key='image'
+                    config['gamma_range'], False, True, retain_stats=True, 
+                    p_per_sample=config['p_gamma'], data_key='image'
                 ),
                 SpatialTransform(
                     None, patch_center_dist_from_border=None, do_elastic_deform=False,
                     do_rotation=True, angle_x=rotate_range, angle_y=rotate_range,
-                    angle_z=rotate_range, do_scale=True, scale=data_config['scale_range'],
+                    angle_z=rotate_range, do_scale=True, scale=config['scale_range'],
                     order_data=3, border_mode_data='constant', border_cval_data=0, order_seg=0,
                     border_mode_seg='constant', border_cval_seg=0, random_crop=False,
-                    p_scale_per_sample=data_config['p_scale'], p_rot_per_sample=data_config['p_rotation'],
+                    p_scale_per_sample=config['p_scale'], p_rot_per_sample=config['p_rotation'],
                     independent_scale_for_each_axis=False, data_key='image', label_key='label'
                 ),
-                MirrorTransform(data_config['mirror_axes'], data_key='image', label_key='label'),
+                MirrorTransform(config['mirror_axes'], data_key='image', label_key='label'),
                 NumpyToTensor(['image', 'label'], 'float')
             ]
         )

@@ -1,49 +1,21 @@
 """Helper functions for input/output."""
 
+import os
 import json
 import logging
 import pickle
 from pathlib import Path
 import sys
-from typing_extensions import ParamSpecArgs
+import socket
+import subprocess
 
 import numpy as np
+import torch
 import yaml
 import SimpleITK as sitk
 
 PATH_TO_CONFIG = Path("./config/")
 
-def get_complete_config():
-    """Loads .yaml files specified in ./config/main.yaml.
-
-    Returns:
-        A dict containing the parameters specified in the included individual
-        config files.
-    """
-    config = {}
-
-    # Load includes
-    main = get_config('main')
-
-    # Add includes
-    for config_file in main:
-        if config_file != 'model_main':
-            config_to_include = get_config(config_file)
-        else:
-            models_to_select = get_config(config_file)
-            complete_model_config = get_config('models')
-
-            config_to_include = {
-                'backbone': complete_model_config['backbones'][models_to_select['backbone']],
-                'neck': complete_model_config['necks'][models_to_select['neck']]
-            }
-
-            config_to_include['backbone']['name'] = models_to_select['backbone']
-            config_to_include['neck']['name'] = models_to_select['neck']
-
-        config[config_file.split('_')[0]] = config_to_include
-
-    return config
 
 def get_config(config_name):
     """Loads a .yaml file from ./config corresponding to the name arg.
@@ -52,10 +24,17 @@ def get_config(config_name):
         config_name: A string referring to the .yaml file to load.
 
     Returns:
-        A container including the information of the referred .yaml file.
+        A container including the information of the referred .yaml file and information
+        regarding the dataset, if specified in the referred .yaml file.
     """
     with open(PATH_TO_CONFIG / (config_name + '.yaml'), 'r') as stream:
         config = yaml.safe_load(stream)
+
+    # Add dataset config
+    if 'dataset' in config:
+        path_to_data_info = Path(os.getcwd()) / 'dataset' / config['dataset'] / 'data_info.json'
+        config.update(load_json(path_to_data_info))
+
     return config
 
 def load_nifti(path_to_file):
@@ -173,3 +152,13 @@ def write_ply(verts, colors, indices, output_file):
     for ind in indices:
         file.write('3 {:d} {:d} {:d}\n'.format(ind[0], ind[1], ind[2]))
     file.close()
+
+def get_meta_data():
+    meta_data = {}
+    meta_data['git_commit_hash'] = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+    meta_data['python_version'] = sys.version.splitlines()[0]
+    meta_data['gcc_version'] = sys.version.splitlines()[1]
+    meta_data['pytorch_version'] = torch.__version__
+    meta_data['host_name'] = socket.gethostname()
+
+    return meta_data

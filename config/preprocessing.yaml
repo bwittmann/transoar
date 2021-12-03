@@ -1,0 +1,20 @@
+# Config file for preprocessing related params
+
+# General
+dataset_config: visceral
+dataset_name: transoar_spacing444_th_newconf
+modality: CT
+path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
+path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
+
+# Preprocessing
+fixed_size: True
+foreground_normalization: True
+target_spacing: [4, 4, 4] #[False, [x, x, x]]; if False: use estimated target spacing
+cropping: True
+key: image # [image, label]
+margin: 2
+orientation: RAS
+min_num_organs: 12
+anisotropy_threshold: 3
+target_spacing_percentile: 50

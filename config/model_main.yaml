@@ -1,4 +1,0 @@
-# Config file to select parts like the backbone for the model
-
-backbone: senet
-neck: detr

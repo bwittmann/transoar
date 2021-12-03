@@ -36,4 +36,17 @@ necks:
     dec_layers: 2 #6
     pre_norm: False
     num_queries: 50 # spine-trans use 25
-    aux_loss: True
+    aux_loss: False
+
+  def-detr:
+    enc_layer: 6
+    dec_layer: 6
+    dim_feedforward: 1024
+    hidden_dim: 256
+    dropout: 0.1
+    nheads: 8
+    num_queries: 300
+    dec_n_points: 4
+    enc_n_points: 4
+    aux_loss: False
+

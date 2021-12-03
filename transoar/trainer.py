@@ -1,7 +1,6 @@
 """Module containing the trainer of the transoar project."""
 
 import torch
-import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
@@ -23,20 +22,17 @@ class Trainer:
         self._device = device
         self._path_to_run = path_to_run
         self._epoch_to_start = epoch
+        self._config = config
 
-        self._train_config = config['training']
         self._writer = SummaryWriter(log_dir=path_to_run)
 
         self._evaluator = DetectionEvaluator(
-            classes=list(config['data']['labels'].values())
+            classes=list(config['labels'].values())
         )
 
         # Init main metric for checkpoint
         self._main_metric_key = 'mAP_IoU_0.10_0.50_0.05_MaxDet_1'
         self._main_metric_max_val = metric_start_val
-
-        # Create a dict for loss coefs
-        self._loss_coefs = config['training']['loss_coefs']
 
     def _train_one_epoch(self, num_epoch):
         self._model.train()
@@ -65,13 +61,13 @@ class Trainer:
             # Create absolute loss and mult with loss coefficient
             loss_abs = 0
             for loss_key, loss_val in loss_dict.items():
-                loss_abs += loss_val * self._loss_coefs[loss_key.split('_')[0]]
+                loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
 
             self._optimizer.zero_grad()
             loss_abs.backward()
 
             # Clip grads to counter exploding grads
-            max_norm = self._train_config['clip_max_norm']
+            max_norm = self._config['clip_max_norm']
             if max_norm > 0:
                 torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm)
 
@@ -123,7 +119,7 @@ class Trainer:
             # Create absolute loss and mult with loss coefficient
             loss_abs = 0
             for loss_key, loss_val in loss_dict.items():
-                loss_abs += loss_val * self._loss_coefs[loss_key.split('_')[0]]
+                loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
 
             # Evaluate validation predictions based on metric
             pred_boxes, pred_classes, pred_scores = inference(out)
@@ -149,7 +145,7 @@ class Trainer:
 
         # Check if new best checkpoint
         if metric_scores[self._main_metric_key] >= self._main_metric_max_val \
-            and not self._train_config['debug_mode']:
+            and not self._config['debug_mode']:
             self._main_metric_max_val = metric_scores[self._main_metric_key]
             self._save_checkpoint(
                 num_epoch,
@@ -183,7 +179,7 @@ class Trainer:
         if self._epoch_to_start == 0:   # For initial performance estimation
             self._validate(0)
 
-        for epoch in range(self._epoch_to_start + 1, self._train_config['epochs'] + 1):
+        for epoch in range(self._epoch_to_start + 1, self._config['epochs'] + 1):
             self._train_one_epoch(epoch)
 
             # Log learning rates
@@ -193,12 +189,12 @@ class Trainer:
                 backbone=self._optimizer.param_groups[1]['lr']
             )
 
-            if epoch % self._train_config['val_interval'] == 0:
+            if epoch % self._config['val_interval'] == 0:
                 self._validate(epoch)
 
             self._scheduler.step()
 
-            if not self._train_config['debug_mode']:
+            if not self._config['debug_mode']:
                 self._save_checkpoint(epoch, 'model_last.pt')
 
     def _write_to_logger(self, num_epoch, category, **kwargs):

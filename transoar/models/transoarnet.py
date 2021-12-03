@@ -8,12 +8,12 @@ import torch.nn.functional as F
 from transoar.models.build import build_backbone, build_neck, build_pos_enc
 
 class TransoarNet(nn.Module):
-    def __init__(self, config, num_classes):
+    def __init__(self, config):
         super().__init__()
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
         num_channels = config['backbone']['num_channels']
-        num_classes = num_classes
+        num_classes = config['num_classes']
 
         # Use auxiliary decoding losses if required
         self._aux_loss = config['neck']['aux_loss']

@@ -16,7 +16,7 @@ def run(args):
     config = load_json(path_to_run / 'config.json')
 
     set_to_eval = 'val'
-    test_loader = get_loader(config['data'], set_to_eval, batch_size=1)
+    test_loader = get_loader(config, set_to_eval, batch_size=1)
 
     class_boxes = defaultdict(list)
 

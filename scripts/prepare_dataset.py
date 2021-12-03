@@ -9,7 +9,6 @@ from transoar.utils.io import get_config, set_root_logger
 from transoar.data.processor import Preprocessor
 from transoar.data.analyzer import DataSetAnalyzer
 
-# TODO: Add multiprocessing
 
 if __name__ == "__main__":
     random.seed(10)  # Set arbitrary seed to make experiments reproducible
@@ -19,12 +18,13 @@ if __name__ == "__main__":
     logging.info('Started preparing dataset.')
     
     # Load data config
-    data_config = get_config('data_main')
+    preprocessing_config = get_config('preprocessing')
+    data_config = get_config(preprocessing_config['dataset_config'])
 
-    dataset_name = data_config['dataset_name']
-    modality = data_config['modality']
-    path_to_gc_dataset = Path(data_config['path_to_gc_dataset'])   # GC dataset for test and val set
-    path_to_sc_dataset = Path(data_config['path_to_sc_dataset'])   # SC dataset for train
+    dataset_name = preprocessing_config['dataset_name']
+    modality = preprocessing_config['modality']
+    path_to_gc_dataset = Path(preprocessing_config['path_to_gc_dataset'])   # GC dataset for test and val set
+    path_to_sc_dataset = Path(preprocessing_config['path_to_sc_dataset'])   # SC dataset for train
 
     path_to_splits = Path(f"./dataset/{dataset_name}_{modality}")
 
@@ -44,14 +44,14 @@ if __name__ == "__main__":
 
     # Analyze properties of dataset like spacing and intensity properties
     logging.info(f'Starting dataset analysis.')
-    analyzer = DataSetAnalyzer(train_set + val_set, data_config)
+    analyzer = DataSetAnalyzer(train_set + val_set, preprocessing_config)
     dataset_analysis = analyzer.analyze()
     logging.info(f'Succesfully finished dataset analysis.')
 
     # Prepare dataset based on dataset analysis
     logging.info(f"Starting dataset pre-processing. Target spacing: {dataset_analysis['target_spacing']}.")
     preprocessor = Preprocessor(
-        train_set, val_set, test_set, data_config, path_to_splits, dataset_analysis
+        train_set, val_set, test_set, preprocessing_config, data_config, path_to_splits, dataset_analysis
     )
     preprocessor.prepare_sets()
     logging.info(f'Succesfully finished dataset pre-processing.')
