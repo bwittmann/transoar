@@ -4,6 +4,7 @@
 dataset_config: visceral
 dataset_name: transoar_spacing444_th_newconf
 modality: CT
+seed: 10
 path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
 path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
 

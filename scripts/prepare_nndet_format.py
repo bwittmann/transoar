@@ -10,7 +10,7 @@ import shutil
 import numpy as np
 from tqdm import tqdm
 
-from transoar.utils.io import load_nifti, write_nifti
+from transoar.utils.io import load_nifti, write_nifti, get_config
 
 
 def get_instances(labels_path):
@@ -31,14 +31,16 @@ def get_instances(labels_path):
 
 
 if __name__ == "__main__":
-    random.seed(10)  # Set arbitrary seed to make experiments reproducible
+    preprocessing_config = get_config('preprocessing')
+
+    random.seed(preprocessing_config['seed'])  # Set arbitrary seed to make experiments reproducible
     logging.basicConfig(level=logging.INFO)
 
-    path_to_gc_dataset = Path('/home/bastian/Datasets/CT_GC')   # GC dataset for test and val set
-    path_to_sc_dataset = Path('/home/bastian/Datasets/CT_SC')   # SC dataset for train
+    path_to_gc_dataset = Path('/home/home/supro_bastian/datasets/CT_only_th/CT_GC')   # GC dataset for test and val set
+    path_to_sc_dataset = Path('/home/home/supro_bastian/datasets/CT_only_th/CT_SC')   # SC dataset for train
 
     path_to_new_dataset = Path(os.environ['det_data'])
-    new_name = 'Task101_OrganDet'
+    new_name = 'Task102_OrganDet'
 
     dataset_info = {
         "task": new_name,
@@ -81,6 +83,7 @@ if __name__ == "__main__":
     cases_sc = list(Path(path_to_sc_dataset).iterdir())
     cases_gc = list(Path(path_to_gc_dataset).iterdir())
     random.shuffle(cases_gc)
+    random.shuffle(cases_sc)
 
     # Create test, val, and train split
     test_set = cases_gc[:int(len(cases_gc)/2)]
@@ -100,11 +103,6 @@ if __name__ == "__main__":
     for target_dir in targe_dirs:
         os.makedirs(target_dir)
 
-    random.shuffle(train_set)
-    random.shuffle(test_set)
-    # train_set = train_set[:20]
-    # test_set = test_set[:5]
-
     logging.info('Preparing dataset to match nndet format.')
     for idx, case in enumerate(tqdm((train_set + test_set))):
         case_paths = list(case.iterdir())
@@ -122,6 +120,9 @@ if __name__ == "__main__":
         try:
             instances, labels, labels_meta_data = get_instances(labels_path)
         except RuntimeError:
+            continue
+
+        if np.unique(labels).size < preprocessing_config['min_num_organs'] + 1:
             continue
 
         # Write labels

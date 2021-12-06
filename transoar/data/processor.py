@@ -50,7 +50,7 @@ class Preprocessor:
                 shapes.append(image.shape)
 
                 # Skip cases with a small amount of labels
-                if np.unique(label).size < self._preprocessing_config['min_num_organs']:
+                if np.unique(label).size < self._preprocessing_config['min_num_organs'] + 1:
                     logging.info(f"Skipped case {case.name} with less than {self._preprocessing_config['min_num_organs']} organs.")
                     continue
 

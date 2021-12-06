@@ -11,8 +11,6 @@ from transoar.data.analyzer import DataSetAnalyzer
 
 
 if __name__ == "__main__":
-    random.seed(10)  # Set arbitrary seed to make experiments reproducible
-    
     # Set config of root logger
     set_root_logger('./logs/prepare_dataset.log')
     logging.info('Started preparing dataset.')
@@ -20,6 +18,8 @@ if __name__ == "__main__":
     # Load data config
     preprocessing_config = get_config('preprocessing')
     data_config = get_config(preprocessing_config['dataset_config'])
+
+    random.seed(preprocessing_config['seed'])  # Set arbitrary seed to make experiments reproducible
 
     dataset_name = preprocessing_config['dataset_name']
     modality = preprocessing_config['modality']
