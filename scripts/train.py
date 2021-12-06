@@ -2,10 +2,12 @@
 
 import argparse
 import os
+import random
 from pathlib import Path
 
 import numpy as np
 import torch
+import monai
 
 from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
@@ -82,9 +84,14 @@ if __name__ == "__main__":
     # Get relevant configs
     config = get_config(args.config)
 
+    # To get reproducable results
     torch.manual_seed(config['seed'])
+    torch.cuda.manual_seed(config['seed'])
     np.random.seed(config['seed'])
-    torch.backends.cudnn.deterministic = True   # TODO check
-    torch.backends.cudnn.benchmark = False
+    monai.utils.set_determinism(seed=config['seed'])
+    random.seed(config['seed'])
+
+    torch.backends.cudnn.benchmark = False  # performance vs. reproducibility
+    torch.backends.cudnn.deterministic = True
 
     train(config, args)

@@ -1,5 +1,6 @@
 """Module containing dataloader related functionality."""
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -18,9 +19,13 @@ def get_loader(config, split, batch_size=None):
     dataset = TransoarDataset(config, split)
     dataloader = DataLoader(
         dataset, batch_size=batch_size, shuffle=config['shuffle'],
-        num_workers=config['num_workers'], collate_fn=collator
+        num_workers=config['num_workers'], collate_fn=collator, worker_init_fn=init_fn
     )
     return dataloader
+
+def init_fn(worker_id):
+    """https://github.com/pytorch/pytorch/issues/7068"""
+    np.random.seed(10 + worker_id)
 
 
 class TransoarCollator:
