@@ -13,7 +13,7 @@ class TransoarCriterion(nn.Module):
         1) we compute hungarian assignment between ground truth boxes and the outputs of the model
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
-    def __init__(self, num_classes, matcher, eos_coef):
+    def __init__(self, num_classes, matcher):
         """ Create the criterion.
         Parameters:
             num_classes: number of object categories, omitting the special no-object category
@@ -24,10 +24,11 @@ class TransoarCriterion(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         self.matcher = matcher
-        self.eos_coef = eos_coef
-        empty_weight = torch.ones(self.num_classes + 1)
-        empty_weight[0] = self.eos_coef
-        self.register_buffer('empty_weight', empty_weight)
+        
+        # Hack to make deterministic, https://github.com/pytorch/pytorch/issues/46024
+        self.cls_weights = torch.tensor(
+            [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+        ).type(torch.FloatTensor)
 
     def loss_class(self, outputs, targets, indices):
         """Classification loss (NLL)
@@ -43,7 +44,7 @@ class TransoarCriterion(nn.Module):
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
 
-        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.empty_weight)
+        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.cls_weights.to(device=src_logits.device))
 
         return loss_ce
 

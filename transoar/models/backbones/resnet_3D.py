@@ -111,9 +111,12 @@ class ResNet(nn.Module):
         conv1_t_stride=2,
         shortcut_type='B',
         widen_factor=1.0,
-        strides=[1, 2, 2, 2]
+        strides=[1, 2, 2, 2],
+        max_pool=True
     ):
         super().__init__()
+        self.max_pool = max_pool
+
         block_inplanes = [int(x * widen_factor) for x in block_inplanes]
         self.in_planes = block_inplanes[0]
 
@@ -125,7 +128,9 @@ class ResNet(nn.Module):
                                bias=False)
         self.bn1 = nn.GroupNorm(num_groups=4, num_channels=self.in_planes)
         self.relu = nn.ReLU(inplace=True)
-        # self.maxpool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1)
+
+        # Changed kernel size to make deterministic, https://github.com/pytorch/pytorch/issues/23550
+        self.maxpool = nn.MaxPool3d(kernel_size=2, stride=2, padding=1)
 
         layer1 = self._make_layer(
             block, block_inplanes[0], layers[0], shortcut_type, stride=strides[0]
@@ -143,7 +148,7 @@ class ResNet(nn.Module):
         )
 
         all_layers = [layer1, layer2, layer3, layer4]
-        self.layers = nn.ModuleList(all_layers[:num_layers + 1])
+        self.layers = nn.ModuleList(all_layers[:num_layers])
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -193,6 +198,9 @@ class ResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+
+        if self.max_pool:
+            x = self.maxpool(x)
 
         for layer in self.layers:
             x = layer(x)

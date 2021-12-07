@@ -19,6 +19,7 @@ def build_backbone(config):
             groups=1,
             reduction=config['reduction'],
             strides=config['strides'],
+            max_pool=config['pool'],
             inplanes=64,
             downsample_kernel_size=1,
             input_3x3=False
@@ -31,6 +32,7 @@ def build_backbone(config):
             n_input_channels=config['in_chans'],
             num_layers=config['num_layers'],
             strides=config['strides'],
+            max_pool=config['pool'],
             conv1_t_size=7,
             conv1_t_stride=2,
             shortcut_type='B',
@@ -63,8 +65,7 @@ def build_criterion(config):
 
     criterion = TransoarCriterion(
         num_classes=config['num_classes'],
-        matcher=matcher,
-        eos_coef=config['eos_coef']
+        matcher=matcher
     )
 
     return criterion

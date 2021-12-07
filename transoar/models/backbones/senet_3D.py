@@ -64,6 +64,7 @@ class SENet(nn.Module):
         groups: int,
         reduction: int,
         strides: List[int],
+        max_pool: True,
         inplanes: int = 128,
         downsample_kernel_size: int = 3,
         input_3x3: bool = True,
@@ -112,7 +113,9 @@ class SENet(nn.Module):
                 ("relu1", relu_type(inplace=True)),
             ]
 
-        layer0_modules.append(("pool", pool_type(kernel_size=3, stride=2, ceil_mode=True)))
+        if max_pool:
+            # Changed kernel size to make deterministic, https://github.com/pytorch/pytorch/issues/23550
+            layer0_modules.append(("pool", pool_type(kernel_size=2, stride=2, ceil_mode=True)))
 
         layer0 = nn.Sequential(OrderedDict(layer0_modules))
         layer1 = self._make_layer(
