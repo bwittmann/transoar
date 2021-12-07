@@ -1,0 +1,73 @@
+# Config file for senet + detr combination
+
+# General training
+experiment_name: test #test_bbstrides1222_layer22_q300_b3_h768_nodrop_noskip_realval_longer_aux
+device: cuda:2
+val_interval: 1
+debug_mode: False  # doesn't save checkpoints
+seed: 10
+
+epochs: 3300 # should be about ~300k train steps, prev
+lr: 1e-4
+lr_backbone: 1e-5
+weight_decay: 1e-4
+clip_max_norm: 0.1
+
+# Scheduler
+lr_drop: 2700 # at about 2/3 of train run
+
+# Data
+dataset: transoar_spacing444_th_newconf_CT
+overfit: False # use same set consisting of one image for train and val
+bbox_padding: 1
+
+# Augmentation
+use_augmentation: True
+p_rotation: 0.2
+rotation: [-30, 30]
+p_scale: 0.2
+scale_range: [0.7, 1.4]
+p_gamma: 0.3
+gamma_range: [0.7, 1.5]
+mirror_axes: [0, 1, 2]
+
+# Dataloader
+batch_size: 1
+shuffle: False  # TODO
+num_workers: 8
+
+# Hungarian matching
+set_cost_class: 1
+set_cost_bbox: 5
+set_cost_giou: 4
+
+# Losses
+eos_coef: 0.1
+loss_coefs:
+  cls: 1
+  bbox: 5
+  giou: 2
+
+# Model specific params
+backbone:
+  name: resnet
+  depths: [3, 4, 6, 3]
+  strides: [1, 2, 2, 2]
+  in_chans: 1
+  num_channels: 2048
+  feature_map_dim: [8, 8, 20]
+  num_layers: 4
+
+neck:
+  name: detr
+  skip_con: False # from backbone to heads
+  pos_encoding: sine
+  hidden_dim: 256 # prev: 256 -> 768
+  dropout: 0.0  # prev: 0.1
+  nheads: 8
+  dim_feedforward: 2048
+  enc_layers: 1 #6
+  dec_layers: 1 #6
+  pre_norm: False
+  num_queries: 20 # spine-trans use 25
+  aux_loss: False

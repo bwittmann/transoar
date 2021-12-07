@@ -3,6 +3,7 @@
 from transoar.models.matcher import HungarianMatcher
 from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
+from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.necks.detr_transformer import DetrTransformer
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
 
@@ -22,7 +23,20 @@ def build_backbone(config):
             downsample_kernel_size=1,
             input_3x3=False
         )
-        
+    if config['name'] == 'resnet':
+        model = ResNet(
+            block=Bottleneck,
+            layers=config['depths'],
+            block_inplanes=get_inplanes(),
+            n_input_channels=config['in_chans'],
+            num_layers=config['num_layers'],
+            strides=config['strides'],
+            conv1_t_size=7,
+            conv1_t_stride=2,
+            shortcut_type='B',
+            widen_factor=1.0
+        )
+
     return model
 
 def build_neck(config):
