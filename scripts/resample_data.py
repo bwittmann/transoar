@@ -11,8 +11,9 @@ from monai.transforms import (
     SaveImaged
 )
 
+from transoar.utils.visualization import visualize_voxel_grid
 
-def resample_nifti(case_path, target_spacing, new_path):
+def resample_nifti(case_path, target_spacing, new_path, debug=True):
     assert isinstance(target_spacing, list)
 
     # Get path of label and data
@@ -38,17 +39,21 @@ def resample_nifti(case_path, target_spacing, new_path):
         'label': paths[1]
     }
 
-    transform_and_save(data_dict)
+    out = transform_and_save(data_dict)
+
+    if debug:
+        visualize_voxel_grid(out['image'])
+        visualize_voxel_grid(out['label'])
 
 
 if __name__ == "__main__":
     TARGET_SPACING = [4, 4, 4]
-    PATH_TO_NEW_DATASET = Path('/home/bastian/datasets/CT_GC_3mm')
-    PATH_TO_DATASET = Path('/home/bastian/datasets/visceral3/CT_GC')
+    PATH_TO_NEW_DATASET = Path(f'/home/bastian/datasets/CT_GC_{TARGET_SPACING[0]}mm')
+    PATH_TO_DATASET = Path('/home/bastian/datasets/CT_GC')
 
     cases_path = list(Path(PATH_TO_DATASET).iterdir())
 
     # Resample
     for case_path in tqdm(cases_path):
-        new_path = PATH_TO_NEW_DATASET / cases_path[0].name
-        resample_nifti(case_path, TARGET_SPACING, new_path)
+        new_path = PATH_TO_NEW_DATASET / case_path.name
+        resample_nifti(case_path, TARGET_SPACING, new_path, debug=False)
