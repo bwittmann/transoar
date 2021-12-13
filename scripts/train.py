@@ -86,7 +86,6 @@ if __name__ == "__main__":
 
     # To get reproducable results
     torch.manual_seed(config['seed'])
-    torch.cuda.manual_seed(config['seed'])
     np.random.seed(config['seed'])
     monai.utils.set_determinism(seed=config['seed'])
     random.seed(config['seed'])
