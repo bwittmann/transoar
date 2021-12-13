@@ -1,7 +1,7 @@
 # Config file for senet + detr combination
 
 # General training
-experiment_name: testing #senet_kernel2_noworkerinit_final_commit #test_aux_loss #senet_kernel3_noworkerinit_prevseed_repr
+experiment_name: senet_detr_11_q100_h256 #test_aux_loss #senet_kernel3_noworkerinit_prevseed_repr
 device: cuda:5
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
@@ -39,7 +39,7 @@ num_workers: 4
 # Hungarian matching
 set_cost_class: 1
 set_cost_bbox: 5
-set_cost_giou: 4
+set_cost_giou: 2
 
 # Losses
 loss_coefs:
@@ -67,8 +67,8 @@ neck:
   dropout: 0.0  # prev: 0.1
   nheads: 8
   dim_feedforward: 2048
-  enc_layers: 2 #6
-  dec_layers: 2 #6
+  enc_layers: 1 #6
+  dec_layers: 1 #6
   pre_norm: False
   num_queries: 100 # spine-trans: 25
   aux_loss: False
