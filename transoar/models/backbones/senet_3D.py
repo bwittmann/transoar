@@ -68,7 +68,8 @@ class SENet(nn.Module):
         inplanes: int = 128,
         downsample_kernel_size: int = 3,
         input_3x3: bool = True,
-        num_layers: int = -1
+        num_layers: int = -1,
+        return_intermediate_outputs=True
     ) -> None:
 
         super().__init__()
@@ -80,6 +81,7 @@ class SENet(nn.Module):
 
         self.inplanes = inplanes
         self.spatial_dims = spatial_dims
+        self.return_intermediate_outputs = return_intermediate_outputs
 
         layer0_modules: List[Tuple[str, Any]]
 
@@ -217,13 +219,19 @@ class SENet(nn.Module):
         return nn.Sequential(*layers)
 
     def features(self, x: torch.Tensor, mask: torch.Tensor):
+
+        out = []
         for layer in self.layers:
             x = layer(x)
+            # Adjust mask via interpolation - True: masked, False: not masked
+            mask_inter = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool).squeeze(1)
+            out.append((x, mask_inter))
 
-        # Adjust mask via interpolation - True: masked, False: not masked
-        mask = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool).squeeze(1)
-        return x, mask
+        # Decide which layer outputs to return
+        if self.return_intermediate_outputs:
+            return out[2:]
+        else:
+            return out[-1:]  # only return last output
 
     def forward(self, x: torch.Tensor, mask: torch.tensor):
-        x, mask = self.features(x, mask)
-        return x, mask
+        return self.features(x, mask)

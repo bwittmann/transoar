@@ -24,3 +24,8 @@ runs
 
 # Testing / debugging files
 backup
+
+# Build
+transoar/models/ops/build/
+transoar/models/ops/dist/
+

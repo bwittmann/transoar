@@ -5,6 +5,7 @@ from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.necks.detr_transformer import DetrTransformer
+from transoar.models.necks.deformable_detr_transformer import DeformableTransformer
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
 
 
@@ -22,7 +23,8 @@ def build_backbone(config):
             max_pool=config['pool'],
             inplanes=64,
             downsample_kernel_size=1,
-            input_3x3=False
+            input_3x3=False,
+            return_intermediate_outputs=config['return_intermediate_outputs']
         )
     if config['name'] == 'resnet':
         model = ResNet(
@@ -36,7 +38,8 @@ def build_backbone(config):
             conv1_t_size=7,
             conv1_t_stride=2,
             shortcut_type='B',
-            widen_factor=1.0
+            widen_factor=1.0,
+            return_intermediate_outputs=config['return_intermediate_outputs']
         )
 
     return model
@@ -53,6 +56,20 @@ def build_neck(config):
             normalize_before=config['pre_norm'],
             return_intermediate_dec=True
         )
+    elif config['name'] == 'def_detr':
+        model = DeformableTransformer(
+            d_model=config['hidden_dim'],
+            nhead=config['nheads'],
+            num_encoder_layers=config['enc_layers'],
+            num_decoder_layers=config['dec_layers'],
+            dim_feedforward=config['dim_feedforward'],
+            dropout=config['dropout'],
+            activation="relu",
+            return_intermediate_dec=True,
+            num_feature_levels=config['num_feature_levels'],
+            dec_n_points=config['dec_n_points'],
+            enc_n_points=config['enc_n_points']
+        )  
 
     return model
 

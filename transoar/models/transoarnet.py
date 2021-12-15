@@ -1,5 +1,7 @@
 """Main model of the transoar project."""
 
+import math
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -37,21 +39,72 @@ class TransoarNet(nn.Module):
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         # Get projections and embeddings
-        self._query_embed = nn.Embedding(num_queries, hidden_dim)
-        self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
+        if 'num_feature_levels' in config['neck']:
+            self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # TODO: Why?
+
+            num_feature_levels = config['neck']['num_feature_levels']
+            if num_feature_levels > 1:
+                num_backbone_outs = len(config['backbone']['num_channels'])
+                input_proj_list = []
+                for _ in range(num_backbone_outs):
+                    in_channels = config['backbone']['num_channels'][_]
+                    input_proj_list.append(nn.Sequential(
+                        nn.Conv3d(in_channels, hidden_dim, kernel_size=1),
+                        nn.GroupNorm(32, hidden_dim),
+                    ))
+
+                self._input_proj = nn.ModuleList(input_proj_list)
+            else:
+                self._input_proj = nn.ModuleList([
+                nn.Sequential(
+                    nn.Conv3d(config['backbone']['num_channels'][0], hidden_dim, kernel_size=1),    # TODO
+                    nn.GroupNorm(32, hidden_dim),
+                )])
+
+            # Initialize learnable params
+            prior_prob = 0.01
+            bias_value = -math.log((1 - prior_prob) / prior_prob)
+            self._cls_head.bias.data = torch.ones(num_classes) * bias_value
+            nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
+            nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
+            for proj in self._input_proj:
+                nn.init.xavier_uniform_(proj[0].weight, gain=1)
+                nn.init.constant_(proj[0].bias, 0)
+
+            num_pred = config['neck']['dec_layers']
+            nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
+            self._cls_head = nn.ModuleList([self._cls_head for _ in range(num_pred)])   # TODO check logic
+            self._bbox_reg_head = nn.ModuleList([self._bbox_reg_head for _ in range(num_pred)])
+            self._neck.decoder.bbox_embed = None
+        else:
+            self._query_embed = nn.Embedding(num_queries, hidden_dim)
+            self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
+
     def forward(self, x, mask):
-        x_backbone, mask = self._backbone(x, mask)
-        x_backbone_proj = self._input_proj(x_backbone)
+        out_backbone = self._backbone(x, mask)
+
+        if len(out_backbone) > 1:   # For approaches that utilize multiple feature maps
+            srcs = []
+            masks = []
+            pos = []
+            for idx, (src, mask) in enumerate(out_backbone):
+                srcs.append(self._input_proj[idx](src))
+                masks.append(mask)
+                pos.append(self._pos_enc(mask))
+        else:
+            srcs = self._input_proj(out_backbone[0][0])
+            masks = out_backbone[0][1]
+            pos = self._pos_enc(masks)
 
         x_neck = self._neck(             # [Batch, Queries, HiddenDim]         
-            x_backbone_proj,
-            mask,
+            srcs,
+            masks,
             self._query_embed.weight,
-            self._pos_enc(mask)
+            pos
         )
 
         if self._skip_con:
