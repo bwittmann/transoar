@@ -63,13 +63,18 @@ class MSDeformAttn(nn.Module):
         constant_(self.sampling_offsets.weight.data, 0.)
 
         # See paper p13
-        thetas = torch.arange(self.n_heads, dtype=torch.float32) * (2.0 * math.pi / self.n_heads)
-        grid_init = torch.stack([thetas.cos(), thetas.sin(), thetas.cos()], -1) # TODO
-
+        grid_init = torch.cartesian_prod(torch.tensor([-1, 0, 1]), torch.tensor([-1, 0, 1]), torch.tensor([-1, 0, 1])).to(dtype=torch.float32)
+        if self.n_heads == 26:  # sample in 26 directions
+            grid_init = grid_init[torch.nonzero(torch.abs(grid_init).sum(dim=1)).squeeze()] # Get rid of origin
+        elif self.n_heads == 6: # sample in 6 directions
+            grid_init = grid_init[torch.nonzero(torch.logical_and(torch.abs(grid_init).sum(dim=1) < 2, torch.abs(grid_init).sum(dim=1) > 0)).squeeze()]
+        else:
+            raise ValueError("Only nheads of value 26 or 6 are supported.")
+        
         # [NumHeads, FeatureLevels, NumPoints, Offset]
-        grid_init = (grid_init / grid_init.abs().max(-1, keepdim=True)[0]).view(self.n_heads, 1, 1, 3).repeat(1, self.n_levels, self.n_points, 1)
+        grid_init = grid_init.view(self.n_heads, 1, 1, 3).repeat(1, self.n_levels, self.n_points, 1)
         for i in range(self.n_points):
-            grid_init[:, :, i, :] *= i + 1
+            grid_init[:, :, i, :] *= i + 1  # As each sampled point should go further in the given direction
 
         # Bias weights don't get updated    TODO: check, should not work with nn.Parameter
         with torch.no_grad():
@@ -114,12 +119,9 @@ class MSDeformAttn(nn.Module):
             offset_normalizer = torch.stack([input_spatial_shapes[..., 1], input_spatial_shapes[..., 0]], -1)
             sampling_locations = reference_points[:, :, None, :, None, :] \
                                  + sampling_offsets / offset_normalizer[None, None, None, :, None, :]
-        elif reference_points.shape[-1] == 4:
-            sampling_locations = reference_points[:, :, None, :, None, :2] \
-                                 + sampling_offsets / self.n_points * reference_points[:, :, None, :, None, 2:] * 0.5
         elif reference_points.shape[-1] == 3:   # TODO
             offset_normalizer = torch.stack(
-                [input_spatial_shapes[..., 2], input_spatial_shapes[..., 1], input_spatial_shapes[..., 0]], -1  # TODO check why the other way round
+                [input_spatial_shapes[..., 2], input_spatial_shapes[..., 1], input_spatial_shapes[..., 0]], -1  # TODO to fit WHD of reference?
             )
             sampling_locations = reference_points[:, :, None, :, None, :] \
                                  + sampling_offsets / offset_normalizer[None, None, None, :, None, :]                   # [Batch, AllLvlPatches, NumHeads, Lvls, NumPoints, Offset]

@@ -1,13 +1,13 @@
 # Config file for senet + deformable detr combination
 
 # General training
-experiment_name: test #senet_def_detr
+experiment_name: test #_def #senet_def_detr
 device: cuda:7
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
 
-epochs: 50
+epochs: 500 # prev: 50
 lr: 2e-4
 lr_backbone: 2e-5
 lr_linear_proj_mult: 0.1
@@ -15,7 +15,7 @@ weight_decay: 1e-4
 clip_max_norm: 0.1
 
 # Scheduler
-lr_drop: 40
+lr_drop: 400  # prev: 40
 
 # Data
 dataset: transoar_spacing444_th_newconf_CT
@@ -68,9 +68,9 @@ neck:
   pos_encoding: sine
   pos_encoding_scale: 6.28318530718 # 2 * np.pi2
   num_feature_levels: 3
-  hidden_dim: 256
+  hidden_dim: 192 #832 # prev: 256
   dropout: 0.1
-  nheads: 8
+  nheads: 6 #26  #prev: 8
   dim_feedforward: 1024
   enc_layers: 1 #6
   dec_layers: 1 #6
