@@ -24,7 +24,7 @@ class TransoarNet(nn.Module):
         self._skip_con = config['neck']['skip_con']
         if self._skip_con:
             self._skip_proj = nn.Linear(
-                np.prod(config['backbone']['feature_map_dim']), 
+                config['backbone']['num_feature_patches'], 
                 config['neck']['num_queries']
             )
 
@@ -85,7 +85,7 @@ class TransoarNet(nn.Module):
             masks = out_backbone[0][1]
             pos = self._pos_enc(masks)
 
-        x_neck = self._neck(             # [Batch, Queries, HiddenDim]         
+        out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
             srcs,
             masks,
             self._query_embed.weight,
@@ -93,12 +93,15 @@ class TransoarNet(nn.Module):
         )
 
         if self._skip_con:
-            x_backbone_proj = x_backbone_proj.flatten(2)
-            x_backbone_skip_proj = self._skip_proj(x_backbone_proj).permute(0, 2, 1)
-            x_neck = x_neck + x_backbone_skip_proj
+            if isinstance(srcs, torch.Tensor):
+                out_backbone_proj = srcs.flatten(2)
+            else:
+                out_backbone_proj = torch.cat([src.flatten(2) for src in srcs], dim=-1)
+            out_backbone_skip_proj = self._skip_proj(out_backbone_proj).permute(0, 2, 1)
+            out_neck = out_neck + out_backbone_skip_proj
 
-        pred_logits = self._cls_head(x_neck)
-        pred_boxes = self._bbox_reg_head(x_neck).sigmoid()
+        pred_logits = self._cls_head(out_neck)
+        pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
