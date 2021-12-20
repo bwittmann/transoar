@@ -28,7 +28,7 @@ def _is_power_of_2(n):
 
 
 class MSDeformAttn(nn.Module):
-    def __init__(self, d_model=256, n_levels=4, n_heads=8, n_points=4):
+    def __init__(self, d_model=256, n_levels=4, n_heads=8, n_points=4, use_cuda=True):
         """
         Multi-Scale Deformable Attention Module
         :param d_model      hidden dimension
@@ -51,6 +51,7 @@ class MSDeformAttn(nn.Module):
         self.n_levels = n_levels
         self.n_heads = n_heads
         self.n_points = n_points
+        self.use_cuda = use_cuda
 
         self.sampling_offsets = nn.Linear(d_model, n_heads * n_levels * n_points * 3)   # 3 -> offset of ref coords 
         self.attention_weights = nn.Linear(d_model, n_heads * n_levels * n_points)
@@ -129,11 +130,12 @@ class MSDeformAttn(nn.Module):
             raise ValueError(
                 'Last dim of reference_points must be 2 or 4, but get {} instead.'.format(reference_points.shape[-1]))
 
-        # TODO: Incorporate cuda version
-        # output = MSDeformAttnFunction.apply(
-        #     value, input_spatial_shapes, input_level_start_index, sampling_locations, attention_weights, self.im2col_step
-        # )
-        output = ms_deform_attn_core_pytorch(value, input_spatial_shapes, sampling_locations, attention_weights)
+        if self.use_cuda:
+            output = MSDeformAttnFunction.apply(
+                value, input_spatial_shapes, input_level_start_index, sampling_locations, attention_weights, self.im2col_step
+            )
+        else:
+            output = ms_deform_attn_core_pytorch(value, input_spatial_shapes, sampling_locations, attention_weights)
 
         output = self.output_proj(output)
         return output

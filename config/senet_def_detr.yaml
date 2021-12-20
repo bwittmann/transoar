@@ -1,7 +1,7 @@
 # Config file for senet + deformable detr combination
 
 # General training
-experiment_name: test #_def #senet_def_detr
+experiment_name: test #test_def_updated2_cuda #_def #senet_def_detr
 device: cuda:7
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
@@ -38,13 +38,13 @@ shuffle: False  # TODO
 num_workers: 4
 
 # Hungarian matching
-set_cost_class: 2
+set_cost_class: 2 # 2
 set_cost_bbox: 5
 set_cost_giou: 2
 
 # Losses
 loss_coefs:
-  cls: 2
+  cls: 2  #2
   bbox: 5
   giou: 2
   focal_alpha: 0.25
@@ -78,6 +78,7 @@ neck:
   dec_n_points: 4
   num_queries: 300
   aux_loss: True
+  use_cuda: True
 
   two_stage: False  # TODO
   box_refine: False # TODO

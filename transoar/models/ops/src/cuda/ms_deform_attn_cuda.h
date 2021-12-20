@@ -27,4 +27,3 @@ std::vector<at::Tensor> ms_deform_attn_cuda_backward(
     const at::Tensor &attn_weight,
     const at::Tensor &grad_output,
     const int im2col_step);
-

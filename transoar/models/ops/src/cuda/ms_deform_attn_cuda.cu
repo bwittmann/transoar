@@ -1,10 +1,10 @@
 /*!
 **************************************************************************************************
-* Deformable DETR
-* Copyright (c) 2020 SenseTime. All Rights Reserved.
+* Deformable 3D DETR
+* Copyright (c) 2020 . All Rights Reserved. TODO
 * Licensed under the Apache License, Version 2.0 [see LICENSE for details]
 **************************************************************************************************
-* Modified from https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0
+* Modified from https://github.com/fundamentalvision/Deformable-DETR
 **************************************************************************************************
 */
 
@@ -37,10 +37,10 @@ at::Tensor ms_deform_attn_cuda_forward(
     AT_ASSERTM(sampling_loc.type().is_cuda(), "sampling_loc must be a CUDA tensor");
     AT_ASSERTM(attn_weight.type().is_cuda(), "attn_weight must be a CUDA tensor");
 
-    const int batch = value.size(0);
-    const int spatial_size = value.size(1);
-    const int num_heads = value.size(2);
-    const int channels = value.size(3);
+    const int batch = value.size(0);        // N
+    const int spatial_size = value.size(1); // S
+    const int num_heads = value.size(2);    // M
+    const int channels = value.size(3);     // C
 
     const int num_levels = spatial_shapes.size(0);
 
@@ -51,14 +51,14 @@ at::Tensor ms_deform_attn_cuda_forward(
 
     AT_ASSERTM(batch % im2col_step_ == 0, "batch(%d) must divide im2col_step(%d)", batch, im2col_step_);
     
-    auto output = at::zeros({batch, num_query, num_heads, channels}, value.options());
+    auto output = at::zeros({batch, num_query, num_heads, channels}, value.options()); // (N, Lq, M, C)
 
     const int batch_n = im2col_step_;
     auto output_n = output.view({batch/im2col_step_, batch_n, num_query, num_heads, channels});
-    auto per_value_size = spatial_size * num_heads * channels;
-    auto per_sample_loc_size = num_query * num_heads * num_levels * num_point * 2;
-    auto per_attn_weight_size = num_query * num_heads * num_levels * num_point;
-    for (int n = 0; n < batch/im2col_step_; ++n)
+    auto per_value_size = spatial_size * num_heads * channels; // S * M * C
+    auto per_sample_loc_size = num_query * num_heads * num_levels * num_point * 3; // Lq * M * L * P * 3
+    auto per_attn_weight_size = num_query * num_heads * num_levels * num_point; // Lq * M * L * P
+    for (int n = 0; n < batch/im2col_step_; ++n) //does multiple iterations if im2col_step is smaller than the batchsize (N)
     {
         auto columns = output_n.select(0, n);
         AT_DISPATCH_FLOATING_TYPES(value.type(), "ms_deform_attn_forward_cuda", ([&] {
@@ -74,7 +74,7 @@ at::Tensor ms_deform_attn_cuda_forward(
         }));
     }
 
-    output = output.view({batch, num_query, num_heads*channels});
+    output = output.view({batch, num_query, num_heads*channels}); // (N, Lq, M*C)
 
     return output;
 }
@@ -104,17 +104,18 @@ std::vector<at::Tensor> ms_deform_attn_cuda_backward(
     AT_ASSERTM(attn_weight.type().is_cuda(), "attn_weight must be a CUDA tensor");
     AT_ASSERTM(grad_output.type().is_cuda(), "grad_output must be a CUDA tensor");
 
-    const int batch = value.size(0);
-    const int spatial_size = value.size(1);
-    const int num_heads = value.size(2);
-    const int channels = value.size(3);
+    const int batch = value.size(0);        // N
+    const int spatial_size = value.size(1); // S
+    const int num_heads = value.size(2);    // M
+    const int channels = value.size(3);     // C
 
     const int num_levels = spatial_shapes.size(0);
 
     const int num_query = sampling_loc.size(1);
     const int num_point = sampling_loc.size(4);
 
-    const int im2col_step_ = std::min(batch, im2col_step);
+    const int im2col_step_ = std::min(batch, im2col_step); //that basically the batch size (might be smaller)
+    //HIER im2col verstehen und dann wie genau die threads/blocks aufgeteilt werden damit am schluss 3* threadid.x verstanden wird
 
     AT_ASSERTM(batch % im2col_step_ == 0, "batch(%d) must divide im2col_step(%d)", batch, im2col_step_);
 
@@ -124,11 +125,11 @@ std::vector<at::Tensor> ms_deform_attn_cuda_backward(
 
     const int batch_n = im2col_step_;
     auto per_value_size = spatial_size * num_heads * channels;
-    auto per_sample_loc_size = num_query * num_heads * num_levels * num_point * 2;
+    auto per_sample_loc_size = num_query * num_heads * num_levels * num_point * 3;
     auto per_attn_weight_size = num_query * num_heads * num_levels * num_point;
     auto grad_output_n = grad_output.view({batch/im2col_step_, batch_n, num_query, num_heads, channels});
     
-    for (int n = 0; n < batch/im2col_step_; ++n)
+    for (int n = 0; n < batch/im2col_step_; ++n)    //does multiple iterations if im2col_step is smaller than the batchsize (N)
     {
         auto grad_output_g = grad_output_n.select(0, n);
         AT_DISPATCH_FLOATING_TYPES(value.type(), "ms_deform_attn_backward_cuda", ([&] {

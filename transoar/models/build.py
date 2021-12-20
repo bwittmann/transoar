@@ -68,7 +68,8 @@ def build_neck(config):
             return_intermediate_dec=True,
             num_feature_levels=config['num_feature_levels'],
             dec_n_points=config['dec_n_points'],
-            enc_n_points=config['enc_n_points']
+            enc_n_points=config['enc_n_points'],
+            use_cuda=config['use_cuda']
         )  
 
     return model

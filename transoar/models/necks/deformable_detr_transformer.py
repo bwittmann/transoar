@@ -12,23 +12,35 @@ from transoar.models.ops.modules import MSDeformAttn
 
 class DeformableTransformer(nn.Module):
     def __init__(
-        self, d_model=256, nhead=8, num_encoder_layers=6, num_decoder_layers=6, 
-        dim_feedforward=1024, dropout=0.1, activation="relu", return_intermediate_dec=False,
-        num_feature_levels=4, dec_n_points=4,  enc_n_points=4
+        self,
+        d_model=256,
+        nhead=8,
+        num_encoder_layers=6,
+        num_decoder_layers=6, 
+        dim_feedforward=1024,
+        dropout=0.1,
+        activation="relu",
+        return_intermediate_dec=False,
+        num_feature_levels=4,
+        dec_n_points=4,
+        enc_n_points=4,
+        use_cuda=True
     ):
         super().__init__()
 
         self.d_model = d_model
         self.nhead = nhead
 
-        encoder_layer = DeformableTransformerEncoderLayer(d_model, dim_feedforward,
-                                                          dropout, activation,
-                                                          num_feature_levels, nhead, enc_n_points)
+        encoder_layer = DeformableTransformerEncoderLayer(
+            d_model, dim_feedforward, dropout, activation, num_feature_levels,
+            nhead, enc_n_points, use_cuda
+        )
         self.encoder = DeformableTransformerEncoder(encoder_layer, num_encoder_layers)
 
-        decoder_layer = DeformableTransformerDecoderLayer(d_model, dim_feedforward,
-                                                          dropout, activation,
-                                                          num_feature_levels, nhead, dec_n_points)
+        decoder_layer = DeformableTransformerDecoderLayer(
+            d_model, dim_feedforward, dropout, activation,
+            num_feature_levels, nhead, dec_n_points, use_cuda
+        )
         self.decoder = DeformableTransformerDecoder(decoder_layer, num_decoder_layers, return_intermediate_dec)
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
@@ -113,14 +125,21 @@ class DeformableTransformer(nn.Module):
 
 
 class DeformableTransformerEncoderLayer(nn.Module):
-    def __init__(self,
-                 d_model=256, d_ffn=1024,
-                 dropout=0.1, activation="relu",
-                 n_levels=4, n_heads=8, n_points=4):
+    def __init__(
+        self,
+        d_model=256,
+        d_ffn=1024,
+        dropout=0.1,
+        activation="relu",
+        n_levels=4,
+        n_heads=8,
+        n_points=4,
+        use_cuda=True
+    ):
         super().__init__()
 
         # self attention
-        self.self_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
+        self.self_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points, use_cuda)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 
@@ -192,13 +211,21 @@ class DeformableTransformerEncoder(nn.Module):
 
 
 class DeformableTransformerDecoderLayer(nn.Module):
-    def __init__(self, d_model=256, d_ffn=1024,
-                 dropout=0.1, activation="relu",
-                 n_levels=4, n_heads=8, n_points=4):
+    def __init__(
+        self,
+        d_model=256,
+        d_ffn=1024,
+        dropout=0.1, 
+        activation="relu",
+        n_levels=4,
+        n_heads=8,
+        n_points=4,
+        use_cuda=True
+    ):
         super().__init__()
 
         # cross attention
-        self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
+        self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points, use_cuda)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 
