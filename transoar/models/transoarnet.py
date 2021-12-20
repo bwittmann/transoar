@@ -40,8 +40,9 @@ class TransoarNet(nn.Module):
 
         # Get projections and embeddings
         if 'num_feature_levels' in config['neck']:
-            self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # TODO: Why?
+            self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
 
+            # Get individual input projection for each feature level
             num_feature_levels = config['neck']['num_feature_levels']
             if num_feature_levels > 1:
                 num_backbone_outs = len(config['backbone']['num_channels'])
@@ -60,22 +61,6 @@ class TransoarNet(nn.Module):
                     nn.Conv3d(config['backbone']['num_channels'][0], hidden_dim, kernel_size=1),    # TODO
                     nn.GroupNorm(32, hidden_dim),
                 )])
-
-            # Initialize learnable params
-            prior_prob = 0.01
-            bias_value = -math.log((1 - prior_prob) / prior_prob)
-            self._cls_head.bias.data = torch.ones(num_classes) * bias_value
-            nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
-            nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
-            for proj in self._input_proj:
-                nn.init.xavier_uniform_(proj[0].weight, gain=1)
-                nn.init.constant_(proj[0].bias, 0)
-
-            num_pred = config['neck']['dec_layers']
-            nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
-            self._cls_head = nn.ModuleList([self._cls_head for _ in range(num_pred)])   # TODO check logic
-            self._bbox_reg_head = nn.ModuleList([self._bbox_reg_head for _ in range(num_pred)])
-            self._neck.decoder.bbox_embed = None
         else:
             self._query_embed = nn.Embedding(num_queries, hidden_dim)
             self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
