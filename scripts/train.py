@@ -16,6 +16,14 @@ from transoar.models.transoarnet import TransoarNet
 from transoar.models.build import build_criterion
 
 
+def match_keywords(n, keywords):
+        out = False
+        for b in keywords:
+            if b in n:
+                out = True
+                break
+        return out
+
 def train(config, args):
     device = config['device']
 
@@ -31,12 +39,28 @@ def train(config, args):
     criterion = build_criterion(config).to(device=device)
 
     param_dicts = [
-        {"params": [p for n, p in model.named_parameters() if "backbone" not in n and p.requires_grad]},
         {
-            "params": [p for n, p in model.named_parameters() if "backbone" in n and p.requires_grad],
-            "lr": float(config['lr_backbone'])
+            'params': [
+                p for n, p in model.named_parameters() if not match_keywords(n, ['backbone', 'reference_points', 'sampling_offsets']) and p.requires_grad
+            ],
+            'lr': float(config['lr'])
         },
+        {
+            'params': [p for n, p in model.named_parameters() if match_keywords(n, ['backbone']) and p.requires_grad],
+            'lr': float(config['lr_backbone'])
+        } 
     ]
+
+    # Append additional param dict for def detr
+    if sum([match_keywords(n, ['reference_points', 'sampling_offsets']) for n, _ in model.named_parameters()]) > 0:
+        param_dicts.append(
+            {
+                "params": [
+                    p for n, p in model.named_parameters() if match_keywords(n, ['reference_points', 'sampling_offsets']) and p.requires_grad
+                ],
+                'lr': float(config['lr']) * config['lr_linear_proj_mult']
+            }
+        )
 
     optim = torch.optim.AdamW(
         param_dicts, lr=float(config['lr']), weight_decay=float(config['weight_decay'])
