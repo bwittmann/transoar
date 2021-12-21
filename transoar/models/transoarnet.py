@@ -68,6 +68,35 @@ class TransoarNet(nn.Module):
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
+        # Weight init
+        self._reset_parameters()
+
+    def _reset_parameters(self):
+        if self._skip_con:
+            nn.init.xavier_uniform(self._skip_proj.weight.data)
+            nn.init.constant_(self._skip_proj.bias, 0)
+
+        if isinstance(self._input_proj, nn.modules.container.ModuleList):
+            for name, param in self._input_proj.named_parameters():
+                if 'bias' in name:
+                    nn.init.constant_(param, 0)
+                elif param.dim() > 1:   # Don't change default init of GroupNorm
+                    nn.init.xavier_uniform_(param)
+        else:
+            nn.init.xavier_uniform_(self._input_proj.weight.data)
+            nn.init.constant_(self._input_proj.bias.data, 0) 
+
+        for name, param in self._bbox_reg_head.named_parameters():
+            if 'bias' in name:
+                nn.init.constant_(param, 0)
+            elif param.dim() > 1:
+                nn.init.kaiming_uniform_(param, nonlinearity='relu')    
+
+        nn.init.xavier_uniform_(self._cls_head.weight.data)
+        nn.init.constant_(self._cls_head.bias.data, 0)
+
+        nn.init.xavier_uniform_(self._query_embed.weight.data)
+
 
     def forward(self, x, mask):
         out_backbone = self._backbone(x, mask)
