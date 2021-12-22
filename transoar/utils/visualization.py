@@ -5,16 +5,16 @@ import math
 
 import cv2
 import torch
-import trimesh
 import open3d as o3d
 import numpy as np
+import torch.nn.functional as F
 
 from transoar.utils.io import write_ply
 
 PALETTE = {
     1: [255, 0, 0], # colors for organ point cloud
     2: [0, 255, 0],
-    3: [0, 255, 0],
+    3: [0, 0, 255],
     4: [255, 153, 153],
     5: [255, 204, 153],
     6: [255, 255, 153],
@@ -157,12 +157,6 @@ def save_pred_visualization(
         create_mesh: If True, create mesh out of seg_mask instead of point cloud.
             This should not be invoked, as it currently works poorly.
     """
-    def rescale_bbox(bbox, data):
-        # Change val of bboxes from sigmoid range back to meaningful values
-        bbox[:3] = bbox[:3] * data.shape
-        bbox[3:] = bbox[3:] * data.shape
-        return bbox
-
     if isinstance(seg_mask, torch.Tensor):
         seg_mask = seg_mask.squeeze().detach().cpu().numpy()
 
@@ -199,19 +193,90 @@ def save_pred_visualization(
             o3d.io.write_point_cloud(path_pc, pcd)
 
         # Gt bboxes
-        bbox = rescale_bbox(bbox, seg_mask)
+        bbox = rescale_bbox(bbox, seg_mask.shape)
         bbox = np.concatenate((bbox, np.array([0])), axis=0)
         path_bbox = str(path_to_instance) + f'/{classes[str(class_)]}_bbox_gt.ply'
         write_bbox(bbox, 1000, path_bbox, PALETTE, seg_mask.shape[-1] / 750)
 
     # Generate pred bboxes
     for bbox, class_ in zip(pred_boxes, pred_classes):
-        bbox = rescale_bbox(bbox, seg_mask)
+        bbox = rescale_bbox(bbox, seg_mask.shape)
 
         bbox = np.concatenate((bbox, np.array([0])), axis=0)
         path_bbox = str(path_to_instance) + f'/{classes[str(class_)]}_bbox_pred.ply'
         write_bbox(bbox, 1001, path_bbox, PALETTE, seg_mask.shape[-1] / 750)
 
+def rescale_bbox(bbox, original_shape):
+        # Change val of bboxes from sigmoid range back to meaningful values
+        bbox[:3] = bbox[:3] * original_shape
+        bbox[3:] = bbox[3:] * original_shape
+        return bbox
+
+def save_attn_visualization(
+    model_out, backbone_features, enc_attn_weights, dec_attn_weights, original_shape, seg_mask
+):
+    seg_mask = seg_mask.squeeze()
+
+    # Get shape of input the feature map
+    d, h, w = backbone_features.shape[-3:]
+
+    # Get all predicted classes and bboxes for all queries
+    all_pred_classes = torch.max(F.softmax(model_out['pred_logits'], dim=-1), dim=-1)[1].squeeze()
+    all_pred_boxes = model_out['pred_boxes'].squeeze()
+
+    # Decoder cross attn weights, averaged over all heads
+    for query_id in range(dec_attn_weights.shape[0]):
+        query_dec_attn_weights = dec_attn_weights[query_id].view(d, h, w)                        
+        assert torch.isclose(query_dec_attn_weights.sum(), torch.tensor([1.]))
+
+        # Upsample attn weights to original input shape
+        query_dec_attn_weights = F.interpolate(query_dec_attn_weights[None, None], original_shape).squeeze()
+
+        # Get class and bbox of current query
+        query_class = all_pred_classes[query_id]
+        # query_box = rescale_bbox(all_pred_boxes[query_id], original_shape)
+
+        # Generate complete pc and different colored query pc
+        pc_rest = torch.nonzero(torch.logical_and(seg_mask != 0, seg_mask != query_class))
+        pc_rest_color = (torch.tensor(PALETTE[3]) / 255)[None].repeat(pc_rest.shape[0], 1)
+
+        pc_query = torch.nonzero(seg_mask == query_class)
+        pc_query_color = (torch.tensor(PALETTE[1]) / 255)[None].repeat(pc_query.shape[0], 1)
+
+        pc_comb, pc_comb_color = torch.cat((pc_rest, pc_query), dim=0), torch.cat((pc_rest_color, pc_query_color), dim=0)
+
+        pc = o3d.geometry.PointCloud()
+        pc.points = o3d.utility.Vector3dVector(pc_comb)
+        pc.colors = o3d.utility.Vector3dVector(pc_comb_color)
+        pc_organs = pc 
+
+        pc_attn_weights = []
+
+        query_dec_attn_weights = query_dec_attn_weights.flatten()
+        mask = torch.ones_like(query_dec_attn_weights).to(dtype=torch.bool)
+        mask[::30] = False
+        query_dec_attn_weights[mask] = -1
+        query_dec_attn_weights = query_dec_attn_weights.view(original_shape) 
+
+        weights = query_dec_attn_weights.unique()[2:]
+        for weight in weights:
+            pc_attn_weight = torch.nonzero(query_dec_attn_weights == weight)
+            color = torch.tensor([1, 1, 1]) - 60 * weight
+            color[0] = 1
+
+            pc_attn_color = color[None].repeat(pc_attn_weight.shape[0], 1)
+
+            pc = o3d.geometry.PointCloud()
+            pc.points = o3d.utility.Vector3dVector(pc_attn_weight)
+            pc.colors = o3d.utility.Vector3dVector(pc_attn_color)
+
+            pc_attn_weights.append(pc)
+
+        for idx, pc in enumerate(pc_attn_weights):
+            o3d.io.write_point_cloud(f'/home/bastian/Downloads/tester/attn{idx}.ply', pc)
+
+        o3d.io.write_point_cloud('/home/bastian/Downloads/tester/test.ply', pc_organs)
+        o3d.visualization.draw_geometries([pc_organs, *pc_attn_weights])
 
 def write_bbox(bbox, mode, output_file, palette, diameter=0.3):
     """Generate a .ply file representing a bbox.
