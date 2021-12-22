@@ -16,7 +16,7 @@ from transoar.models.transoarnet import TransoarNet
 from transoar.models.build import build_criterion
 
 
-def match_keywords(n, keywords):
+def match(n, keywords):
         out = False
         for b in keywords:
             if b in n:
@@ -38,25 +38,35 @@ def train(config, args):
     model = TransoarNet(config).to(device=device)
     criterion = build_criterion(config).to(device=device)
 
+    # Analysis of model parameter distribution
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['backbone', 'input_proj']))
+    num_neck_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['neck', 'query']))
+    num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['head']))
+
+    print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%') # TODO: Incorp into logging
+    print(f'num_neck_params\t\t{num_neck_params:>10}\t{num_neck_params/num_params:.4f}%')
+    print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
+
     param_dicts = [
         {
             'params': [
-                p for n, p in model.named_parameters() if not match_keywords(n, ['backbone', 'reference_points', 'sampling_offsets']) and p.requires_grad
+                p for n, p in model.named_parameters() if not match(n, ['backbone', 'reference_points', 'sampling_offsets']) and p.requires_grad
             ],
             'lr': float(config['lr'])
         },
         {
-            'params': [p for n, p in model.named_parameters() if match_keywords(n, ['backbone']) and p.requires_grad],
+            'params': [p for n, p in model.named_parameters() if match(n, ['backbone']) and p.requires_grad],
             'lr': float(config['lr_backbone'])
         } 
     ]
 
     # Append additional param dict for def detr
-    if sum([match_keywords(n, ['reference_points', 'sampling_offsets']) for n, _ in model.named_parameters()]) > 0:
+    if sum([match(n, ['reference_points', 'sampling_offsets']) for n, _ in model.named_parameters()]) > 0:
         param_dicts.append(
             {
                 "params": [
-                    p for n, p in model.named_parameters() if match_keywords(n, ['reference_points', 'sampling_offsets']) and p.requires_grad
+                    p for n, p in model.named_parameters() if match(n, ['reference_points', 'sampling_offsets']) and p.requires_grad
                 ],
                 'lr': float(config['lr']) * config['lr_linear_proj_mult']
             }
