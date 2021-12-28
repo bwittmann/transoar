@@ -122,7 +122,7 @@ class MSDeformAttn(nn.Module):
                                  + sampling_offsets / offset_normalizer[None, None, None, :, None, :]
         elif reference_points.shape[-1] == 3:   # TODO
             offset_normalizer = torch.stack(
-                [input_spatial_shapes[..., 2], input_spatial_shapes[..., 1], input_spatial_shapes[..., 0]], -1  # TODO to fit WHD of reference?
+                [input_spatial_shapes[..., 2], input_spatial_shapes[..., 1], input_spatial_shapes[..., 0]], -1          # To fit WHD/XYZ
             )
             sampling_locations = reference_points[:, :, None, :, None, :] \
                                  + sampling_offsets / offset_normalizer[None, None, None, :, None, :]                   # [Batch, AllLvlPatches, NumHeads, Lvls, NumPoints, Offset]

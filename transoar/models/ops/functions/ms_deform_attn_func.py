@@ -54,7 +54,7 @@ def ms_deform_attn_core_pytorch(value, value_spatial_shapes, sampling_locations,
         value_l_ = value_list[lid_].flatten(2).transpose(1, 2).reshape(N_*M_, D_, D, H, W)                          # [Batch*NumHeads, FeatureDim, D, H, W]
         sampling_grid_l_ = sampling_grids[:, :, :, lid_].transpose(1, 2).flatten(0, 1)                              # [Batch*NumHeads, AllLvlPatches, NumPoints, Offset]
 
-        # value_l_ in format DHW, sampling_grid_l_ in format WHD (see F.grid_sample doc)
+        # value_l_ in format DHW, sampling_grid_l_ in format WHD/XYZ (see F.grid_sample doc)
         sampling_value_l_ = F.grid_sample(
             value_l_, sampling_grid_l_[:, None], mode='bilinear', padding_mode='zeros', align_corners=False         # [Batch*NumHeads, FeatureDim, AllLvlPatches, NumPoints]
         ).squeeze(2)    # TODO: check this hack

@@ -68,7 +68,7 @@ class DeformableTransformer(nn.Module):
         valid_ratio_d = valid_D.float() / D
         valid_ratio_h = valid_H.float() / H
         valid_ratio_w = valid_W.float() / W
-        valid_ratio = torch.stack([valid_ratio_w, valid_ratio_h, valid_ratio_d], -1)    # TODO check why w h d
+        valid_ratio = torch.stack([valid_ratio_w, valid_ratio_h, valid_ratio_d], -1)
         return valid_ratio
 
     def forward(self, srcs, masks, query_embed, pos_embeds):
@@ -100,7 +100,7 @@ class DeformableTransformer(nn.Module):
         # Determine indices of batches that mark the start of a new feature level
         level_start_index = torch.cat((spatial_shapes.new_zeros((1, )), spatial_shapes.prod(1).cumsum(0)[:-1]))
 
-        # Determine the ratios of valid regions based on the mask for d, h, w   # TODO
+        # Determine the ratios of valid regions based on the mask for in format WHD/XYZ
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
 
         # encoder
@@ -189,14 +189,14 @@ class DeformableTransformerEncoder(nn.Module):
                 torch.linspace(0.5, H_ - 0.5, H_, dtype=torch.float32, device=device),
                 torch.linspace(0.5, W_ - 0.5, W_, dtype=torch.float32, device=device)
             )
-            # Get relative coords where coords in masked area have values bigger 1
-            ref_z = ref_z.reshape(-1)[None] / D_ #(valid_ratios[:, None, lvl, 2] * D_)  # TODO
-            ref_y = ref_y.reshape(-1)[None] / H_ #(valid_ratios[:, None, lvl, 1] * H_)
-            ref_x = ref_x.reshape(-1)[None] / W_ #(valid_ratios[:, None, lvl, 0] * W_)
-            ref = torch.stack((ref_x, ref_y, ref_z), -1)    # Coords in format W, H, D
+            # Get relative coords in range [0, 1], ref points in masked areas have values > 1
+            ref_z = ref_z.reshape(-1)[None] / (valid_ratios[:, None, lvl, 2] * D_)  # TODO
+            ref_y = ref_y.reshape(-1)[None] / (valid_ratios[:, None, lvl, 1] * H_)
+            ref_x = ref_x.reshape(-1)[None] / (valid_ratios[:, None, lvl, 0] * W_)
+            ref = torch.stack((ref_x, ref_y, ref_z), -1)    # Coords in format WHD/XYZ
             reference_points_list.append(ref)
         reference_points = torch.cat(reference_points_list, 1)  # [Batch, AllLvlPatches, RelativeRefCoords]
-        reference_points = reference_points[:, :, None] * valid_ratios[:, None] # Valid ratio also in format W, H, D
+        reference_points = reference_points[:, :, None] * valid_ratios[:, None] # Valid ratio also in format WHD/XYZ
         return reference_points
 
     def forward(self, src, spatial_shapes, level_start_index, valid_ratios, pos=None, padding_mask=None):
