@@ -112,10 +112,12 @@ class ResNet(nn.Module):
         shortcut_type='B',
         widen_factor=1.0,
         strides=[1, 2, 2, 2],
-        max_pool=True
+        max_pool=True,
+        return_intermediate_outputs=True
     ):
         super().__init__()
         self.max_pool = max_pool
+        self.return_intermediate_outputs = return_intermediate_outputs
 
         block_inplanes = [int(x * widen_factor) for x in block_inplanes]
         self.in_planes = block_inplanes[0]
@@ -202,9 +204,16 @@ class ResNet(nn.Module):
         if self.max_pool:
             x = self.maxpool(x)
 
+        out = []
         for layer in self.layers:
             x = layer(x)
+            # Adjust mask via interpolation - True: masked, False: not masked
+            mask_inter = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool).squeeze(1)
+            out.append((x, mask_inter))
 
-        # Adjust mask via interpolation - True: masked, False: not masked
-        mask = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool).squeeze(1)
-        return x, mask
+        # Decide which layer outputs to return
+        if self.return_intermediate_outputs:
+            return out[1:]
+        else:
+            return out[-1:]  # only return last output
+

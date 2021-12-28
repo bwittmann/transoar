@@ -1,8 +1,8 @@
 # Config file for senet + detr combination
 
 # General training
-experiment_name: test #senet_detr_22_q100_h257_shuffle #test_aux_loss #senet_kernel3_noworkerinit_prevseed_repr
-device: cuda:5
+experiment_name: test
+device: cuda:4
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
@@ -23,9 +23,9 @@ bbox_padding: 1
 
 # Augmentation
 use_augmentation: True
-p_rotation: 0.2 # prev: 0.2
+p_rotation: 0.2
 rotation: [-30, 30]
-p_scale: 0.2 # prev: 0.2
+p_scale: 0.2
 scale_range: [0.7, 1.4]
 p_gamma: 0.3
 gamma_range: [0.7, 1.5]
@@ -33,7 +33,7 @@ mirror_axes: [0, 1, 2]
 
 # Dataloader
 batch_size: 3
-shuffle: True  # TODO
+shuffle: False
 num_workers: 4
 
 # Hungarian matching
@@ -54,7 +54,7 @@ backbone:
   depths: [4, 4, 8, 8]
   strides: [1, 2, 2, 2] # prev. [1, 2, 2, 2]
   num_channels: 2048 # [64, 256, 512, 1024, 2048]
-  num_feature_patches: 160
+  num_feature_patches: 160  # 1728 spine
   num_layers: 4 # [0, 1, 2, 3, 4]
   reduction: 16
   pool: True
@@ -63,7 +63,7 @@ backbone:
 neck:
   name: detr
   skip_con: False # from backbone to heads
-  pos_encoding: sine
+  pos_encoding: sine # [sine, learned]
   hidden_dim: 256 # prev: 256 -> 768
   dropout: 0  # prev: 0.1
   nheads: 8

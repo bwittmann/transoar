@@ -1,4 +1,4 @@
-# Config file for senet + deformable detr combination
+# Config file for resnet + deformable detr combination
 
 # General training
 experiment_name: test
@@ -47,18 +47,16 @@ loss_coefs:
   cls: 2
   bbox: 5
   giou: 2
-  focal_alpha: 0.25
 
 # Model specific params
 backbone:
-  name: senet
-  in_chans: 1
-  depths: [4, 4, 8, 8]
+  name: resnet
+  depths: [3, 4, 6, 3]
   strides: [1, 2, 2, 2]
-  num_channels: [512, 1024, 2048] #[64, 256, 512, 1024, 2048]
-  num_feature_patches: 10800
-  num_layers: 4 # [0, 1, 2, 3, 4]
-  reduction: 16
+  in_chans: 1
+  num_channels: [512, 1024, 2048]
+  num_feature_patches: 11040
+  num_layers: 4
   pool: True
   return_intermediate_outputs: True
 

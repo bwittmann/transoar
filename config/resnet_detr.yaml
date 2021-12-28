@@ -1,20 +1,20 @@
-# Config file for senet + detr combination
+# Config file for resnet + detr combination
 
 # General training
-experiment_name: test_repr2 #test_bbstrides1222_layer22_q300_b3_h768_nodrop_noskip_realval_longer_aux
-device: cuda:2
+experiment_name: test
+device: cuda:4
 val_interval: 1
-debug_mode: False  # doesn't save checkpoints
+debug_mode: True # doesn't save checkpoints
 seed: 10
 
-epochs: 3300 # should be about ~300k train steps, prev
+epochs: 2000
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4
 clip_max_norm: 0.1
 
 # Scheduler
-lr_drop: 2700 # at about 2/3 of train run
+lr_drop: 1300
 
 # Data
 dataset: transoar_spacing444_th_newconf_CT
@@ -33,13 +33,13 @@ mirror_axes: [0, 1, 2]
 
 # Dataloader
 batch_size: 3
-shuffle: False  # TODO
+shuffle: False
 num_workers: 4
 
 # Hungarian matching
 set_cost_class: 1
 set_cost_bbox: 5
-set_cost_giou: 4
+set_cost_giou: 2
 
 # Losses
 loss_coefs:
@@ -54,20 +54,21 @@ backbone:
   strides: [1, 2, 2, 2]
   in_chans: 1
   num_channels: 2048
-  feature_map_dim: [8, 8, 20]
+  num_feature_patches: 160
   num_layers: 4
   pool: True
+  return_intermediate_outputs: False
 
 neck:
   name: detr
   skip_con: False # from backbone to heads
   pos_encoding: sine
-  hidden_dim: 256 # prev: 256 -> 768
+  hidden_dim: 256
   dropout: 0.0  # prev: 0.1
   nheads: 8
   dim_feedforward: 2048
-  enc_layers: 2 #6
-  dec_layers: 2 #6
+  enc_layers: 2 # prev: 6
+  dec_layers: 2 # prev: 6
   pre_norm: False
-  num_queries: 100 # spine-trans use 25
+  num_queries: 100
   aux_loss: False
