@@ -61,6 +61,8 @@ class TransoarNet(nn.Module):
                     nn.Conv3d(config['backbone']['num_channels'][0], hidden_dim, kernel_size=1),
                     nn.GroupNorm(32, hidden_dim),
                 )])
+            
+            self._reset_parameter()
         else:
             self._query_embed = nn.Embedding(num_queries, hidden_dim)
             self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
@@ -68,47 +70,14 @@ class TransoarNet(nn.Module):
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
-        # Weight init
-        self._reset_parameters()
+    def _reset_parameter(self):
+        nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
+        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
+        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
 
-    def _reset_parameters(self):
-        # if self._skip_con:
-        #     nn.init.xavier_uniform(self._skip_proj.weight.data)
-        #     nn.init.constant_(self._skip_proj.bias, 0)
-
-        # if isinstance(self._input_proj, nn.modules.container.ModuleList):
-        #     for name, param in self._input_proj.named_parameters():
-        #         if 'bias' in name:
-        #             nn.init.constant_(param, 0)
-        #         elif param.dim() > 1:   # Don't change default init of GroupNorm
-        #             nn.init.xavier_uniform_(param)
-        # else:
-        #     nn.init.xavier_uniform_(self._input_proj.weight.data)
-        #     nn.init.constant_(self._input_proj.bias.data, 0) 
-
-        # for name, param in self._bbox_reg_head.named_parameters():
-        #     if 'bias' in name:
-        #         nn.init.constant_(param, 0)
-        #     elif param.dim() > 1:
-        #         nn.init.kaiming_uniform_(param, nonlinearity='relu')    
-
-        # nn.init.xavier_uniform_(self._cls_head.weight.data)
-        # nn.init.constant_(self._cls_head.bias.data, 0)
-
-        # nn.init.xavier_uniform_(self._query_embed.weight.data)
-
-        if isinstance(self._input_proj, nn.modules.container.ModuleList):
-            for param in self._input_proj.parameters():
-                if param.dim() > 1:
-                    nn.init.xavier_uniform_(param)
-
-        for param in self._bbox_reg_head.parameters():
-            if param.dim() > 1:
-                nn.init.xavier_uniform_(param)
-
-        nn.init.xavier_uniform_(self._cls_head.weight.data)
-        nn.init.xavier_uniform_(self._query_embed.weight.data)
-
+        for proj in self._input_proj:
+            nn.init.xavier_uniform_(proj[0].weight, gain=1)
+            nn.init.constant_(proj[0].bias, 0)
 
     def forward(self, x, mask):
         out_backbone = self._backbone(x, mask)
@@ -141,8 +110,31 @@ class TransoarNet(nn.Module):
             out_backbone_skip_proj = self._skip_proj(out_backbone_proj).permute(0, 2, 1)
             out_neck = out_neck + out_backbone_skip_proj
 
-        pred_logits = self._cls_head(out_neck)
-        pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
+        if len(out_neck) > 2:   # In the case of relative offset prediction to references
+            hs, init_reference_out, inter_references_out = out_neck
+
+            outputs_classes = []
+            outputs_coords = []
+            for lvl in range(hs.shape[0]):
+                if lvl == 0:
+                    reference = init_reference_out
+                else:
+                    reference = inter_references_out[lvl - 1]
+                reference = inverse_sigmoid(reference)
+                outputs_class = self._cls_head(hs[lvl])
+                tmp = self._bbox_reg_head(hs[lvl])
+
+                assert reference.shape[-1] == 3
+                tmp[..., :3] += reference
+
+                outputs_coord = tmp.sigmoid()
+                outputs_classes.append(outputs_class)
+                outputs_coords.append(outputs_coord)
+            pred_logits = torch.stack(outputs_classes)
+            pred_boxes = torch.stack(outputs_coords)
+        else:
+            pred_logits = self._cls_head(out_neck)
+            pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
@@ -176,3 +168,9 @@ class MLP(nn.Module):
         for i, layer in enumerate(self.layers):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
+
+def inverse_sigmoid(x, eps=1e-5):
+    x = x.clamp(min=0, max=1)
+    x1 = x.clamp(min=eps)
+    x2 = (1 - x).clamp(min=eps)
+    return torch.log(x1/x2)

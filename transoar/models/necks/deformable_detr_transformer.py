@@ -117,11 +117,11 @@ class DeformableTransformer(nn.Module):
         init_reference_out = reference_points
 
         # decoder
-        hs = self.decoder(
+        hs, inter_references_out = self.decoder(
             tgt, reference_points, memory, spatial_shapes, level_start_index, valid_ratios, query_embed, mask_flatten
         )
 
-        return hs
+        return hs, init_reference_out, inter_references_out
 
 
 class DeformableTransformerEncoderLayer(nn.Module):
@@ -190,9 +190,9 @@ class DeformableTransformerEncoder(nn.Module):
                 torch.linspace(0.5, W_ - 0.5, W_, dtype=torch.float32, device=device)
             )
             # Get relative coords in range [0, 1], ref points in masked areas have values > 1
-            ref_z = ref_z.reshape(-1)[None] / (valid_ratios[:, None, lvl, 2] * D_)  # TODO
-            ref_y = ref_y.reshape(-1)[None] / (valid_ratios[:, None, lvl, 1] * H_)
-            ref_x = ref_x.reshape(-1)[None] / (valid_ratios[:, None, lvl, 0] * W_)
+            ref_z = ref_z.reshape(-1)[None] / D_ #(valid_ratios[:, None, lvl, 2] * D_)  # TODO
+            ref_y = ref_y.reshape(-1)[None] / H_ #(valid_ratios[:, None, lvl, 1] * H_)
+            ref_x = ref_x.reshape(-1)[None] / W_ #(valid_ratios[:, None, lvl, 0] * W_)
             ref = torch.stack((ref_x, ref_y, ref_z), -1)    # Coords in format WHD/XYZ
             reference_points_list.append(ref)
         reference_points = torch.cat(reference_points_list, 1)  # [Batch, AllLvlPatches, RelativeRefCoords]
@@ -284,6 +284,7 @@ class DeformableTransformerDecoder(nn.Module):
         output = tgt
 
         intermediate = []
+        intermediate_reference_points = []
         for layer in self.layers:
             if reference_points.shape[-1] == 3:
                 reference_points_input = reference_points[:, :, None] * src_valid_ratios[:, None]   # Only have refererence points in valid areas
@@ -294,11 +295,12 @@ class DeformableTransformerDecoder(nn.Module):
 
             if self.return_intermediate:
                 intermediate.append(output)
+                intermediate_reference_points.append(reference_points)
 
         if self.return_intermediate:
-            return torch.stack(intermediate)
+            return torch.stack(intermediate), torch.stack(intermediate_reference_points)
 
-        return output
+        return output, reference_points
 
 
 def _get_clones(module, N):
@@ -314,10 +316,3 @@ def _get_activation_fn(activation):
     if activation == "glu":
         return F.glu
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
-
-
-def inverse_sigmoid(x, eps=1e-5):
-    x = x.clamp(min=0, max=1)
-    x1 = x.clamp(min=eps)
-    x2 = (1 - x).clamp(min=eps)
-    return torch.log(x1/x2)
