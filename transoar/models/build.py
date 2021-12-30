@@ -81,10 +81,7 @@ def build_criterion(config):
         cost_giou=config['set_cost_giou']
     )
 
-    criterion = TransoarCriterion(
-        num_classes=config['num_classes'],
-        matcher=matcher
-    )
+    criterion = TransoarCriterion()
 
     return criterion
 

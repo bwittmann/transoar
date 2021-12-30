@@ -34,8 +34,7 @@ class TransoarNet(nn.Module):
         # Get neck
         self._neck = build_neck(config['neck'])
 
-        # Get heads
-        self._cls_head = nn.Linear(hidden_dim, num_classes + 1)
+        # Get bbox head
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         # Get projections and embeddings
@@ -121,36 +120,30 @@ class TransoarNet(nn.Module):
                 else:
                     reference = inter_references_out[lvl - 1]
                 reference = inverse_sigmoid(reference)
-                outputs_class = self._cls_head(hs[lvl])
                 tmp = self._bbox_reg_head(hs[lvl])
 
                 assert reference.shape[-1] == 3
                 tmp[..., :3] += reference
 
                 outputs_coord = tmp.sigmoid()
-                outputs_classes.append(outputs_class)
                 outputs_coords.append(outputs_coord)
-            pred_logits = torch.stack(outputs_classes)
             pred_boxes = torch.stack(outputs_coords)
         else:
-            pred_logits = self._cls_head(out_neck)
             pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
 
         out = {
-            'pred_logits': pred_logits[-1], # Take output of last layer
             'pred_boxes': pred_boxes[-1]
         }
 
         if self._aux_loss:
-            out['aux_outputs'] = self._set_aux_loss(pred_logits, pred_boxes)
+            out['aux_outputs'] = self._set_aux_loss(pred_boxes)
 
         return out
 
     @torch.jit.unused
-    def _set_aux_loss(self, pred_logits, pred_boxes):
+    def _set_aux_loss(self, pred_boxes):
         # Hack to support dictionary with non-homogeneous values
-        return [{'pred_logits': a, 'pred_boxes': b}
-                for a, b in zip(pred_logits[:-1], pred_boxes[:-1])]
+        return [{'pred_boxes': a} for a in pred_boxes[:-1]]
 
 
 class MLP(nn.Module):

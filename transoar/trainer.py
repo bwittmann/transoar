@@ -56,7 +56,7 @@ class Trainer:
 
             # Make prediction 
             out = self._model(data, mask)
-            loss_dict = self._criterion(out, targets)
+            loss_dict, *_ = self._criterion(out, targets)
 
             # Create absolute loss and mult with loss coefficient
             loss_abs = 0
@@ -76,7 +76,6 @@ class Trainer:
             loss_agg += loss_abs.item()
             loss_bbox_agg += loss_dict['bbox'].item()
             loss_giou_agg += loss_dict['giou'].item()
-            loss_cls_agg += loss_dict['cls'].item()
 
         loss = loss_agg / len(self._train_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
@@ -114,7 +113,7 @@ class Trainer:
 
             # Make prediction 
             out = self._model(data, mask)
-            loss_dict = self._criterion(out, targets)
+            loss_dict, out_boxes, out_classes = self._criterion(out, targets)
 
             # Create absolute loss and mult with loss coefficient
             loss_abs = 0
@@ -122,7 +121,10 @@ class Trainer:
                 loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
 
             # Evaluate validation predictions based on metric
-            pred_boxes, pred_classes, pred_scores = inference(out)
+            pred_boxes = [boxes.detach().cpu().numpy() for boxes in out_boxes]
+            pred_classes = [classes.detach().cpu().numpy() for classes in out_classes]
+            pred_scores = [torch.ones_like(classes).detach().cpu().numpy() for classes in out_classes]
+            
             self._evaluator.add(
                 pred_boxes=pred_boxes,
                 pred_classes=pred_classes,
@@ -134,7 +136,6 @@ class Trainer:
             loss_agg += loss_abs.item()
             loss_bbox_agg += loss_dict['bbox'].item()
             loss_giou_agg += loss_dict['giou'].item()
-            loss_cls_agg += loss_dict['cls'].item()
 
         loss = loss_agg / len(self._val_loader)
         loss_bbox = loss_bbox_agg / len(self._val_loader)

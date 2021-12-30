@@ -90,7 +90,7 @@ class DetectionEvaluator:
         """
         # reduce class ids by 1 to start with 0
         gt_classes = [batch_elem_classes -1 for batch_elem_classes in gt_classes]
-        pred_classes = [batch_elem_classes -1 for batch_elem_classes in pred_classes]
+        # pred_classes = [batch_elem_classes -1 for batch_elem_classes in pred_classes]
 
         if gt_ignore is None:   # only zeros -> don't ignore anything
             n = [0 if gt_boxes_img.size == 0 else gt_boxes_img.shape[0] for gt_boxes_img in gt_boxes]
