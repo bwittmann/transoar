@@ -4,6 +4,7 @@ from transoar.models.matcher import HungarianMatcher
 from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
+from transoar.models.backbones.convnet_light_3D import ConvNetLight
 from transoar.models.necks.detr_transformer import DetrTransformer
 from transoar.models.necks.deformable_detr_transformer import DeformableTransformer
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
@@ -26,7 +27,7 @@ def build_backbone(config):
             input_3x3=False,
             return_intermediate_outputs=config['return_intermediate_outputs']
         )
-    if config['name'] == 'resnet':
+    elif config['name'] == 'resnet':
         model = ResNet(
             block=Bottleneck,
             layers=config['depths'],
@@ -39,6 +40,13 @@ def build_backbone(config):
             conv1_t_stride=2,
             shortcut_type='B',
             widen_factor=1.0,
+            return_intermediate_outputs=config['return_intermediate_outputs']
+        )
+    elif config['name'] == 'convnet_light':
+        model = ConvNetLight(
+            out_channels=config['num_channels'],
+            kernel_sizes=config['kernel_size'],
+            strides=config['strides'],
             return_intermediate_outputs=config['return_intermediate_outputs']
         )
 
