@@ -35,16 +35,16 @@ class TransoarDataset(Dataset):
         # Load npy files
         data, label = np.load(data_path), np.load(label_path)
 
-        if self._config['use_augmentation']:
+        if self._config['augmentation']['use_augmentation']:
             data_dict = {
-                'image': data[None],
-                'label': label[None]
+                'image': data,
+                'label': label
             }
 
             # Apply data augmentation
-            data_transformed = self._augmentation(**data_dict)
+            data_transformed = self._augmentation(data_dict)
             data, label = data_transformed['image'], data_transformed['label']
         else:
-            data, label = torch.tensor(data[None]), torch.tensor(label[None])
+            data, label = torch.tensor(data), torch.tensor(label)
 
-        return data.squeeze(0), label.squeeze(0)
+        return data, label

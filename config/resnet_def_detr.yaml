@@ -1,8 +1,8 @@
 # Config file for resnet + deformable detr combination
 
 # General training
-experiment_name: test
-device: cuda:5
+experiment_name: test_new_aug_except_crop_resnet
+device: cuda:6
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
@@ -18,22 +18,12 @@ clip_max_norm: 0.1
 lr_drop: 400  # prev: 40
 
 # Data
-dataset: transoar_spacing444_th_newconf_CT
+dataset: transoar_test_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
-# Augmentation
-use_augmentation: True
-p_rotation: 0.2
-rotation: [-30, 30]
-p_scale: 0.2
-scale_range: [0.7, 1.4]
-p_gamma: 0.3
-gamma_range: [0.7, 1.5]
-mirror_axes: [0, 1, 2]
-
 # Dataloader
-batch_size: 1
+batch_size: 2
 shuffle: False
 num_workers: 4
 
@@ -69,10 +59,36 @@ neck:
   dropout: 0.1
   nheads: 6 #26 #6  #prev: 8
   dim_feedforward: 1024
-  enc_layers: 1 #6
-  dec_layers: 1 #6
+  enc_layers: 2 #6
+  dec_layers: 2 #6
   enc_n_points: 4 #4
   dec_n_points: 4 #4
-  num_queries: 20 #300
+  num_queries: 300 #300
   aux_loss: True
-  use_cuda: False
+  use_cuda: True
+
+  # Augmentation
+augmentation:
+  use_augmentation: True
+  patch_size: [64, 64, 64]
+
+  p_gaussian_noise: 0.1
+  p_gaussian_smooth: 0.2
+  p_intensity_scale: 0.15
+  p_intensity_shift: 0.15
+  p_adjust_contrast: 0.2 # 0.1, 0.3
+  p_rotate: 0.2
+  p_zoom: 0.0 #0.2
+  p_shear: 0.0
+  p_axis_flip: 0.5
+
+  gaussian_noise_mean: 0.0
+  gaussian_noise_std: 0.1
+  gaussian_smooth_sigma: [0.5, 1.0]
+  intensity_scale_factors: [0.75, 1.25]
+  intensity_shift_offsets: [-0.1, 0.1]
+  adjust_contrast_gamma: [0.7, 1.5]
+  rotation: [-30, 30]
+  min_zoom: 0.7
+  max_zoom: 1.4
+  shear_range: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]

@@ -1,5 +1,6 @@
 """Transformations for different operations."""
 
+from monai.transforms.spatial.dictionary import RandAxisFlipd
 import numpy as np
 from monai.transforms import (
     Compose,
@@ -8,23 +9,22 @@ from monai.transforms import (
     LoadImaged,
     Orientationd,
     Spacingd,
-    MapTransform
+    MapTransform,
+    ScaleIntensityRanged,
+    Resized,
+    RandSpatialCropd,
+    RandGaussianNoised,
+    RandGaussianSmoothd,
+    RandScaleIntensityd,
+    RandShiftIntensityd,
+    RandAdjustContrastd,
+    RandRotated,
+    RandZoomd,
+    RandAffined,
+    RandAxisFlipd,
+    RandFlipd,
+    ToTensord
 )
-from batchgenerators.transforms.abstract_transforms import Compose as BGCompose
-from batchgenerators.transforms.spatial_transforms import (
-    MirrorTransform,
-    SpatialTransform
-)
-from batchgenerators.transforms.color_transforms import (
-    GammaTransform,
-    BrightnessMultiplicativeTransform,
-    ContrastAugmentationTransform,
-)
-from batchgenerators.transforms.noise_transforms import (
-    GaussianBlurTransform,
-    GaussianNoiseTransform,
-)
-from batchgenerators.transforms.utility_transforms import NumpyToTensor
 
 
 def crop_air(x):
@@ -45,19 +45,10 @@ class NormalizeClipd(MapTransform):
         data[key] = (data[key] - self._mean) / self._std
         return data
 
-def transform_crop(margin, crop_key, orientation):
-    transform_list = [
-        Orientationd(keys=["image", "label"], axcodes=orientation),
-        CropForegroundd(
-            keys=['image', 'label'], source_key=crop_key, 
-            margin=margin, select_fn=crop_air
-        )
-    ]
-    return Compose(transform_list)
+
 
 def transform_preprocessing(
-    margin, crop_key, orientation, target_spacing, clip_min, 
-    clip_max, std, mean
+    margin, crop_key, orientation, target_spacing
 ):
     transform_list = [
         LoadImaged(keys=["image", "label"]),
@@ -70,63 +61,101 @@ def transform_preprocessing(
         CropForegroundd(
             keys=["image", "label"], source_key=crop_key, 
             margin=margin, select_fn=crop_air
-        ),
-        NormalizeClipd(
-            keys=['image'], clip_min=clip_min, clip_max=clip_max, 
-            std=std, mean=mean
         )
     ]
 
     return Compose(transform_list)
 
-
 def get_transforms(split, config):
+    rotate_range = [i / 180 * np.pi for i in config['augmentation']['rotation']]
     if split == 'train':
-        rotate_range = [i / 180 * np.pi for i in config['rotation']]
-        transform = BGCompose(
-            [
-                GaussianNoiseTransform(p_per_sample=0.1, data_key='image'),
-                GaussianBlurTransform(
-                    (0.5, 1.), different_sigma_per_channel=True, p_per_sample=0.2,
-                    p_per_channel=0.5, data_key='image'
-                ),
-                BrightnessMultiplicativeTransform(
-                    multiplier_range=(0.75, 1.25), p_per_sample=0.15, data_key='image'
-                ),
-                ContrastAugmentationTransform(p_per_sample=0.15, data_key='image'),
-                GammaTransform(
-                    config['gamma_range'], True, True, retain_stats=True, p_per_sample=0.1,
-                    data_key='image'
-                ),
-                GammaTransform(
-                    config['gamma_range'], False, True, retain_stats=True, 
-                    p_per_sample=config['p_gamma'], data_key='image'
-                ),
-                SpatialTransform(
-                    None, patch_center_dist_from_border=None, do_elastic_deform=False,
-                    do_rotation=True, angle_x=rotate_range, angle_y=rotate_range,
-                    angle_z=rotate_range, do_scale=True, scale=config['scale_range'],
-                    order_data=3, border_mode_data='constant', border_cval_data=0, order_seg=0,
-                    border_mode_seg='constant', border_cval_seg=0, random_crop=False,
-                    p_scale_per_sample=config['p_scale'], p_rot_per_sample=config['p_rotation'],
-                    independent_scale_for_each_axis=False, data_key='image', label_key='label'
-                ),
-                MirrorTransform(config['mirror_axes'], data_key='image', label_key='label'),
-                NumpyToTensor(['image', 'label'], 'float')
-            ]
-        )
-        return transform
+        transform = [
+            RandGaussianNoised(
+                keys=['image'], prob=config['augmentation']['p_gaussian_noise'], 
+                mean=config['augmentation']['gaussian_noise_mean'], std=config['augmentation']['gaussian_noise_std']
+            ),
+            ScaleIntensityRanged(
+                keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+            ),
+            Resized(
+                keys=['image', 'label'], spatial_size=[int(x) for x in config['shape_statistics']['median']],   # TODO
+                mode=['area', 'nearest']
+            ),
+            RandRotated(
+                keys=['image', 'label'], prob=config['augmentation']['p_rotate'],
+                range_x=rotate_range, range_y=rotate_range, range_z=rotate_range,
+                mode=['bilinear', 'nearest'], padding_mode='zeros'
+            ),
+            RandZoomd(
+                keys=['image', 'label'], prob=config['augmentation']['p_zoom'],
+                min_zoom=config['augmentation']['min_zoom'],
+                max_zoom=config['augmentation']['max_zoom'],
+                mode=['area', 'nearest'], padding_mode='zeros'
+            ),
+            RandAffined(
+                keys=['image', 'label'], prob=config['augmentation']['p_shear'],
+                shear_range=config['augmentation']['shear_range'],
+                mode=['bilinear', 'nearest'], padding_mode='zeros'
+            ),
+            RandSpatialCropd(
+                keys=['image', 'label'], roi_size=[int(x) for x in config['shape_statistics']['median']],
+                random_size=False
+            ),
+            # RandGaussianNoised(
+            #     keys=['image'], prob=config['augmentation']['p_gaussian_noise'], 
+            #     mean=config['augmentation']['gaussian_noise_mean'], std=config['augmentation']['gaussian_noise_std']
+            # ),
+            RandGaussianSmoothd(
+                keys=['image'], prob=config['augmentation']['p_gaussian_smooth'],
+                sigma_x=config['augmentation']['gaussian_smooth_sigma'], 
+                sigma_y=config['augmentation']['gaussian_smooth_sigma'],
+                sigma_z=config['augmentation']['gaussian_smooth_sigma'],
+            ),
+            RandScaleIntensityd(
+                keys=['image'], prob=config['augmentation']['p_intensity_scale'],
+                factors=config['augmentation']['intensity_scale_factors']
+            ),
+            RandShiftIntensityd(
+                keys=['image'], prob=config['augmentation']['p_intensity_shift'],
+                offsets=config['augmentation']['intensity_shift_offsets']
+            ),
+            RandAdjustContrastd(
+                keys=['image'], prob=config['augmentation']['p_adjust_contrast'],
+                gamma=config['augmentation']['adjust_contrast_gamma']
+            ),
+            RandAxisFlipd(
+                keys=['image', 'label'], prob=config['augmentation']['p_axis_flip']
+            ),
+            RandFlipd(
+                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
+                spatial_axis=0
+            ),
+            RandFlipd(
+                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
+                spatial_axis=1
+            ),
+            RandFlipd(
+                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
+                spatial_axis=2
+            ),
+            ToTensord(
+                keys=['image', 'label']
+            )
+        ]
     elif split == 'val':
-        transform = BGCompose(
-            [
-                NumpyToTensor(['image', 'label'], 'float')
-            ]
-        )
-        return transform
-    elif split == 'test':
-        transform = BGCompose(
-            [
-                NumpyToTensor(['image', 'label'], 'float')
-            ]
-        )
-        return transform
+        transform = [
+            ScaleIntensityRanged(
+                keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+            ),
+            Resized(
+                keys=['image', 'label'], spatial_size=[int(x) for x in config['shape_statistics']['median']],
+                mode=['area', 'nearest']
+            ),
+            # RandSpatialCropd(
+            #     keys=['image', 'label'], roi_size=config['augmentation']['patch_size'], random_size=False
+            # ),
+            ToTensord(
+                keys=['image', 'label']
+            )
+        ]
+    return Compose(transform)
