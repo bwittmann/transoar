@@ -6,8 +6,7 @@ from pathlib import Path
 import random
 
 from transoar.utils.io import get_config, set_root_logger
-from transoar.data.processor import Preprocessor
-from transoar.data.analyzer import DataSetAnalyzer
+from transoar.data.preprocessor import PreProcessor
 
 
 if __name__ == "__main__":
@@ -42,16 +41,11 @@ if __name__ == "__main__":
     logging.info(f'Preparing dataset {dataset_name}_{modality}.')
     logging.info(f'len train: {len(train_set)}, len val: {len(val_set)}, len test: {len(test_set)}.')
 
-    # Analyze properties of dataset like spacing and intensity properties
-    logging.info(f'Starting dataset analysis.')
-    analyzer = DataSetAnalyzer(train_set + val_set, preprocessing_config)
-    dataset_analysis = analyzer.analyze()
-    logging.info(f'Succesfully finished dataset analysis.')
 
     # Prepare dataset based on dataset analysis
-    logging.info(f"Starting dataset pre-processing. Target spacing: {dataset_analysis['target_spacing']}.")
-    preprocessor = Preprocessor(
-        train_set, val_set, test_set, preprocessing_config, data_config, path_to_splits, dataset_analysis
+    logging.info(f"Starting dataset preprocessing. Target spacing: {preprocessing_config['target_spacing']}.")
+    preprocessor = PreProcessor(
+        train_set, val_set, test_set, path_to_splits, preprocessing_config, data_config
     )
-    preprocessor.prepare_sets()
-    logging.info(f'Succesfully finished dataset pre-processing.')
+    preprocessor.run()
+    logging.info(f'Succesfully finished dataset preprocessing.')
