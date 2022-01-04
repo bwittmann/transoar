@@ -12,11 +12,13 @@ class ConvNetLight(nn.Module):
         out_channels,
         kernel_sizes,
         strides,
-        return_intermediate_outputs=True
+        return_intermediate_outputs=True,
+        learnable=False
     ):
         super().__init__()
 
         self._return_intermediate_outputs = return_intermediate_outputs
+        self._learnable = learnable
 
         layer1 = Block(
             1, out_channels[0], kernel_sizes[0], strides[0]
@@ -28,18 +30,24 @@ class ConvNetLight(nn.Module):
             out_channels[1], out_channels[2], kernel_sizes[2], strides[2]
         )
 
-        self._layers = nn.ModuleList(
-            [
-                layer1,
-                layer2,
-                layer3
-            ]
-        )
+        if learnable:
+            self._layers = nn.ModuleList(
+                [
+                    layer1,
+                    layer2,
+                    layer3
+                ]
+            )
+        else:
+            self._layers = [None, None, None]
         
     def forward(self, x, mask):
         out = []
         for layer in self._layers:
-            x = layer(x)
+            if self._learnable:
+                x = layer(x)
+            else:
+                x = F.interpolate(x, scale_factor=0.5)
 
             # Adjust mask via interpolation - True: masked, False: not masked
             mask_inter = F.interpolate(mask.float(), size=x.shape[-3:]).to(torch.bool).squeeze(1)

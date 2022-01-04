@@ -47,7 +47,8 @@ def build_backbone(config):
             out_channels=config['num_channels'],
             kernel_sizes=config['kernel_size'],
             strides=config['strides'],
-            return_intermediate_outputs=config['return_intermediate_outputs']
+            return_intermediate_outputs=config['return_intermediate_outputs'],
+            learnable=config['learnable']
         )
 
     return model

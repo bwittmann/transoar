@@ -1,15 +1,15 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test_convnet_light_high_lr
-device: cuda:6
+experiment_name: test_convnet_new_aug_crop_80_70_150
+device: cuda:5
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
 
 epochs: 500 # prev: 50
-lr: 1e-3 #2e-4
-lr_backbone: 1e-4 #2e-5
+lr: 2e-4
+lr_backbone: 2e-5
 lr_linear_proj_mult: 0.1
 weight_decay: 1e-4
 clip_max_norm: 0.1
@@ -24,7 +24,7 @@ bbox_padding: 1
 
 # Dataloader
 batch_size: 2
-shuffle: False
+shuffle: True
 num_workers: 4
 
 # Hungarian matching
@@ -45,6 +45,7 @@ backbone:
   kernel_size: [2, 2, 2]
   strides: [2, 2, 2]
   return_intermediate_outputs: True
+  learnable: True
 
 neck:
   name: def_detr
@@ -54,7 +55,7 @@ neck:
   hidden_dim: 192 #832 # 192 # prev: 256
   dropout: 0.0 #0.1
   nheads: 6 #26 #6  #prev: 8
-  dim_feedforward: 64 #1024
+  dim_feedforward: 256 #1024
   enc_layers: 2 #6
   dec_layers: 2 #6
   enc_n_points: 4 #4
@@ -66,12 +67,12 @@ neck:
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [64, 64, 64]
+  patch_size: [80, 70, 150]
 
-  p_gaussian_noise: 0.4 #0.1
+  p_gaussian_noise: 0.1 #0.1
   p_gaussian_smooth: 0.1 #0.2
-  p_intensity_scale: 0.15
-  p_intensity_shift: 0.15
+  p_intensity_scale: 0.2 #0.15
+  p_intensity_shift: 0.2
   p_adjust_contrast: 0.2 # 0.1, 0.3
   p_rotate: 0.5 #0.2
   p_zoom: 0.5 #0.2
