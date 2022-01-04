@@ -42,6 +42,8 @@ class TransoarDataset(Dataset):
             }
 
             # Apply data augmentation
+            self._augmentation.set_random_state(torch.initial_seed() + idx)
+
             data_transformed = self._augmentation(data_dict)
             data, label = data_transformed['image'], data_transformed['label']
         else:

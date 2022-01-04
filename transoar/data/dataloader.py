@@ -1,8 +1,6 @@
 """Module containing dataloader related functionality."""
 
-import numpy as np
 import torch
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from transoar.data.dataset import TransoarDataset
@@ -24,8 +22,19 @@ def get_loader(config, split, batch_size=None):
     return dataloader
 
 # def init_fn(worker_id):
-#     """https://github.com/pytorch/pytorch/issues/7068"""
-#     np.random.seed(10 + worker_id)
+#     """
+#     https://github.com/pytorch/pytorch/issues/7068
+#     https://tanelp.github.io/posts/a-bug-that-plagues-thousands-of-open-source-ml-projects/
+#     """
+#     torch_seed = torch.initial_seed()
+#     if torch_seed >= 2**30:
+#         torch_seed = torch_seed % 2**30
+#     seed = torch_seed + worker_id
+
+#     random.seed(seed)   
+#     np.random.seed(seed)
+#     monai.utils.set_determinism(seed=seed)
+#     torch.manual_seed(seed)
 
 
 class TransoarCollator:
