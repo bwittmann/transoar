@@ -6,7 +6,7 @@ import logging
 import numpy as np
 
 from transoar.data.transforms import transform_preprocessing
-from transoar.utils.io import write_json, write_nifti
+from transoar.utils.io import write_json
 
 class PreProcessor:
     """Data preprocessor of the transoar project.
@@ -73,10 +73,6 @@ class PreProcessor:
                 path_to_case = self._path_to_splits / split_name / case.name
                 os.makedirs(path_to_case)
 
-                # meta_data = {}
-                # meta_data['itk_spacing'] = [4, 4, 4]
-                #write_nifti(image.squeeze(), meta_data, str(path_to_case / 'data.nii.gz'))
-                #write_nifti(label.squeeze(), meta_data, str(path_to_case / 'label.nii.gz'))
                 np.save(str(path_to_case / 'data.npy'), image.astype(np.float32))
                 np.save(str(path_to_case / 'label.npy'), label.astype(np.int32))
 
@@ -95,10 +91,10 @@ class PreProcessor:
     def _get_shape_statistics(self):
         shapes = np.array(self._shapes, dtype=np.int)[:, 1:]
         shape_statistics = {
-            "median": np.median(shapes, axis=0).tolist(),
-            "mean": np.mean(shapes, axis=0).tolist(),
-            "min": np.min(shapes, axis=0).tolist(),
-            "max": np.max(shapes, axis=0).tolist(),
+            "median": np.median(shapes, axis=0, dtype=np.int).tolist(),
+            "mean": np.mean(shapes, axis=0, dtype=np.int).tolist(),
+            "min": np.min(shapes, axis=0, dtype=np.int).tolist(),
+            "max": np.max(shapes, axis=0, dtype=np.int).tolist(),
             "percentile_99_5": np.percentile(shapes, 99.5, axis=0).tolist(),
             "percentile_00_5": np.percentile(shapes, 0.5, axis=0).tolist()
         }

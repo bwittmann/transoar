@@ -1,6 +1,5 @@
 """Transformations for different operations."""
 
-from monai.transforms.spatial.dictionary import RandAxisFlipd
 import numpy as np
 from monai.transforms import (
     Compose,
@@ -21,7 +20,6 @@ from monai.transforms import (
     RandRotated,
     RandZoomd,
     RandAffined,
-    RandAxisFlipd,
     RandFlipd,
     ToTensord
 )
@@ -44,8 +42,6 @@ class NormalizeClipd(MapTransform):
         data[key] = np.clip(data[key], self._clip_min, self._clip_max)
         data[key] = (data[key] - self._mean) / self._std
         return data
-
-
 
 def transform_preprocessing(
     margin, crop_key, orientation, target_spacing
@@ -85,7 +81,7 @@ def get_transforms(split, config):
 
             # Spatial transformations
             Resized(        # Resize
-                keys=['image', 'label'], spatial_size=[int(x) for x in config['shape_statistics']['median']],   # TODO
+                keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
                 mode=['area', 'nearest']
             ),
             RandRotated(    # Rotation    
@@ -162,7 +158,7 @@ def get_transforms(split, config):
                 # a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
             Resized(
-                keys=['image', 'label'], spatial_size=[int(x) for x in config['shape_statistics']['median']],
+                keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
                 mode=['area', 'nearest']
             ),
             RandSpatialCropd(
