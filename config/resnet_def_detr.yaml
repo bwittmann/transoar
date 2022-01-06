@@ -24,7 +24,7 @@ bbox_padding: 1
 
 # Dataloader
 batch_size: 2
-shuffle: False
+shuffle: True
 num_workers: 4
 
 # Hungarian matching
@@ -63,32 +63,38 @@ neck:
   dec_layers: 2 #6
   enc_n_points: 4 #4
   dec_n_points: 4 #4
-  num_queries: 300 #300
+  num_queries: 20 #300
   aux_loss: True
   use_cuda: True
 
   # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [64, 64, 64]
+  patch_size: [64, 64, 156] #null #[64, 64, 64]
 
-  p_gaussian_noise: 0.1
-  p_gaussian_smooth: 0.2
-  p_intensity_scale: 0.15
-  p_intensity_shift: 0.15
-  p_adjust_contrast: 0.2 # 0.1, 0.3
-  p_rotate: 0.2
-  p_zoom: 0.0 #0.2
-  p_shear: 0.0
-  p_axis_flip: 0.5
+  p_gaussian_noise: 0 #0.1
+  p_gaussian_smooth: 0 #0.1
+  p_intensity_scale: 0.5 #0.2
+  p_intensity_shift: 0.5 #0.2
+  p_adjust_contrast: 0 #0.2
+  p_rotate: 0.5
+  p_zoom: 0.5
+  p_shear: 0.5
+  p_translate: 0.5 # 0
+  p_flip: 0 #0.5
 
   gaussian_noise_mean: 0.0
   gaussian_noise_std: 0.1
   gaussian_smooth_sigma: [0.5, 1.0]
-  intensity_scale_factors: [0.75, 1.25]
-  intensity_shift_offsets: [-0.1, 0.1]
+
+  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_shift_offsets: 0.1
+
   adjust_contrast_gamma: [0.7, 1.5]
-  rotation: [-30, 30]
-  min_zoom: 0.7
-  max_zoom: 1.4
-  shear_range: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+
+  rotation: [-15, 15]
+  min_zoom: 0.8
+  max_zoom: 1.2 
+  translate_precentage: 10
+  shear_range: [0.1, 0.1, 0.1]
+  flip_axis: [0, 1, 2]

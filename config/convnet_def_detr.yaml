@@ -1,8 +1,8 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test_convnet_new_aug_crop_80_70_150
-device: cuda:5
+experiment_name: test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
+device: cuda:6
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
@@ -52,11 +52,11 @@ neck:
   skip_con: False # from backbone to heads
   pos_encoding: sine
   num_feature_levels: 3
-  hidden_dim: 192 #832 # 192 # prev: 256
-  dropout: 0.0 #0.1
-  nheads: 6 #26 #6  #prev: 8
+  hidden_dim: 832 # 192 # prev: 256
+  dropout: 0.0
+  nheads: 26 #6  #prev: 8
   dim_feedforward: 256 #1024
-  enc_layers: 2 #6
+  enc_layers: 1 #6
   dec_layers: 2 #6
   enc_n_points: 4 #4
   dec_n_points: 4 #4
@@ -67,27 +67,31 @@ neck:
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [80, 70, 150]
+  patch_size: [64, 64, 156] #null #[64, 64, 64]
 
-  p_gaussian_noise: 0.1 #0.1
-  p_gaussian_smooth: 0.1 #0.2
-  p_intensity_scale: 0.2 #0.15
-  p_intensity_shift: 0.2
-  p_adjust_contrast: 0.2 # 0.1, 0.3
-  p_rotate: 0.5 #0.2
-  p_zoom: 0.5 #0.2
-  p_shear: 0.0
-  p_axis_flip: 0.5 #0.5
-  p_flip: 0.5 #0.5
+  p_gaussian_noise: 0 #0.1
+  p_gaussian_smooth: 0 #0.1
+  p_intensity_scale: 0.5 #0.2
+  p_intensity_shift: 0.5 #0.2
+  p_adjust_contrast: 0 #0.2
+  p_rotate: 0.5
+  p_zoom: 0.5
+  p_shear: 0.5
+  p_translate: 0.5 # 0
+  p_flip: 0 #0.5
 
   gaussian_noise_mean: 0.0
   gaussian_noise_std: 0.1
   gaussian_smooth_sigma: [0.5, 1.0]
-  intensity_scale_factors: [0.75, 1.25]
-  intensity_shift_offsets: [-0.1, 0.1]
+
+  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_shift_offsets: 0.1
+
   adjust_contrast_gamma: [0.7, 1.5]
-  rotation: [-10, 10] #[-30, 30]
-  min_zoom: 1.0 #0.7
-  max_zoom: 1.2
-  shear_range: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+
+  rotation: [-15, 15]
+  min_zoom: 0.8
+  max_zoom: 1.2 
+  translate_precentage: 10
+  shear_range: [0.1, 0.1, 0.1]
   flip_axis: [0, 1, 2]

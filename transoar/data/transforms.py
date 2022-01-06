@@ -68,43 +68,70 @@ def transform_preprocessing(
 
 def get_transforms(split, config):
     rotate_range = [i / 180 * np.pi for i in config['augmentation']['rotation']]
+    translate_range = [(i * config['augmentation']['translate_precentage']) / 100 for i in config['shape_statistics']['median']]
+    
+    if config['augmentation']['patch_size'] is None:
+        patch_size = [int(x) for x in config['shape_statistics']['median']]
+    else:
+        patch_size = config['augmentation']['patch_size']
+
     if split == 'train':
         transform = [
-            RandGaussianNoised(
-                keys=['image'], prob=config['augmentation']['p_gaussian_noise'], 
-                mean=config['augmentation']['gaussian_noise_mean'], std=config['augmentation']['gaussian_noise_std']
-            ),
             ScaleIntensityRanged(
                 keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+                # keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
+                # a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
-            Resized(
+
+            # Spatial transformations
+            Resized(        # Resize
                 keys=['image', 'label'], spatial_size=[int(x) for x in config['shape_statistics']['median']],   # TODO
                 mode=['area', 'nearest']
             ),
-            RandRotated(
+            RandRotated(    # Rotation    
                 keys=['image', 'label'], prob=config['augmentation']['p_rotate'],
                 range_x=rotate_range, range_y=rotate_range, range_z=rotate_range,
                 mode=['bilinear', 'nearest'], padding_mode='zeros'
             ),
-            RandZoomd(
+            RandZoomd(      # Zoom
                 keys=['image', 'label'], prob=config['augmentation']['p_zoom'],
                 min_zoom=config['augmentation']['min_zoom'],
                 max_zoom=config['augmentation']['max_zoom'],
-                mode=['area', 'nearest'], padding_mode='zeros'
+                mode=['area', 'nearest'], padding_mode='constant', constant_values=0
             ),
-            RandAffined(
+            RandAffined(    # Translation
+                keys=['image', 'label'], prob=config['augmentation']['p_translate'],
+                mode=['bilinear', 'nearest'],
+                translate_range=translate_range, padding_mode='zeros'
+            ), 
+            RandAffined(    # Shear
                 keys=['image', 'label'], prob=config['augmentation']['p_shear'],
                 shear_range=config['augmentation']['shear_range'],
                 mode=['bilinear', 'nearest'], padding_mode='zeros'
             ),
-            RandSpatialCropd(
-                keys=['image', 'label'], roi_size=[int(x) for x in config['shape_statistics']['median']],
-                random_size=False
+            RandFlipd(      # Flip axis 0
+                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
+                spatial_axis=config['augmentation']['flip_axis'][0]
             ),
-            # RandGaussianNoised(
-            #     keys=['image'], prob=config['augmentation']['p_gaussian_noise'], 
-            #     mean=config['augmentation']['gaussian_noise_mean'], std=config['augmentation']['gaussian_noise_std']
-            # ),
+            RandFlipd(      # Flip axis 1
+                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
+                spatial_axis=config['augmentation']['flip_axis'][1]
+            ),
+            RandFlipd(      # Flip axis 2
+                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
+                spatial_axis=config['augmentation']['flip_axis'][2]
+            ),
+            RandSpatialCropd(
+                keys=['image', 'label'],
+                roi_size=patch_size,
+                random_size=False, random_center=True
+            ),
+
+            # Intensity transformations
+            RandGaussianNoised(
+                keys=['image'], prob=config['augmentation']['p_gaussian_noise'], 
+                mean=config['augmentation']['gaussian_noise_mean'], std=config['augmentation']['gaussian_noise_std']
+            ),
             RandGaussianSmoothd(
                 keys=['image'], prob=config['augmentation']['p_gaussian_smooth'],
                 sigma_x=config['augmentation']['gaussian_smooth_sigma'], 
@@ -123,21 +150,6 @@ def get_transforms(split, config):
                 keys=['image'], prob=config['augmentation']['p_adjust_contrast'],
                 gamma=config['augmentation']['adjust_contrast_gamma']
             ),
-            RandAxisFlipd(
-                keys=['image', 'label'], prob=config['augmentation']['p_axis_flip']
-            ),
-            RandFlipd(
-                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
-                spatial_axis=0
-            ),
-            RandFlipd(
-                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
-                spatial_axis=1
-            ),
-            RandFlipd(
-                keys=['image', 'label'], prob=config['augmentation']['p_flip'],
-                spatial_axis=2
-            ),
             ToTensord(
                 keys=['image', 'label']
             )
@@ -146,14 +158,17 @@ def get_transforms(split, config):
         transform = [
             ScaleIntensityRanged(
                 keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+                # keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
+                # a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
             Resized(
                 keys=['image', 'label'], spatial_size=[int(x) for x in config['shape_statistics']['median']],
                 mode=['area', 'nearest']
             ),
-            # RandSpatialCropd(
-            #     keys=['image', 'label'], roi_size=config['augmentation']['patch_size'], random_size=False
-            # ),
+            RandSpatialCropd(
+                keys=['image', 'label'], roi_size=patch_size,
+                random_size=False, random_center=True
+            ),
             ToTensord(
                 keys=['image', 'label']
             )
