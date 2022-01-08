@@ -57,16 +57,16 @@ class PreProcessor:
                 preprocessed_case = self._preprocessing_transform(case_dict)
                 image, label = preprocessed_case['image'], preprocessed_case['label']
 
+                # Skip cases with a small amount of labels
+                if np.unique(label).size < self._preprocessing_config['min_num_organs'] + 1:
+                    logging.info(f"Skipped case {case.name} with less than {self._preprocessing_config['min_num_organs']} organs.")
+                    continue
+
                 if split_name != 'test':
                     self._shapes.append(image.shape)
 
                     voxels_foreground = self._get_foreground_voxels(image, label)
                     self._norm_voxels += voxels_foreground
-
-                # Skip cases with a small amount of labels
-                if np.unique(label).size < self._preprocessing_config['min_num_organs'] + 1:
-                    logging.info(f"Skipped case {case.name} with less than {self._preprocessing_config['min_num_organs']} organs.")
-                    continue
 
                 logging.info(f'Successfull prepared case {case.name} of shape {image.shape}.')
 
@@ -91,10 +91,10 @@ class PreProcessor:
     def _get_shape_statistics(self):
         shapes = np.array(self._shapes, dtype=np.int)[:, 1:]
         shape_statistics = {
-            "median": np.median(shapes, axis=0, dtype=np.int).tolist(),
-            "mean": np.mean(shapes, axis=0, dtype=np.int).tolist(),
-            "min": np.min(shapes, axis=0, dtype=np.int).tolist(),
-            "max": np.max(shapes, axis=0, dtype=np.int).tolist(),
+            "median": np.median(shapes, axis=0).astype(np.int).tolist(),
+            "mean": np.mean(shapes, axis=0).tolist(),
+            "min": np.min(shapes, axis=0).tolist(),
+            "max": np.max(shapes, axis=0).tolist(),
             "percentile_99_5": np.percentile(shapes, 99.5, axis=0).tolist(),
             "percentile_00_5": np.percentile(shapes, 0.5, axis=0).tolist()
         }
