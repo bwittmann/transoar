@@ -8,7 +8,6 @@ from monai.transforms import (
     LoadImaged,
     Orientationd,
     Spacingd,
-    MapTransform,
     ScaleIntensityRanged,
     Resized,
     RandSpatialCropd,
@@ -24,24 +23,9 @@ from monai.transforms import (
     ToTensord
 )
 
-
 def crop_air(x):
     # To not crop fat which is -120 to -90
     return x > -500
-
-class NormalizeClipd(MapTransform):
-    def __init__(self, keys, clip_min, clip_max, std, mean):
-        self._key = keys
-        self._clip_min = clip_min
-        self._clip_max = clip_max
-        self._std = std
-        self._mean = mean
-
-    def __call__(self, data):
-        key = self._key[0]
-        data[key] = np.clip(data[key], self._clip_min, self._clip_max)
-        data[key] = (data[key] - self._mean) / self._std
-        return data
 
 def transform_preprocessing(
     margin, crop_key, orientation, target_spacing
@@ -67,12 +51,13 @@ def get_transforms(split, config):
     translate_range = [(i * config['augmentation']['translate_precentage']) / 100 for i in config['shape_statistics']['median']]
     
     if config['augmentation']['patch_size'] is None:
-        patch_size = [int(x) for x in config['shape_statistics']['median']]
+        patch_size = config['shape_statistics']['median']
     else:
         patch_size = config['augmentation']['patch_size']
 
     if split == 'train':
         transform = [
+            # Scale and clip intensity values
             ScaleIntensityRanged(
                 keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
                 # keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
@@ -146,6 +131,8 @@ def get_transforms(split, config):
                 keys=['image'], prob=config['augmentation']['p_adjust_contrast'],
                 gamma=config['augmentation']['adjust_contrast_gamma']
             ),
+
+            # Convert to torch.Tensor
             ToTensord(
                 keys=['image', 'label']
             )
@@ -169,4 +156,25 @@ def get_transforms(split, config):
                 keys=['image', 'label']
             )
         ]
+    elif split == 'test':
+        transform = [
+            ScaleIntensityRanged(
+                keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+                # keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
+                # a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
+            ),
+            Resized(
+                keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
+                mode=['area', 'nearest']
+            ),
+            RandSpatialCropd(
+                keys=['image', 'label'], roi_size=patch_size,
+                random_size=False, random_center=True
+            ),
+            ToTensord(
+                keys=['image', 'label']
+            )
+        ]
+    else:
+        raise ValueError("Please use 'test', 'val', or 'train' as split arg.")
     return Compose(transform)
