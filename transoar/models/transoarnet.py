@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transoar.models.build import build_backbone, build_neck, build_pos_enc
+from transoar.models.build import build_backbone, build_neck, build_position_encoding
 
 class TransoarNet(nn.Module):
     def __init__(self, config):
@@ -68,7 +68,7 @@ class TransoarNet(nn.Module):
             self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 
         # Get positional encoding
-        self._pos_enc = build_pos_enc(config['neck'])
+        self._pos_enc = build_position_encoding(mode='v2', hidden_dim=384)
 
     def _reset_parameter(self):
         nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
@@ -89,7 +89,7 @@ class TransoarNet(nn.Module):
             for idx, (src, mask) in enumerate(out_backbone):
                 srcs.append(self._input_proj[idx](src))
                 masks.append(mask)
-                pos.append(self._pos_enc(mask))
+                pos.append(self._pos_enc(src))
         else:
             srcs = self._input_proj(out_backbone[0][0])
             masks = out_backbone[0][1]

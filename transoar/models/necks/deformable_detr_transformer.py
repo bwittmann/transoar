@@ -68,7 +68,7 @@ class DeformableTransformer(nn.Module):
         valid_ratio_d = valid_D.float() / D
         valid_ratio_h = valid_H.float() / H
         valid_ratio_w = valid_W.float() / W
-        valid_ratio = torch.stack([valid_ratio_w, valid_ratio_h, valid_ratio_d], -1)
+        valid_ratio = torch.stack([valid_ratio_d, valid_ratio_w, valid_ratio_h], -1)
         return valid_ratio
 
     def forward(self, srcs, masks, query_embed, pos_embeds):
@@ -139,7 +139,7 @@ class DeformableTransformerEncoderLayer(nn.Module):
         super().__init__()
 
         # self attention
-        self.self_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points, use_cuda)
+        self.self_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 
@@ -184,19 +184,18 @@ class DeformableTransformerEncoder(nn.Module):
         reference_points_list = []
         for lvl, (D_, H_, W_) in enumerate(spatial_shapes):
 
-            ref_z, ref_y, ref_x = torch.meshgrid(
-                torch.linspace(0.5, D_ - 0.5, D_, dtype=torch.float32, device=device),
-                torch.linspace(0.5, H_ - 0.5, H_, dtype=torch.float32, device=device),
-                torch.linspace(0.5, W_ - 0.5, W_, dtype=torch.float32, device=device)
-            )
-            # Get relative coords in range [0, 1], ref points in masked areas have values > 1
-            ref_z = ref_z.reshape(-1)[None] / D_ #(valid_ratios[:, None, lvl, 2] * D_)  # TODO
-            ref_y = ref_y.reshape(-1)[None] / H_ #(valid_ratios[:, None, lvl, 1] * H_)
-            ref_x = ref_x.reshape(-1)[None] / W_ #(valid_ratios[:, None, lvl, 0] * W_)
-            ref = torch.stack((ref_x, ref_y, ref_z), -1)    # Coords in format WHD/XYZ
+            ref_d, ref_y, ref_x = torch.meshgrid(torch.linspace(0.5, D_ - 0.5, D_, dtype=torch.float32, device=device),
+                                                 torch.linspace(0.5, H_ - 0.5, H_, dtype=torch.float32, device=device),
+                                                 torch.linspace(0.5, W_ - 0.5, W_, dtype=torch.float32, device=device))
+
+            ref_d = ref_d.reshape(-1)[None] / (valid_ratios[:, None, lvl, 0] * D_)
+            ref_y = ref_y.reshape(-1)[None] / (valid_ratios[:, None, lvl, 2] * H_)
+            ref_x = ref_x.reshape(-1)[None] / (valid_ratios[:, None, lvl, 1] * W_)
+
+            ref = torch.stack((ref_d, ref_x, ref_y), -1)   # D W H
             reference_points_list.append(ref)
-        reference_points = torch.cat(reference_points_list, 1)  # [Batch, AllLvlPatches, RelativeRefCoords]
-        reference_points = reference_points[:, :, None] * valid_ratios[:, None] # Valid ratio also in format WHD/XYZ
+        reference_points = torch.cat(reference_points_list, 1)
+        reference_points = reference_points[:, :, None] * valid_ratios[:, None]
         return reference_points
 
     def forward(self, src, spatial_shapes, level_start_index, valid_ratios, pos=None, padding_mask=None):
@@ -225,7 +224,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
         super().__init__()
 
         # cross attention
-        self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points, use_cuda)
+        self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 

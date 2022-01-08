@@ -1,8 +1,8 @@
 # Config file for resnet + deformable detr combination
 
 # General training
-experiment_name: test_new_aug_except_crop_resnet
-device: cuda:6
+experiment_name: test #test_cotr_def_detr_q300_drop01 #1mm_resnet_def_detr_lfirst3_crop192
+device: cuda:4
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
@@ -18,12 +18,12 @@ clip_max_norm: 0.1
 lr_drop: 400  # prev: 40
 
 # Data
-dataset: transoar_test_CT
+dataset: transoar_test_3mm_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
-batch_size: 2
+batch_size: 1
 shuffle: True
 num_workers: 4
 
@@ -44,7 +44,7 @@ backbone:
   depths: [3, 4, 6, 3]
   strides: [1, 2, 2, 2]
   in_chans: 1
-  num_channels: [512, 1024, 2048]
+  num_channels: [256, 512, 1024]
   num_feature_patches: 11040
   num_layers: 4
   pool: True
@@ -55,22 +55,22 @@ neck:
   skip_con: False # from backbone to heads
   pos_encoding: sine
   num_feature_levels: 3
-  hidden_dim: 192 #832 # 192 # prev: 256
+  hidden_dim: 384 #192 #832 # 192 # prev: 256
   dropout: 0.1
   nheads: 6 #26 #6  #prev: 8
-  dim_feedforward: 1024
+  dim_feedforward: 1536
   enc_layers: 2 #6
   dec_layers: 2 #6
   enc_n_points: 4 #4
   dec_n_points: 4 #4
-  num_queries: 20 #300
+  num_queries: 300 #300
   aux_loss: True
   use_cuda: True
 
   # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [64, 64, 156] #null #[64, 64, 64]
+  patch_size: null #[192, 192, 192] #null #[64, 64, 156] #null #[64, 64, 64]
 
   p_gaussian_noise: 0 #0.1
   p_gaussian_smooth: 0 #0.1

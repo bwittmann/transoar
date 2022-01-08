@@ -5,9 +5,11 @@ from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.backbones.convnet_light_3D import ConvNetLight
+from transoar.models.backbones.resnet_light_3D import Backbone
 from transoar.models.necks.detr_transformer import DetrTransformer
 from transoar.models.necks.deformable_detr_transformer import DeformableTransformer
-from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
+from transoar.models.position_encoding import PositionEmbeddingSine
+
 
 
 def build_backbone(config):
@@ -50,6 +52,11 @@ def build_backbone(config):
             return_intermediate_outputs=config['return_intermediate_outputs'],
             learnable=config['learnable']
         )
+    elif config['name'] == 'resnet_light':
+        model = Backbone(
+            depth=9,
+            norm_cfg='IN',
+        )
 
     return model
 
@@ -63,7 +70,8 @@ def build_neck(config):
             num_encoder_layers=config['enc_layers'],
             num_decoder_layers=config['dec_layers'],
             normalize_before=config['pre_norm'],
-            return_intermediate_dec=True
+            return_intermediate_dec=True,
+            activation='gelu'
         )
     elif config['name'] == 'def_detr':
         model = DeformableTransformer(
@@ -97,11 +105,16 @@ def build_criterion(config):
 
     return criterion
 
-def build_pos_enc(config):
-    channels = config['hidden_dim']
-    if config['pos_encoding'] == 'sine':
-        return PositionEmbeddingSine3D(channels=channels)
-    elif config['pos_encoding'] == 'learned':
-        return PositionEmbeddingLearned3D(channels=channels)
+def build_position_encoding(mode, hidden_dim):
+    N_steps = hidden_dim // 3
+    if (hidden_dim % 3) != 0:
+        N_steps = [N_steps, N_steps, N_steps + hidden_dim % 3]
     else:
-        raise ValueError('Please select a implemented pos. encoding.')
+        N_steps = [N_steps, N_steps, N_steps]
+    
+    if mode in ('v2', 'sine'):
+        position_embedding = PositionEmbeddingSine(num_pos_feats=N_steps, normalize=True)
+    else:
+        raise ValueError(f"not supported {mode}")
+
+    return position_embedding
