@@ -59,9 +59,9 @@ def get_transforms(split, config):
         transform = [
             # Scale and clip intensity values
             ScaleIntensityRanged(
-                keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
-                # keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
-                # a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
+                # keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+                keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
+                a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
 
             # Spatial transformations
@@ -140,9 +140,9 @@ def get_transforms(split, config):
     elif split == 'val':
         transform = [
             ScaleIntensityRanged(
-                keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
-                # keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
-                # a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
+                # keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+                keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
+                a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
             Resized(
                 keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
@@ -159,9 +159,9 @@ def get_transforms(split, config):
     elif split == 'test':
         transform = [
             ScaleIntensityRanged(
-                keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
-                # keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
-                # a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
+                # keys=['image'], a_min=-57, a_max=164, b_min=0.0, b_max=1.0, clip=True
+                keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
+                a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
             Resized(
                 keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],

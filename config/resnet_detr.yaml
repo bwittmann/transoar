@@ -1,39 +1,29 @@
 # Config file for resnet + detr combination
 
 # General training
-experiment_name: test
-device: cuda:4
+experiment_name: 3mm_resnet_detr_no_flip_lfirst3_q100_compare
+device: cuda:7
 val_interval: 1
-debug_mode: True # doesn't save checkpoints
+debug_mode: False # doesn't save checkpoints
 seed: 10
 
-epochs: 2000
+epochs: 1100 #2000
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4
 clip_max_norm: 0.1
 
 # Scheduler
-lr_drop: 1300
+lr_drop: 700 #1300
 
 # Data
-dataset: transoar_spacing444_th_newconf_CT
+dataset: transoar_test_3mm_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
-# Augmentation
-use_augmentation: True
-p_rotation: 0.2
-rotation: [-30, 30]
-p_scale: 0.2
-scale_range: [0.7, 1.4]
-p_gamma: 0.3
-gamma_range: [0.7, 1.5]
-mirror_axes: [0, 1, 2]
-
 # Dataloader
-batch_size: 3
-shuffle: False
+batch_size: 2
+shuffle: True
 num_workers: 4
 
 # Hungarian matching
@@ -53,7 +43,7 @@ backbone:
   depths: [3, 4, 6, 3]
   strides: [1, 2, 2, 2]
   in_chans: 1
-  num_channels: 2048
+  num_channels: 1024
   num_feature_patches: 160
   num_layers: 4
   pool: True
@@ -63,12 +53,44 @@ neck:
   name: detr
   skip_con: False # from backbone to heads
   pos_encoding: sine
-  hidden_dim: 256
+  hidden_dim: 192
   dropout: 0.0  # prev: 0.1
-  nheads: 8
-  dim_feedforward: 2048
+  nheads: 6
+  dim_feedforward: 1024 #2048
   enc_layers: 2 # prev: 6
   dec_layers: 2 # prev: 6
   pre_norm: False
   num_queries: 100
-  aux_loss: False
+  aux_loss: True
+
+# Augmentation
+augmentation:
+  use_augmentation: True
+  patch_size: null #[64, 64, 64]
+
+  p_gaussian_noise: 0.0 #0.1
+  p_gaussian_smooth: 0.0 #0.1
+  p_intensity_scale: 0.5 #0.2
+  p_intensity_shift: 0.5 #0.2
+  p_adjust_contrast: 0.0 #0.2
+  p_rotate: 0.5
+  p_zoom: 0.5
+  p_shear: 0.5
+  p_translate: 0.5
+  p_flip: 0.0
+
+  gaussian_noise_mean: 0.0
+  gaussian_noise_std: 0.1
+  gaussian_smooth_sigma: [0.5, 1.0]
+
+  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_shift_offsets: 0.1
+
+  adjust_contrast_gamma: [0.7, 1.5]
+
+  rotation: [-15, 15]
+  min_zoom: 0.8
+  max_zoom: 1.2 
+  translate_precentage: 10
+  shear_range: [0.1, 0.1, 0.1]
+  flip_axis: [0, 1, 2]

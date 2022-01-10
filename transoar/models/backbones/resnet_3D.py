@@ -213,7 +213,7 @@ class ResNet(nn.Module):
 
         # Decide which layer outputs to return
         if self.return_intermediate_outputs:
-            return out[1:]
+            return out[:-1]
         else:
-            return out[-1:]  # only return last output
+            return [out[-2]]  # only return last output
 

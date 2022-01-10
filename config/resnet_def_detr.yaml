@@ -1,7 +1,7 @@
 # Config file for resnet + deformable detr combination
 
 # General training
-experiment_name: test_new_aug_except_crop_resnet
+experiment_name: 2mm_resnet_def_detr_noflip_lfirst3_q100_crop152_152_304_q100
 device: cuda:6
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
@@ -18,14 +18,14 @@ clip_max_norm: 0.1
 lr_drop: 400  # prev: 40
 
 # Data
-dataset: transoar_test_CT
+dataset: transoar_test_2mm_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
 batch_size: 2
 shuffle: True
-num_workers: 4
+num_workers: 8
 
 # Hungarian matching
 set_cost_class: 2
@@ -44,7 +44,7 @@ backbone:
   depths: [3, 4, 6, 3]
   strides: [1, 2, 2, 2]
   in_chans: 1
-  num_channels: [512, 1024, 2048]
+  num_channels: [256, 512, 1024] #[512, 1024, 2048]
   num_feature_patches: 11040
   num_layers: 4
   pool: True
@@ -56,32 +56,32 @@ neck:
   pos_encoding: sine
   num_feature_levels: 3
   hidden_dim: 192 #832 # 192 # prev: 256
-  dropout: 0.1
+  dropout: 0.0
   nheads: 6 #26 #6  #prev: 8
   dim_feedforward: 1024
   enc_layers: 2 #6
   dec_layers: 2 #6
   enc_n_points: 4 #4
   dec_n_points: 4 #4
-  num_queries: 20 #300
+  num_queries: 100 #300
   aux_loss: True
   use_cuda: True
 
-  # Augmentation
+# Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [64, 64, 156] #null #[64, 64, 64]
+  patch_size: [152, 152, 304] #null #[64, 64, 64]
 
-  p_gaussian_noise: 0 #0.1
-  p_gaussian_smooth: 0 #0.1
+  p_gaussian_noise: 0.0 #0.1
+  p_gaussian_smooth: 0.0 #0.1
   p_intensity_scale: 0.5 #0.2
   p_intensity_shift: 0.5 #0.2
-  p_adjust_contrast: 0 #0.2
+  p_adjust_contrast: 0.0 #0.2
   p_rotate: 0.5
   p_zoom: 0.5
   p_shear: 0.5
-  p_translate: 0.5 # 0
-  p_flip: 0 #0.5
+  p_translate: 0.5
+  p_flip: 0.0
 
   gaussian_noise_mean: 0.0
   gaussian_noise_std: 0.1
