@@ -5,6 +5,7 @@ from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.backbones.convnet_light_3D import ConvNetLight
+from transoar.models.backbones.fpn import FPN
 from transoar.models.necks.detr_transformer import DetrTransformer
 from transoar.models.necks.deformable_detr_transformer import DeformableTransformer
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
@@ -50,6 +51,8 @@ def build_backbone(config):
             return_intermediate_outputs=config['return_intermediate_outputs'],
             learnable=config['learnable']
         )
+    elif config['name'] == 'fpn':
+        model = FPN()
 
     return model
 

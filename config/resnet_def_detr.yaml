@@ -1,8 +1,8 @@
 # Config file for resnet + deformable detr combination
 
 # General training
-experiment_name: 2mm_resnet_def_detr_noflip_lfirst3_q100_crop152_152_304_q100
-device: cuda:6
+experiment_name: test #2mm_resnet_def_detr_noflip_lfirst3_q100_crop152_152_304_q100
+device: cuda:5
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
@@ -40,7 +40,7 @@ loss_coefs:
 
 # Model specific params
 backbone:
-  name: resnet
+  name: fpn #resnet
   depths: [3, 4, 6, 3]
   strides: [1, 2, 2, 2]
   in_chans: 1
@@ -70,7 +70,7 @@ neck:
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [152, 152, 304] #null #[64, 64, 64]
+  patch_size: [160, 160, 320] # div through 32#null #[64, 64, 64]
 
   p_gaussian_noise: 0.0 #0.1
   p_gaussian_smooth: 0.0 #0.1
