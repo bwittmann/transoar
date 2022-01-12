@@ -1,0 +1,90 @@
+# Config file for resnet + deformable detr combination
+
+# General training
+experiment_name: test_retina_net #2mm_resnet_def_detr_noflip_lfirst3_q100_crop160_160_320_q100
+device: cuda:7
+val_interval: 1
+debug_mode: True  # doesn't save checkpoints
+seed: 10
+
+epochs: 500 # prev: 50
+lr: 1e-4
+weight_decay: 0
+clip_max_norm: 0.1
+
+# Scheduler
+lr_drop: 400  # prev: 40
+
+# Data
+dataset: transoar_test_2mm_CT
+overfit: False # use same set consisting of one image for train and val
+bbox_padding: 0
+
+# Dataloader
+batch_size: 2
+shuffle: True
+num_workers: 8
+
+
+# Model specific params
+model:
+  anchor_scales: {'xy': [[8, 10, 12.7], [16, 20, 25], [32, 40, 50.8], [64, 80.6, 102]], 'z': [[8, 10, 12.7], [16, 20, 25], [32, 40, 50.8], [64, 80.6, 102]]}
+  anchor_ratios: [0.5, 1, 2]
+  backbone_shapes: [[40, 40, 80], [20, 20, 40], [10, 10, 20], [5, 5, 10]]
+  backbone_strides: {'xy': [4, 8, 16, 32], 'z': [4, 8, 16, 32]}
+  anchor_stride: 1
+  pyramid_levels: [0, 1, 2, 3]
+  head_classes: 21 # 0 is bg
+  end_filts: 36
+  start_filts: 18
+  n_features: 64
+  n_anchors_per_pos: 9
+  relu: relu
+  n_channels: 1
+  n_latent_dims: 0
+  res_architecture: resnet50
+  sixth_pooling: False
+  operate_stride1: False
+  norm: null
+  dim: 3
+  train_anchors_per_image: 20
+  anchor_matching_iou: 0.5
+  bbox_std_dev: [0.1, 0.1, 0.1, 0.2, 0.2, 0.2]
+  pre_nms_limit: 10000 #50000
+  scale: [160, 160, 160, 160, 320, 320] # for y1x1y2x2z1z2
+  window: [0, 0, 160, 160, 0, 320] # max values for y1x1y2x2z1z2
+  det_nms_thres: 1e-5
+  model_max_instances_per_batch_element: 30
+  model_min_confidence: 0.01 # prev: 0.1 used in get_results
+
+# Augmentation
+augmentation:
+  use_augmentation: True
+  patch_size: [160, 160, 320] # div through 32#null #[64, 64, 64]
+
+  p_gaussian_noise: 0.0 #0.1
+  p_gaussian_smooth: 0.0 #0.1
+  p_intensity_scale: 0.5 #0.2
+  p_intensity_shift: 0.5 #0.2
+  p_adjust_contrast: 0.0 #0.2
+  p_rotate: 0.5
+  p_zoom: 0.5
+  p_shear: 0.5
+  p_translate: 0.5
+  p_flip: 0.0
+
+  gaussian_noise_mean: 0.0
+  gaussian_noise_std: 0.1
+  gaussian_smooth_sigma: [0.5, 1.0]
+
+  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_shift_offsets: 0.1
+
+  adjust_contrast_gamma: [0.7, 1.5]
+
+  rotation: [-15, 15]
+  min_zoom: 0.8
+  max_zoom: 1.2 
+  translate_precentage: 10
+  shear_range: [0.1, 0.1, 0.1]
+  flip_axis: [0, 1, 2]

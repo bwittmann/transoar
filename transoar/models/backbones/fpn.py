@@ -62,16 +62,8 @@ class FPN(nn.Module):
     """
     def __init__(
         self,
-        conv=NDConvGenerator(dim=3),
-        n_channels=1,
-        start_filts=48,
-        end_filts=192,
-        n_latent_dims=0,
-        res_architecture='resnet50',
-        sixth_pooling=False,
-        operate_stride1=False,
-        norm=None,
-        relu='relu'
+        config,
+        conv=NDConvGenerator(dim=3)
     ):
         """
         from configs:
@@ -87,13 +79,20 @@ class FPN(nn.Module):
         """
         super(FPN, self).__init__()
 
-        self.start_filts = start_filts
-        start_filts = self.start_filts
+        start_filts = config['start_filts']
+        end_filts = config['end_filts']
+        res_architecture = config['res_architecture']
+        n_channels = config['n_channels']
+        norm = config['norm']
+        relu = config['relu']
+        n_latent_dims = config['n_latent_dims']
+
         self.n_blocks = [3, 4, {"resnet50": 6, "resnet101": 23}[res_architecture], 3]
         self.block = ResBlock
         self.block_expansion = 4
-        self.operate_stride1 = operate_stride1
-        self.sixth_pooling = sixth_pooling
+        self.operate_stride1 = config['operate_stride1']
+        operate_stride1 = self.operate_stride1
+        self.sixth_pooling = config['sixth_pooling']
 
         if operate_stride1:
             self.C0 = nn.Sequential(conv(n_channels, start_filts, ks=3, pad=1, norm=norm, relu=relu),
@@ -168,7 +167,7 @@ class FPN(nn.Module):
             self.P6_conv2 = conv(self.out_channels, self.out_channels, ks=3, stride=1, pad=1, relu=None)
 
 
-    def forward(self, x, mask):
+    def forward(self, x):
         """
         :param x: input image of shape (b, c, y, x, (z))
         :return: list of output feature maps per pyramid level, each with shape (b, c, y, x, (z)).
@@ -195,23 +194,11 @@ class FPN(nn.Module):
         p2_pre_out = self.P2_conv1(c2_out) + F.interpolate(p3_pre_out, scale_factor=2)
 
         p2_out = self.P2_conv2(p2_pre_out)
-        p2_mask = F.interpolate(mask.float(), size=p2_out.shape[-3:]).to(torch.bool).squeeze(1)
-
         p3_out = self.P3_conv2(p3_pre_out)
-        p3_mask = F.interpolate(mask.float(), size=p3_out.shape[-3:]).to(torch.bool).squeeze(1)
-
         p4_out = self.P4_conv2(p4_pre_out)
-        p4_mask = F.interpolate(mask.float(), size=p4_out.shape[-3:]).to(torch.bool).squeeze(1)
-
         p5_out = self.P5_conv2(p5_pre_out)
-        p5_mask = F.interpolate(mask.float(), size=p5_out.shape[-3:]).to(torch.bool).squeeze(1)
 
-        out_list = [
-            (p2_out, p2_mask),
-            (p3_out, p3_mask),
-            (p4_out, p4_mask),
-            # (p5_out, p5_mask)
-        ]
+        out_list = [p2_out, p3_out, p4_out, p5_out]
 
         if self.sixth_pooling:
             p6_out = self.P6_conv2(p6_pre_out)

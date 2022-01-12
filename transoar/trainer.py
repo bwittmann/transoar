@@ -3,20 +3,19 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import numpy as np
 
 from transoar.evaluator import DetectionEvaluator
-from transoar.inference import inference
 
 class Trainer:
 
     def __init__(
-        self, train_loader, val_loader, model, criterion, optimizer, scheduler,
+        self, train_loader, val_loader, model, optimizer, scheduler,
         device, config, path_to_run, epoch, metric_start_val
     ):
         self._train_loader = train_loader
         self._val_loader = val_loader
         self._model = model
-        self._criterion = criterion
         self._optimizer = optimizer
         self._scheduler = scheduler
         self._device = device
@@ -39,32 +38,18 @@ class Trainer:
         # self._criterion.train()
 
         loss_agg = 0
-        loss_bbox_agg = 0
-        loss_giou_agg = 0
-        loss_cls_agg = 0
-        for data, mask, bboxes, _ in tqdm(self._train_loader):
+        for data, _, bboxes, _ in tqdm(self._train_loader):
             # Put data to gpu
-            data, mask = data.to(device=self._device), mask.to(device=self._device)
+            data = data.to(device=self._device)
+            # change from x1y1z1x2y2z2 to y1x1y2x2z1z2
+            gt_boxes = [labels[0][:, [1, 0, 4, 3, 2, 5]].numpy() for labels in bboxes]
+            gt_class_ids = [labels[1].numpy() for labels in bboxes]
         
-            targets = []
-            for item in bboxes:
-                target = {
-                    'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': item[1].to(device=self._device)
-                }
-                targets.append(target)
-
             # Make prediction 
-            out = self._model(data, mask)
-            loss_dict = self._criterion(out, targets)
-
-            # Create absolute loss and mult with loss coefficient
-            loss_abs = 0
-            for loss_key, loss_val in loss_dict.items():
-                loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
+            loss, dt_results = self._model.train_forward(data, gt_boxes, gt_class_ids)
 
             self._optimizer.zero_grad()
-            loss_abs.backward()
+            loss.backward()
 
             # Clip grads to counter exploding grads
             max_norm = self._config['clip_max_norm']
@@ -73,73 +58,53 @@ class Trainer:
 
             self._optimizer.step()
 
-            loss_agg += loss_abs.item()
-            loss_bbox_agg += loss_dict['bbox'].item()
-            loss_giou_agg += loss_dict['giou'].item()
-            loss_cls_agg += loss_dict['cls'].item()
+            loss_agg += loss.item()
 
         loss = loss_agg / len(self._train_loader)
-        loss_bbox = loss_bbox_agg / len(self._train_loader)
-        loss_giou = loss_giou_agg / len(self._train_loader)
-        loss_cls = loss_cls_agg / len(self._train_loader)
 
         self._write_to_logger(
             num_epoch, 'train', 
-            total_loss=loss,
-            bbox_loss=loss_bbox,
-            giou_loss=loss_giou,
-            cls_loss=loss_cls
+            total_loss=loss
         )
 
     @torch.no_grad()
     def _validate(self, num_epoch):
         self._model.eval()
-        # self._criterion.eval()
 
         loss_agg = 0
-        loss_bbox_agg = 0
-        loss_giou_agg = 0
-        loss_cls_agg = 0
-        for data, mask, bboxes, _ in tqdm(self._val_loader):
+        for data, _, bboxes, _ in tqdm(self._val_loader):
             # Put data to gpu
-            data, mask = data.to(device=self._device), mask.to(device=self._device)
+            data = data.to(device=self._device)
+            # change from x1y1z1x2y2z2 to y1x1y2x2z1z2
+            gt_boxes = [labels[0][:, [1, 0, 4, 3, 2, 5]].numpy() for labels in bboxes]
+            gt_class_ids = [labels[1].numpy() for labels in bboxes]
         
-            targets = []
-            for item in bboxes:
-                target = {
-                    'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': item[1].to(device=self._device)
-                }
-                targets.append(target)
-
             # Make prediction 
-            out = self._model(data, mask)
-            loss_dict = self._criterion(out, targets)
+            loss, dt_results = self._model.train_forward(data, gt_boxes, gt_class_ids)
 
-            # Create absolute loss and mult with loss coefficient
-            loss_abs = 0
-            for loss_key, loss_val in loss_dict.items():
-                loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
+            pred_scores = []
+            pred_classes = []
+            pred_boxes = []
+            for batch_idx in range(data.shape[0]):
+                if len(dt_results[batch_idx]) == 0:
+                    pred_boxes.append([])
+                    pred_classes.append([])
+                    pred_scores.append([])
+                else:
+                    pred_boxes.append(np.stack([results['box_coords'] for results in dt_results[batch_idx]]))
+                    pred_classes.append(np.stack([results['box_pred_class_id'] for results in dt_results[batch_idx]]))
+                    pred_scores.append(np.stack([results['box_score'] for results in dt_results[batch_idx]]))
 
-            # Evaluate validation predictions based on metric
-            pred_boxes, pred_classes, pred_scores = inference(out)
             self._evaluator.add(
                 pred_boxes=pred_boxes,
                 pred_classes=pred_classes,
                 pred_scores=pred_scores,
-                gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
-                gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
+                gt_boxes=gt_boxes,
+                gt_classes=gt_class_ids
             )
-
-            loss_agg += loss_abs.item()
-            loss_bbox_agg += loss_dict['bbox'].item()
-            loss_giou_agg += loss_dict['giou'].item()
-            loss_cls_agg += loss_dict['cls'].item()
+            loss_agg += loss.item()
 
         loss = loss_agg / len(self._val_loader)
-        loss_bbox = loss_bbox_agg / len(self._val_loader)
-        loss_giou = loss_giou_agg / len(self._val_loader)
-        loss_cls = loss_cls_agg / len(self._val_loader)
         metric_scores = self._evaluator.eval()
         self._evaluator.reset()
 
@@ -155,10 +120,7 @@ class Trainer:
         # Write to logger
         self._write_to_logger(
             num_epoch, 'val', 
-            total_loss=loss,
-            bbox_loss=loss_bbox,
-            giou_loss=loss_giou,
-            cls_loss=loss_cls
+            total_loss=loss
         )
 
         self._write_to_logger(
@@ -185,8 +147,7 @@ class Trainer:
             # Log learning rates
             self._write_to_logger(
                 epoch, 'lr',
-                neck=self._optimizer.param_groups[0]['lr'],
-                backbone=self._optimizer.param_groups[1]['lr']
+                arch=self._optimizer.param_groups[0]['lr'],
             )
 
             if epoch % self._config['val_interval'] == 0:

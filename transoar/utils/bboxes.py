@@ -42,17 +42,17 @@ def box_cxcyczwhd_to_xyzxyz(bboxes):
     else:
         return np.stack(b, axis=-1)
 
-def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normalize=True):
+def segmentation2bbox(segmentation_maps, padding, box_format='xyzxyz', normalize=False):
     batch_bboxes = []
     batch_classes = []
     for map_ in segmentation_maps:
         assert map_.ndim == 4
 
         bboxes = []
-        classes = [int(class_) for class_ in map_.unique(sorted=True)][1:]
-        batch_classes.append(torch.tensor(classes))
+        classes = []
+        all_classes = [int(class_) for class_ in map_.unique(sorted=True)][1:]
 
-        for class_ in classes:
+        for class_ in all_classes:
             class_indices = (map_ == class_).nonzero(as_tuple=False)
 
             min_values = class_indices.min(dim=0)[0][1:].to(torch.float)   # x, y, z
@@ -62,9 +62,11 @@ def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normal
             min_values -= padding
             max_values += padding
 
-            assert min_values[0] < max_values[0]
-            assert min_values[1] < max_values[1]
-            assert min_values[2] < max_values[2]
+            # Get rid of too small objects that might arise due to cropping
+            if ((max_values - min_values) < 3).any():
+                continue
+
+            assert (min_values < max_values).all()
 
             if normalize:   # Put coords between 0 and 1; nec for sigmoid output
                 min_values /= torch.tensor(map_.shape[1:])
@@ -72,14 +74,17 @@ def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normal
 
             if box_format == 'xyzxyz':
                 bboxes.append(torch.hstack((min_values, max_values)))   # x1, y1, z1, x2, y2, z2
+                classes.append(class_)
             elif box_format == 'cxcyczwhd':
                 width, height, depth = max_values - min_values
                 cx, cy, cz = (max_values + min_values) / 2
                 bboxes.append(torch.tensor([cx, cy, cz, width, height, depth]))
+                classes.append(class_)
             else:
                 raise ValueError('Please select a valid box format.')
 
         batch_bboxes.append(torch.vstack(bboxes))
+        batch_classes.append(torch.tensor(classes))
 
     return batch_bboxes, batch_classes
 

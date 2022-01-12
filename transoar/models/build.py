@@ -52,7 +52,7 @@ def build_backbone(config):
             learnable=config['learnable']
         )
     elif config['name'] == 'fpn':
-        model = FPN()
+        model = FPN(config)
 
     return model
 
