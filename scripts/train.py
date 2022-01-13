@@ -13,6 +13,7 @@ from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_config, write_json, get_meta_data
 from transoar.models.transoarnet import TransoarNet
+from transoar.models.retina_unet import RetinaUNet
 from transoar.models.build import build_criterion
 
 
@@ -36,7 +37,9 @@ def train(config, args):
     else:
         val_loader = get_loader(config, 'val')
 
-    model = TransoarNet(config).to(device=device)
+    model = RetinaUNet(config['model'])
+
+    return
     criterion = build_criterion(config).to(device=device)
 
     # Analysis of model parameter distribution

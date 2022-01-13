@@ -1,0 +1,127 @@
+# Config file for light convnet + deformable detr combination
+
+# General training
+experiment_name: test
+device: cuda:6
+val_interval: 1
+debug_mode: True  # doesn't save checkpoints
+seed: 10
+
+epochs: 500 # prev: 50
+lr: 2e-4
+lr_backbone: 2e-5
+lr_linear_proj_mult: 0.1
+weight_decay: 1e-4
+clip_max_norm: 0.1
+
+# Scheduler
+lr_drop: 400  # prev: 40
+
+# Data
+dataset: transoar_test_CT
+overfit: False # use same set consisting of one image for train and val
+bbox_padding: 1
+
+# Dataloader
+batch_size: 2
+shuffle: True
+num_workers: 4
+
+# Hungarian matching
+set_cost_class: 2
+set_cost_bbox: 5
+set_cost_giou: 2
+
+# Losses
+loss_coefs:
+  cls: 2
+  bbox: 5
+  giou: 2
+
+# Model specific params
+model:
+  # Encoder
+  conv_kernels: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]
+  strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 1, 1]]
+  in_channels: 1
+  start_channels: 32
+  max_channels: 320
+  
+  # Decoder
+  decoder_levels: [2, 3, 4, 5, 6]
+  fpn_channels: 128
+  min_out_channels: 8
+  upsampling_mode: transpose
+  num_lateral: 1
+  norm_lateral: False
+  activation_lateral: False
+  num_out: 1
+  norm_out: False
+  activation_out: False
+
+  # Heads
+  head_channels: 128
+  classifier_classes: 20
+  num_convs: 1
+  norm_channels_per_group: 16
+  norm_affine: True
+
+  loss_weight: 1.0
+  prior_prob: 0.01 # for weight init of cls head
+  learnabel_scale: True # for reg head
+
+  seg_classes: 20
+  
+
+
+  # check reductions
+  # different weights for the losses, currently same
+
+  # Anchors
+  anchors_per_position: 27
+
+  # Sampler
+  batch_size_per_image: 32
+  positive_fraction: 0.33
+  pool_size: 20
+  min_neg: 1
+
+  
+
+
+
+
+
+# block_cls StackedConvBlock2
+
+# Augmentation
+augmentation:
+  use_augmentation: True
+  patch_size: null #[64, 64, 64]
+
+  p_gaussian_noise: 0 #0.1
+  p_gaussian_smooth: 0 #0.1
+  p_intensity_scale: 0.5 #0.2
+  p_intensity_shift: 0.5 #0.2
+  p_adjust_contrast: 0 #0.2
+  p_rotate: 0.5
+  p_zoom: 0.5
+  p_shear: 0.5
+  p_translate: 0.5 # 0
+  p_flip: 0 #0.5
+
+  gaussian_noise_mean: 0.0
+  gaussian_noise_std: 0.1
+  gaussian_smooth_sigma: [0.5, 1.0]
+
+  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_shift_offsets: 0.1
+
+  adjust_contrast_gamma: [0.7, 1.5]
+
+  rotation: [-15, 15]
+  min_zoom: 0.8
+  max_zoom: 1.2 
+  translate_precentage: 10
+  shear_range: [0.1, 0.1, 0.1]
+  flip_axis: [0, 1, 2]
