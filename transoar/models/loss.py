@@ -24,13 +24,12 @@ class BCEWithLogitsLossOneHot(nn.BCEWithLogitsLoss):
 
     def forward(self, input, target):
         target_one_hot = self._one_hot_smooth(
-            target, num_classes=self.num_classes + 1, smoothing=self.smoothing)  # [N, C + 1]
+            target, num_classes=self._num_classes + 1, smoothing=self._smoothing)  # [N, C + 1]
         target_one_hot = target_one_hot[:, 1:]  # background is implicitly encoded
 
-        return self.loss_weight * super().forward(input, target_one_hot.float())
+        return self._loss_weight * super().forward(input, target_one_hot.float())
 
-
-class GIoULoss(torch.nn.Module):
+class GIoULoss(nn.Module):
     def __init__(self, eps=1e-7, loss_weight=1.):
         super().__init__()
         self.eps = eps
@@ -42,7 +41,6 @@ class GIoULoss(torch.nn.Module):
                        diagonal=0)
                 )
         return self.loss_weight * -1 * loss
-
 
 @autocast(enabled=False)
 def generalized_box_iou(boxes1, boxes2, eps=0):
@@ -81,3 +79,83 @@ def box_iou_union_3d(boxes1, boxes2, eps=0):
 
 def box_area_3d(boxes):
     return (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 5] - boxes[:, 4])
+
+class SoftDiceLoss(nn.Module):
+    def __init__(
+        self, nonlin=None, batch_dice=False, do_bg=False, 
+        smooth_nom=1e-5, smooth_denom=1e-5
+    ):
+        super().__init__()
+
+        self.do_bg = do_bg
+        self.batch_dice = batch_dice
+        self.nonlin = nonlin
+        self.smooth_nom = smooth_nom
+        self.smooth_denom = smooth_denom
+
+    def forward(self, inp, target, loss_mask=None):
+        shp_x = inp.shape
+
+        if self.batch_dice:
+            axes = [0] + list(range(2, len(shp_x)))
+        else:
+            axes = list(range(2, len(shp_x)))
+
+        if self.nonlin is not None:
+            inp = self.nonlin(inp)
+
+        tp, fp, fn = get_tp_fp_fn(inp, target, axes, loss_mask, False)
+
+        nominator = 2 * tp + self.smooth_nom
+        denominator = 2 * tp + fp + fn + self.smooth_denom
+
+        dc = nominator / denominator
+
+        if not self.do_bg:
+            if self.batch_dice:
+                dc = dc[1:]
+            else:
+                dc = dc[:, 1:]
+        dc = dc.mean()
+
+        return 1 - dc
+
+def get_tp_fp_fn(net_output, gt, axes=None, mask=None, square=False):
+    if axes is None:
+        axes = tuple(range(2, len(net_output.size())))
+
+    shp_x = net_output.shape
+    shp_y = gt.shape
+
+    with torch.no_grad():
+        if len(shp_x) != len(shp_y):
+            gt = gt.view((shp_y[0], 1, *shp_y[1:]))
+
+        if all([i == j for i, j in zip(net_output.shape, gt.shape)]):
+            # if this is the case then gt is probably already a one hot encoding
+            y_onehot = gt
+        else:
+            gt = gt.long()
+            y_onehot = torch.zeros(shp_x)
+            if net_output.device.type == "cuda":
+                y_onehot = y_onehot.cuda(net_output.device.index)
+            y_onehot.scatter_(1, gt, 1)
+
+    tp = net_output * y_onehot
+    fp = net_output * (1 - y_onehot)
+    fn = (1 - net_output) * y_onehot
+
+    if mask is not None:
+        tp = torch.stack(tuple(x_i * mask[:, 0] for x_i in torch.unbind(tp, dim=1)), dim=1)
+        fp = torch.stack(tuple(x_i * mask[:, 0] for x_i in torch.unbind(fp, dim=1)), dim=1)
+        fn = torch.stack(tuple(x_i * mask[:, 0] for x_i in torch.unbind(fn, dim=1)), dim=1)
+
+    if square:
+        tp = tp ** 2
+        fp = fp ** 2
+        fn = fn ** 2
+
+    tp = tp.sum(dim=axes, keepdim=False)
+    fp = fp.sum(dim=axes, keepdim=False)
+    fn = fn.sum(dim=axes, keepdim=False)
+    return tp, fp, fn

@@ -42,7 +42,7 @@ loss_coefs:
 model:
   # Encoder
   conv_kernels: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]
-  strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 1, 1]]
+  strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [1, 1, 2]]
   in_channels: 1
   start_channels: 32
   max_channels: 320
@@ -70,15 +70,11 @@ model:
   prior_prob: 0.01 # for weight init of cls head
   learnabel_scale: True # for reg head
 
-  seg_classes: 20
-  
-
+  seg_classes: 20 # TODO we only do fgbg
+  out_channels: [32, 64, 128, 128, 128, 128, 128]  # TODO make self config
 
   # check reductions
   # different weights for the losses, currently same
-
-  # Anchors
-  anchors_per_position: 27
 
   # Sampler
   batch_size_per_image: 32
@@ -86,18 +82,29 @@ model:
   pool_size: 20
   min_neg: 1
 
+  # Post-processing #General RetinaUnet
+  detections_per_img: 100
+  score_thresh: 0
+  topk_candidates: 10000
+  remove_small_boxes: 0.01
+  nms_thresh: 0.6
+
+  # Anchors
+  anchors_per_position: 27
+  stride: 1
+  width: [[5.0, 9.0, 15.0], [10.0, 18.0, 30.0], [20.0, 36.0, 60.0], [40.0, 72.0, 120.0], [80.0, 144.0, 240.0]]
+  height: [[5.0, 7.0, 13.0], [10.0, 14.0, 26.0], [20.0, 28.0, 52.0], [40.0, 56.0, 104.0], [40.0, 56.0, 104.0]]
+  depth: [[4.0, 6.0, 17.0], [8.0, 12.0, 34.0], [16.0, 24.0, 68.0], [32.0, 48.0, 136.0], [32.0, 48.0, 136.0]]
+
+  # Matcher
+  num_candidates: 4
+  center_in_gt: False
   
-
-
-
-
-
-# block_cls StackedConvBlock2
 
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: null #[64, 64, 64]
+  patch_size: [128, 128, 256] #null #[64, 64, 64]
 
   p_gaussian_noise: 0 #0.1
   p_gaussian_smooth: 0 #0.1

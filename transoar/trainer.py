@@ -1,5 +1,7 @@
 """Module containing the trainer of the transoar project."""
 
+from collections import defaultdict
+
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -10,13 +12,12 @@ from transoar.inference import inference
 class Trainer:
 
     def __init__(
-        self, train_loader, val_loader, model, criterion, optimizer, scheduler,
+        self, train_loader, val_loader, model, optimizer, scheduler,
         device, config, path_to_run, epoch, metric_start_val
     ):
         self._train_loader = train_loader
         self._val_loader = val_loader
         self._model = model
-        self._criterion = criterion
         self._optimizer = optimizer
         self._scheduler = scheduler
         self._device = device
@@ -42,26 +43,21 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
-        for data, mask, bboxes, _ in tqdm(self._train_loader):
+        for data, mask, bboxes, seg_mask in tqdm(self._train_loader):
             # Put data to gpu
             data, mask = data.to(device=self._device), mask.to(device=self._device)
         
-            targets = []
+            targets = defaultdict(list)
             for item in bboxes:
-                target = {
-                    'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': item[1].to(device=self._device)
-                }
-                targets.append(target)
+                targets['target_boxes'].append(item[0].to(dtype=torch.float, device=self._device))
+                targets['target_classes'].append(item[1].to(device=self._device))
+            targets['target_seg'] = seg_mask.squeeze().to(device=self._device)
 
             # Make prediction 
-            out = self._model(data, mask)
-            loss_dict = self._criterion(out, targets)
+            losses, _ = self._model.train_step(data, targets, evaluation=False)
 
-            # Create absolute loss and mult with loss coefficient
-            loss_abs = 0
-            for loss_key, loss_val in loss_dict.items():
-                loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
+            loss_abs = sum(losses.values())
+            print(loss_abs)
 
             self._optimizer.zero_grad()
             loss_abs.backward()
@@ -72,6 +68,8 @@ class Trainer:
                 torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm)
 
             self._optimizer.step()
+
+            continue
 
             loss_agg += loss_abs.item()
             loss_bbox_agg += loss_dict['bbox'].item()
@@ -100,21 +98,19 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
-        for data, mask, bboxes, _ in tqdm(self._val_loader):
+        for data, mask, bboxes, seg_mask in tqdm(self._val_loader):
             # Put data to gpu
             data, mask = data.to(device=self._device), mask.to(device=self._device)
         
-            targets = []
+            targets = defaultdict(list)
             for item in bboxes:
-                target = {
-                    'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': item[1].to(device=self._device)
-                }
-                targets.append(target)
+                targets['target_boxes'].append(item[0].to(dtype=torch.float, device=self._device))
+                targets['target_classes'].append(item[1].to(device=self._device))
+            targets['target_seg'] = seg_mask.squeeze().to(device=self._device)
 
             # Make prediction 
-            out = self._model(data, mask)
-            loss_dict = self._criterion(out, targets)
+            losses, predictions = self._model.train_step(data, targets, evaluation=True)
+            continue
 
             # Create absolute loss and mult with loss coefficient
             loss_abs = 0
@@ -122,7 +118,7 @@ class Trainer:
                 loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
 
             # Evaluate validation predictions based on metric
-            pred_boxes, pred_classes, pred_scores = inference(out)
+            pred_boxes, pred_classes, pred_scores = inference(prediction)
             self._evaluator.add(
                 pred_boxes=pred_boxes,
                 pred_classes=pred_classes,

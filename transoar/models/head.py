@@ -3,29 +3,28 @@ import math
 import torch
 import torch.nn as nn
 
-from transoar.models.loss import BCEWithLogitsLossOneHot, GIoULoss
-from transoar.models.sampler import HardNegativeSamplerBatched
-from transoar.models.coder import BoxCoderND
+from transoar.models.loss import BCEWithLogitsLossOneHot, GIoULoss, SoftDiceLoss
 
-class Head(nn.Module):
-    def __init__(self, config):
-        super().__init__()
+# class Head(nn.Module):
+#     def __init__(self, config):
+#         super().__init__()
 
-        self._cls_head = ClsHead(config)
-        self._reg_head = RegHead(config)
-        self._seg_head = SegHead(config)
+#         self._cls_head = ClsHead(config)
+#         self._reg_head = RegHead(config)
+#         self._seg_head = SegHead(config)
 
-        self._sampler = HardNegativeSamplerBatched(
-            config['batch_size_per_image'], config['positive_fraction'], config['min_neg'],
-            config['pool_size']
-        )
+#         self._sampler = HardNegativeSamplerBatched(
+#             config['batch_size_per_image'], config['positive_fraction'], config['min_neg'],
+#             config['pool_size']
+#         )
 
-        self._box_coder = BoxCoderND(weights=(1.,) * 6)
+#         self._box_coder = BoxCoderND(weights=(1.,) * 6)
       
 class ClsHead(nn.Module):
     def __init__(self, config):
         super().__init__()
         self._config = config
+        self._num_classes = config['classifier_classes']
         out_channels = config['anchors_per_position'] * config['classifier_classes']
 
         block_1 = [
@@ -76,7 +75,7 @@ class ClsHead(nn.Module):
 
         cls_logits = cls_logits.permute(0, 2, 3, 4, 1)
         cls_logits = cls_logits.contiguous()
-        cls_logits = cls_logits.view(x.size()[0], -1, self.num_classes) # [N, anchors, num_classes]
+        cls_logits = cls_logits.view(x.size()[0], -1, self._num_classes) # [N, anchors, num_classes]
 
         return cls_logits
 
@@ -160,8 +159,37 @@ class SegHead(nn.Module):
     def __init__(self, config):
         super().__init__()
 
+        self._seg_classes = config['seg_classes'] + 1
+        self._in_channels = config['out_channels']
+        self._decoder_levels = config['decoder_levels']
 
+        self._out = nn.Conv3d(self._in_channels[0], 2, kernel_size=1, stride=1)
 
+        self._dice_loss = SoftDiceLoss(
+            nonlin=torch.nn.Softmax(dim=1), batch_dice=True, smooth_nom=1e-05, smooth_denom=1e-05,
+            do_bg=False
+        )
+
+        self._ce_loss = nn.CrossEntropyLoss()
+
+        self._logits_convert_fn = nn.Softmax(dim=1)
+        self._alpha = 0.5
+
+    def forward(self, x):
+        x = x[0]
+        return {"seg_logits": self._out(x)}
+
+    def compute_loss(self, pred_seg, target):
+        # To only predict if voxel fg or bg
+        target[target > 0] = 1
+        seg_logits = pred_seg["seg_logits"]
+        return {
+            "seg_ce": self._alpha * self._ce_loss(seg_logits, target.long()),
+            "seg_dice": (1 - self._alpha) * self._dice_loss(seg_logits, target),
+            }
+
+    def postprocess_for_inference(self, prediction):
+        return {"pred_seg": self._logits_convert_fn(prediction["seg_logits"])}
 
 
 class DetectionHeadHNMNative(nn.Module):
@@ -176,7 +204,7 @@ class DetectionHeadHNMNative(nn.Module):
     def forward(self, fmaps):
         logits, offsets = [], []
         for level, p in enumerate(fmaps):
-            logits.append(self.classifier(p, level=level))
+            logits.append(self.classifier(p))
             offsets.append(self.regressor(p, level=level))
 
         sdim = fmaps[0].ndim - 2
