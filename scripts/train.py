@@ -27,7 +27,7 @@ def match(n, keywords):
 
 def train(config, args):
     os.environ["CUDA_VISIBLE_DEVICES"] = config['device'][-1]
-    device = 'cuda:7' # TODO: fix this hack for def detr cuda module
+    device = 'cuda' # TODO: fix this hack for def detr cuda module
 
     # Build necessary components
     train_loader = get_loader(config, 'train')

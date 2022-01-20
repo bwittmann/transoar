@@ -51,93 +51,6 @@ class AnchorGenerator2D(nn.Module):
         self.num_anchors_per_level = self._cache[key][1]
         return self._cache[key][0]
 
-    def grid_anchors(self, grid_sizes, strides) -> Tuple[List[torch.Tensor], List[int]]:
-        """
-        Distribute anchors over feature maps
-
-        Args:
-            grid_sizes (Sequence[Sequence[int]]): spatial sizes of feature maps
-            strides (Sequence[Sequence[int]]): stride of each feature map
-
-        Returns:
-            List[torch.Tensor]: Anchors for each feature maps
-            List[int]: number of anchors per level
-        """
-        assert len(grid_sizes) == len(strides), "Every fm size needs strides"
-        assert len(grid_sizes) == len(self.cell_anchors), "Every fm size needs cell anchors"
-        anchors = []
-        cell_anchors = self.cell_anchors
-        assert cell_anchors is not None
-
-        _i = 0
-        # modified from torchvision (ordering of axis differs)
-        anchor_per_level = []
-        for size, stride, base_anchors in zip(grid_sizes, strides, cell_anchors):
-            size0, size1 = size
-            stride0, stride1 = stride
-            device = base_anchors.device
-            
-            shifts_x = torch.arange(0, size0, dtype=torch.float, device=device) * stride0
-            shifts_y = torch.arange(0, size1, dtype=torch.float, device=device) * stride1
-            
-            shift_y, shift_x = torch.meshgrid(shifts_y, shifts_x)
-            shift_x = shift_x.reshape(-1)
-            shift_y = shift_y.reshape(-1)
-            shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
-
-            _anchors = (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4)
-            anchors.append(_anchors)
-            anchor_per_level.append(_anchors.shape[0])
-            _i += 1
-        return anchors, anchor_per_level
-
-    @staticmethod
-    def generate_anchors(scales: Tuple[int],
-                         aspect_ratios: Tuple[float],
-                         dtype: torch.dtype = torch.float,
-                         device: Union[torch.device, str] = "cpu",
-                         ) -> torch.Tensor:
-        """
-        Generate anchors for a pair of scales and ratios
-
-        Args:
-            scales (Tuple[int]): scales of anchors, e.g. (32, 64, 128)
-            aspect_ratios (Tuple[float]): aspect ratios of height/width, e.g. (0.5, 1, 2)
-            dtype (torch.dtype): data type of anchors
-            device (Union[torch.device, str]): target device of anchors
-
-        Returns:
-            Tensor: anchors of shape [n(scales) * n(ratios), dim * 2]
-        """
-        scales = torch.as_tensor(scales, dtype=dtype, device=device)
-        aspect_ratios = torch.as_tensor(aspect_ratios, dtype=dtype, device=device)
-        h_ratios = torch.sqrt(aspect_ratios)
-        w_ratios = 1 / h_ratios
-
-        ws = (w_ratios[:, None] * scales[None, :]).view(-1)
-        hs = (h_ratios[:, None] * scales[None, :]).view(-1)
-
-        base_anchors = torch.stack([-ws, -hs, ws, hs], dim=1) / 2
-        return base_anchors.round()
-
-    def set_cell_anchors(self,  dtype: torch.dtype, device: Union[torch.device, str] = "cpu") -> None:
-        """
-        Set :para:`self.cell_anchors` if it was not already set
-
-        Args:
-            dtype (torch.dtype): data type of anchors
-            device (Union[torch.device, str]): target device of anchors
-
-        Returns:
-        None
-            result is saved into attribute
-        """
-        if self.cell_anchors is not None:
-            return
-
-        cell_anchors = [self.generate_anchors(sizes, aspect_ratios, dtype, device)
-                        for sizes, aspect_ratios in zip(self.sizes, self.aspect_ratios)]
-        self.cell_anchors = cell_anchors
 
     def forward(self, image_list: torch.Tensor, feature_maps: List[torch.Tensor]) -> List[torch.Tensor]:
         """
@@ -172,16 +85,7 @@ class AnchorGenerator2D(nn.Module):
         # self._cache.clear()
         return anchors
 
-    def num_anchors_per_location(self) -> List[int]:
-        """
-        Number of anchors per resolution
-
-        Returns:
-            List[int]: number of anchors per positions for each resolution
-        """
-        return [len(s) * len(a) for s, a in zip(self.sizes, self.aspect_ratios)]
-
-    def get_num_acnhors_per_level(self) -> List[int]:
+    def get_num_anchors_per_level(self) -> List[int]:
         """
         Number of anchors per resolution
 
@@ -214,53 +118,6 @@ class AnchorGenerator3D(AnchorGenerator2D):
         if not isinstance(zsizes[0], (Sequence, list, tuple)):
             zsizes = (zsizes,) * len(sizes)
         self.zsizes = zsizes
-
-    def set_cell_anchors(self, dtype: torch.dtype, device: Union[torch.device, str] = "cpu") -> None:
-        """
-        Compute anchors for all pairs of sclaes and ratios and save them inside :param:`cell_anchors`
-        if they were not computed before
-
-        Args:
-            dtype (torch.dtype): data type of anchors
-            device (Union[torch.device, str]): target device of anchors
-
-        Returns:
-            None (result is saved into :param:`self.cell_anchors`)
-        """
-        if self.cell_anchors is not None:
-            return
-
-        cell_anchors = [
-            self.generate_anchors(sizes, aspect_ratios, zsizes, dtype, device)
-            for sizes, aspect_ratios, zsizes in zip(self.sizes, self.aspect_ratios, self.zsizes)
-        ]
-        self.cell_anchors = cell_anchors
-
-    @staticmethod
-    def generate_anchors(scales: Tuple[int], aspect_ratios: Tuple[float], zsizes: Tuple[int],
-                         dtype: torch.dtype = torch.float,
-                         device: Union[torch.device, str] = "cpu") -> torch.Tensor:
-        """
-        Generate anchors for a pair of scales and ratios
-
-        Args:
-            scales (Tuple[int]): scales of anchors, e.g. (32, 64, 128)
-            aspect_ratios (Tuple[float]): aspect ratios of height/width, e.g. (0.5, 1, 2)
-            zsizes (Tuple[int]): scale along z dimension
-            dtype (torch.dtype): data type of anchors
-            device (Union[torch.device, str]): target device of anchors
-
-        Returns:
-            Tensor: anchors of shape [n(scales) * n(ratios) * n(zscales) , dim * 2]
-        """
-        base_anchors_2d = AnchorGenerator2D.generate_anchors(
-            scales, aspect_ratios, dtype=dtype, device=device)
-        zanchors = torch.cat(
-            [torch.as_tensor([-z, z], dtype=dtype, device=device).repeat(
-                base_anchors_2d.shape[0], 1) for z in zsizes], dim=0)
-        base_anchors_3d = torch.cat(
-            [base_anchors_2d.repeat(len(zsizes), 1), (zanchors / 2.).round()], dim=1)
-        return base_anchors_3d
 
     def grid_anchors(self, grid_sizes: Sequence[Sequence[int]],
                      strides: Sequence[Sequence[int]]) -> Tuple[List[torch.Tensor], List[int]]:
@@ -301,15 +158,6 @@ class AnchorGenerator3D(AnchorGenerator2D):
 
             _i += 1
         return anchors, anchor_per_level
-
-    def num_anchors_per_location(self) -> List[int]:
-        """
-        Number of anchors per resolution
-
-        Returns:
-            List[int]: number of anchors per positions for each resolution
-        """
-        return [len(s) * len(a) * len(z) for s, a, z in zip(self.sizes, self.aspect_ratios, self.zsizes)]
 
 
 class AnchorGenerator3DS(AnchorGenerator3D):

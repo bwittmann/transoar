@@ -8,14 +8,14 @@ from functools import partial
 import numpy as np
 
 from transoar.metric import Metric
-from transoar.utils.bboxes import iou_3d_np
+from transoar.utils.bboxes import box_iou_3d_np
 
 
 class DetectionEvaluator:
     def __init__(
         self,
         classes,
-        iou_fn=iou_3d_np,
+        iou_fn=box_iou_3d_np,
         max_detections=1
     ):
         """
@@ -89,8 +89,8 @@ class DetectionEvaluator:
             dict: empty dict... detection metrics can only be evaluated at the end
         """
         # reduce class ids by 1 to start with 0
-        gt_classes = [batch_elem_classes -1 for batch_elem_classes in gt_classes]
-        pred_classes = [batch_elem_classes -1 for batch_elem_classes in pred_classes]
+        # gt_classes = [batch_elem_classes -1 for batch_elem_classes in gt_classes]
+        # pred_classes = [batch_elem_classes -1 for batch_elem_classes in pred_classes]
 
         if gt_ignore is None:   # only zeros -> don't ignore anything
             n = [0 if gt_boxes_img.size == 0 else gt_boxes_img.shape[0] for gt_boxes_img in gt_boxes]

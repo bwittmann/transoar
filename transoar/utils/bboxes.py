@@ -72,6 +72,8 @@ def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normal
 
             if box_format == 'xyzxyz':
                 bboxes.append(torch.hstack((min_values, max_values)))   # x1, y1, z1, x2, y2, z2
+            elif box_format == 'xyxyzz':
+                bboxes.append(torch.hstack((min_values[0:2], max_values[0:2], min_values[-1], max_values[-1])))
             elif box_format == 'cxcyczwhd':
                 width, height, depth = max_values - min_values
                 cx, cy, cz = (max_values + min_values) / 2
@@ -172,3 +174,33 @@ def iou_3d_np(bboxes1, bboxes2, format_='cxcyczwhd'):
     intersection = delta_x * delta_y * delta_z
     union = volume_bbox1[:, None] + volume_bbox2 - intersection
     return intersection / union
+
+
+def box_iou_3d_np(boxes1, boxes2):
+    """
+    Return intersection-over-union (Jaccard index) of boxes.
+    Both sets of boxes are expected to be in (x1, y1, x2, y2, z1, z2) format.
+    Arguments:
+        boxes1 (ndarray): set of boxes (x1, y1, x2, y2, z1, z2)[N, 6]
+        boxes2 (ndarray): set of boxes (x1, y1, x2, y2, z1, z2)[M, 6]
+    Returns:
+        iou (ndarray[N, M]): the NxM matrix containing the pairwise
+            IoU values for every element in boxes1 and boxes2
+    """
+    area1 = box_area_3d_np(boxes1)
+    area2 = box_area_3d_np(boxes2)
+
+    x1 = np.maximum(boxes1[:, None, 0], boxes2[:, 0])  # [N, M]
+    y1 = np.maximum(boxes1[:, None, 1], boxes2[:, 1])  # [N, M]
+    x2 = np.minimum(boxes1[:, None, 2], boxes2[:, 2])  # [N, M]
+    y2 = np.minimum(boxes1[:, None, 3], boxes2[:, 3])  # [N, M]
+    z1 = np.maximum(boxes1[:, None, 4], boxes2[:, 4])  # [N, M]
+    z2 = np.minimum(boxes1[:, None, 5], boxes2[:, 5])  # [N, M]
+
+    inter = np.clip((x2 - x1), a_min=0, a_max=None) * np.clip((y2 - y1), a_min=0, a_max=None) * \
+            np.clip((z2 - z1), a_min=0, a_max=None)  # [N, M]
+    return inter / (area1[:, None] + area2 - inter)
+
+
+def box_area_3d_np(boxes: np.ndarray) -> np.ndarray:
+    return (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 5] - boxes[:, 4])

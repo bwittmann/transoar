@@ -126,7 +126,7 @@ class RetinaUNet(nn.Module):
             # indices of ground truth box for each proposal
             match_quality_matrix, matched_idxs = self.proposal_matcher(
                 gt_boxes, anchors_per_image,
-                num_anchors_per_level=self.anchor_generator.get_num_acnhors_per_level(),
+                num_anchors_per_level=self.anchor_generator.get_num_anchors_per_level(),
                 num_anchors_per_loc=self.anchor_generator.num_anchors_per_location()[0])
 
             # get the targets corresponding GT for each proposal

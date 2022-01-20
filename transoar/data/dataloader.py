@@ -51,6 +51,10 @@ class TransoarCollator:
             batch_masks.append(torch.zeros_like(image))
 
         # Generate bboxes and corresponding class labels
-        batch_bboxes, batch_classes = segmentation2bbox(torch.stack(batch_labels), self._bbox_padding)
+        batch_bboxes, batch_classes = segmentation2bbox(
+            torch.stack(batch_labels), self._bbox_padding, normalize=False, box_format='xyxyzz'
+        )
+
+        batch_classes = [classes - 1 for classes in batch_classes]
 
         return torch.stack(batch_images), torch.stack(batch_masks), list(zip(batch_bboxes, batch_classes)), torch.stack(batch_labels)

@@ -41,8 +41,9 @@ class Trainer:
 
         loss_agg = 0
         loss_bbox_agg = 0
-        loss_giou_agg = 0
         loss_cls_agg = 0
+        loss_seg_ce_agg = 0
+        loss_seg_dice_agg = 0
         for data, mask, bboxes, seg_mask in tqdm(self._train_loader):
             # Put data to gpu
             data, mask = data.to(device=self._device), mask.to(device=self._device)
@@ -57,7 +58,6 @@ class Trainer:
             losses, _ = self._model.train_step(data, targets, evaluation=False)
 
             loss_abs = sum(losses.values())
-            print(loss_abs)
 
             self._optimizer.zero_grad()
             loss_abs.backward()
@@ -69,24 +69,26 @@ class Trainer:
 
             self._optimizer.step()
 
-            continue
-
             loss_agg += loss_abs.item()
-            loss_bbox_agg += loss_dict['bbox'].item()
-            loss_giou_agg += loss_dict['giou'].item()
-            loss_cls_agg += loss_dict['cls'].item()
+            loss_bbox_agg += losses['reg'].item()
+            loss_cls_agg += losses['cls'].item()
+            loss_seg_ce_agg += losses['seg_ce'].item()
+            loss_seg_dice_agg += losses['seg_dice'].item()
+
 
         loss = loss_agg / len(self._train_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
-        loss_giou = loss_giou_agg / len(self._train_loader)
-        loss_cls = loss_cls_agg / len(self._train_loader)
+        loss_cls =  loss_cls_agg / len(self._train_loader)
+        loss_seg_ce = loss_seg_ce_agg / len(self._train_loader)
+        loss_seg_dice = loss_seg_dice_agg / len(self._train_loader)
 
         self._write_to_logger(
             num_epoch, 'train', 
             total_loss=loss,
             bbox_loss=loss_bbox,
-            giou_loss=loss_giou,
-            cls_loss=loss_cls
+            cls_loss=loss_cls,
+            seg_ce_loss=loss_seg_ce,
+            seg_dice_loss=loss_seg_dice
         )
 
     @torch.no_grad()
@@ -96,8 +98,9 @@ class Trainer:
 
         loss_agg = 0
         loss_bbox_agg = 0
-        loss_giou_agg = 0
         loss_cls_agg = 0
+        loss_seg_ce_agg = 0
+        loss_seg_dice_agg = 0
         for data, mask, bboxes, seg_mask in tqdm(self._val_loader):
             # Put data to gpu
             data, mask = data.to(device=self._device), mask.to(device=self._device)
@@ -110,32 +113,32 @@ class Trainer:
 
             # Make prediction 
             losses, predictions = self._model.train_step(data, targets, evaluation=True)
-            continue
-
-            # Create absolute loss and mult with loss coefficient
-            loss_abs = 0
-            for loss_key, loss_val in loss_dict.items():
-                loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
-
-            # Evaluate validation predictions based on metric
-            pred_boxes, pred_classes, pred_scores = inference(prediction)
-            self._evaluator.add(
-                pred_boxes=pred_boxes,
-                pred_classes=pred_classes,
-                pred_scores=pred_scores,
-                gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
-                gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
-            )
+            loss_abs = sum(losses.values())
 
             loss_agg += loss_abs.item()
-            loss_bbox_agg += loss_dict['bbox'].item()
-            loss_giou_agg += loss_dict['giou'].item()
-            loss_cls_agg += loss_dict['cls'].item()
+            loss_bbox_agg += losses['reg'].item()
+            loss_cls_agg += losses['cls'].item()
+            loss_seg_ce_agg += losses['seg_ce'].item()
+            loss_seg_dice_agg += losses['seg_dice'].item()
+
+
+            # Evaluate validation predictions based on metric
+            # pred_boxes, pred_classes, pred_scores = inference(predictions)
+
+            self._evaluator.add(
+                pred_boxes=[boxes.detach().cpu().numpy() for boxes in predictions['pred_boxes']],
+                pred_classes=[classes.detach().cpu().numpy() for classes in predictions['pred_labels']],
+                pred_scores=[scores.detach().cpu().numpy() for scores in predictions['pred_scores']],
+                gt_boxes=[gt_boxes.detach().cpu().numpy() for gt_boxes in targets['target_boxes']],
+                gt_classes=[gt_classes.detach().cpu().numpy() for gt_classes in targets['target_classes']],
+            )
 
         loss = loss_agg / len(self._val_loader)
         loss_bbox = loss_bbox_agg / len(self._val_loader)
-        loss_giou = loss_giou_agg / len(self._val_loader)
-        loss_cls = loss_cls_agg / len(self._val_loader)
+        loss_cls =  loss_cls_agg / len(self._val_loader)
+        loss_seg_ce = loss_seg_ce_agg / len(self._val_loader)
+        loss_seg_dice = loss_seg_dice_agg / len(self._val_loader)
+
         metric_scores = self._evaluator.eval()
         self._evaluator.reset()
 
@@ -153,8 +156,9 @@ class Trainer:
             num_epoch, 'val', 
             total_loss=loss,
             bbox_loss=loss_bbox,
-            giou_loss=loss_giou,
-            cls_loss=loss_cls
+            cls_loss=loss_cls,
+            seg_ce_loss=loss_seg_ce,
+            seg_dice_loss=loss_seg_dice
         )
 
         self._write_to_logger(
@@ -181,8 +185,7 @@ class Trainer:
             # Log learning rates
             self._write_to_logger(
                 epoch, 'lr',
-                neck=self._optimizer.param_groups[0]['lr'],
-                backbone=self._optimizer.param_groups[1]['lr']
+                main=self._optimizer.param_groups[0]['lr'],
             )
 
             if epoch % self._config['val_interval'] == 0:
