@@ -7,12 +7,14 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn as nn
 import monai
 
 from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_config, write_json, get_meta_data
 from transoar.models.transoarnet import TransoarNet
+from transoar.models.scheduler import LinearWarmupPolyLR
 from transoar.models.retina_unet import RetinaUNet
 from transoar.models.build import build_criterion
 
@@ -38,6 +40,11 @@ def train(config, args):
         val_loader = get_loader(config, 'val')
 
     model = RetinaUNet(config['model']).to(device=device)
+
+    # model.half()    # https://medium.com/@dwightfoster03/fp16-in-pytorch-a042e9967f7e
+    # for layer in model.children():
+    #     if not isinstance(layer, (nn.Conv3d, nn.ConvTranspose3d, nn.Parameter)):  # GroupNorm leads to errors
+    #         layer.float()
 
     # criterion = build_criterion(config).to(device=device)
 
@@ -75,10 +82,44 @@ def train(config, args):
     #         }
     #     )
 
-    optim = torch.optim.AdamW(
-        model.parameters(), lr=float(config['lr']), weight_decay=float(config['weight_decay'])
+    # optim = torch.optim.AdamW(
+    #     model.parameters(), lr=float(config['lr']), weight_decay=float(config['weight_decay'])
+    # )
+    # scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
+
+    for module in model.modules():
+        if isinstance(module, (nn.InstanceNorm3d, nn.GroupNorm)):
+            for param in module.parameters():
+                assert not hasattr(param, 'no_wd')
+                setattr(param, 'no_wd', True)
+
+    wd_groups = [
+        {
+            'params': filter(lambda p: hasattr(p, "no_wd"), model.parameters()),
+            'weight_decay': 0
+        },
+        {
+            'params': filter(lambda p: not hasattr(p, "no_wd"), model.parameters()),
+            'weight_decay': 3e-05
+
+        } 
+    ]
+
+    optim = torch.optim.SGD(
+        wd_groups,
+        0.01,
+        weight_decay=3e-05,
+        momentum=0.9,
+        nesterov=True
     )
-    scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
+
+    scheduler = LinearWarmupPolyLR(
+        optimizer=optim,
+        warm_iterations=4000,
+        warm_lr=1e-06,
+        poly_gamma=0.9,
+        num_iterations=90000
+    )
 
     # Load checkpoint if applicable
     if args.resume is not None:

@@ -4,10 +4,12 @@ from collections import defaultdict
 
 import torch
 from torch.utils.tensorboard import SummaryWriter
+from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
 from transoar.evaluator import DetectionEvaluator
 from transoar.inference import inference
+
 
 class Trainer:
 
@@ -26,6 +28,7 @@ class Trainer:
         self._config = config
 
         self._writer = SummaryWriter(log_dir=path_to_run)
+        self._scaler = GradScaler()
 
         self._evaluator = DetectionEvaluator(
             classes=list(config['labels'].values())
@@ -44,9 +47,9 @@ class Trainer:
         loss_cls_agg = 0
         loss_seg_ce_agg = 0
         loss_seg_dice_agg = 0
-        for data, mask, bboxes, seg_mask in tqdm(self._train_loader):
+        for data, _, bboxes, seg_mask in tqdm(self._train_loader):
             # Put data to gpu
-            data, mask = data.to(device=self._device), mask.to(device=self._device)
+            data = data.to(device=self._device)
         
             targets = defaultdict(list)
             for item in bboxes:
@@ -55,19 +58,20 @@ class Trainer:
             targets['target_seg'] = seg_mask.squeeze().to(device=self._device)
 
             # Make prediction 
-            losses, _ = self._model.train_step(data, targets, evaluation=False)
-
-            loss_abs = sum(losses.values())
+            with autocast():
+                losses, _ = self._model.train_step(data, targets, evaluation=False)
+                loss_abs = sum(losses.values())
 
             self._optimizer.zero_grad()
-            loss_abs.backward()
+            self._scaler.scale(loss_abs).backward()
 
             # Clip grads to counter exploding grads
-            max_norm = self._config['clip_max_norm']
-            if max_norm > 0:
-                torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm)
+            # max_norm = self._config['clip_max_norm']
+            # if max_norm > 0:
+            #     torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm)
 
-            self._optimizer.step()
+            self._scaler.step(self._optimizer)
+            self._scaler.update()
 
             loss_agg += loss_abs.item()
             loss_bbox_agg += losses['reg'].item()
@@ -75,6 +79,7 @@ class Trainer:
             loss_seg_ce_agg += losses['seg_ce'].item()
             loss_seg_dice_agg += losses['seg_dice'].item()
 
+            self._scheduler.step()
 
         loss = loss_agg / len(self._train_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
@@ -101,9 +106,9 @@ class Trainer:
         loss_cls_agg = 0
         loss_seg_ce_agg = 0
         loss_seg_dice_agg = 0
-        for data, mask, bboxes, seg_mask in tqdm(self._val_loader):
+        for data, _, bboxes, seg_mask in tqdm(self._val_loader):
             # Put data to gpu
-            data, mask = data.to(device=self._device), mask.to(device=self._device)
+            data = data.to(device=self._device)
         
             targets = defaultdict(list)
             for item in bboxes:
@@ -112,8 +117,9 @@ class Trainer:
             targets['target_seg'] = seg_mask.squeeze().to(device=self._device)
 
             # Make prediction 
-            losses, predictions = self._model.train_step(data, targets, evaluation=True)
-            loss_abs = sum(losses.values())
+            with autocast():
+                losses, predictions = self._model.train_step(data, targets, evaluation=True)
+                loss_abs = sum(losses.values())
 
             loss_agg += loss_abs.item()
             loss_bbox_agg += losses['reg'].item()
@@ -190,8 +196,6 @@ class Trainer:
 
             if epoch % self._config['val_interval'] == 0:
                 self._validate(epoch)
-
-            self._scheduler.step()
 
             if not self._config['debug_mode']:
                 self._save_checkpoint(epoch, 'model_last.pt')
