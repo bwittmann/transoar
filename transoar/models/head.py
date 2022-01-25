@@ -159,7 +159,6 @@ class SegHead(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self._seg_classes = config['seg_classes'] + 1
         self._in_channels = config['out_channels']
         self._decoder_levels = config['decoder_levels']
 

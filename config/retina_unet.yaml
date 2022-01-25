@@ -1,7 +1,7 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test #test_orig_train_params_wh_160_flip_wd_switch
+experiment_name: test_nms #test_orig_train_params_wh_160_flip_wd_switch
 device: cuda:4
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
@@ -18,7 +18,7 @@ clip_max_norm: 0.1
 lr_drop: 400  # prev: 40
 
 # Data
-dataset: transoar_test_3mm_CT
+dataset: transoar_test_1mm_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
@@ -50,31 +50,18 @@ model:
   # Decoder
   decoder_levels: [2, 3, 4, 5, 6]
   fpn_channels: 128
-  min_out_channels: 8
-  upsampling_mode: transpose
-  num_lateral: 1
-  norm_lateral: False
-  activation_lateral: False
-  num_out: 1
-  norm_out: False
-  activation_out: False
 
   # Heads
   head_channels: 128
   classifier_classes: 20
-  num_convs: 1
-  norm_channels_per_group: 16
-  norm_affine: True
-
-  loss_weight: 1.0
+  loss_weight: 1.0  # for bce and giou
   prior_prob: 0.01 # for weight init of cls head
   learnabel_scale: True # for reg head
-
-  seg_classes: 20 # TODO we only do fgbg
   out_channels: [32, 64, 128, 128, 128, 128, 128]  # TODO make self config
 
-  # check reductions
-  # different weights for the losses, currently same
+  # Matcher
+  num_candidates: 4   # TODO put to 20 or to 1? since always same nr of gt boxes?
+  center_in_gt: False # TODO try, as this only works poor when objects are very small
 
   # Sampler
   batch_size_per_image: 32
@@ -82,7 +69,7 @@ model:
   pool_size: 20
   min_neg: 1
 
-  # Post-processing #General RetinaUnet
+  # Post-processing
   detections_per_img: 100
   score_thresh: 0
   topk_candidates: 10000
@@ -93,25 +80,26 @@ model:
   anchors_per_position: 27
   stride: 1
 
+  # 48bg giga 160 160 256 - new conf
+  depth: [[6.0, 10.0, 32.0], [12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0]]
+  height: [[8.0, 11.0, 16.0], [16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [64.0, 88.0, 128.0]]
+  width: [[6.0, 8.0, 11.0], [12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0]]
+
+  # 48bg giga 160 160 256
+  # width: [[6.0, 9.0, 22.0], [12.0, 18.0, 44.0], [24.0, 36.0, 88.0], [48.0, 72.0, 176.0], [96.0, 144.0, 352.0]]
+  # height: [[6.0, 9.0, 14.0], [12.0, 18.0, 28.0], [24.0, 36.0, 56.0], [48.0, 72.0, 112.0], [48.0, 72.0, 112.0]]  # TODO last scale not done
+  # depth: [[5.0, 7.0, 11.0], [10.0, 14.0, 22.0], [20.0, 28.0, 44.0], [40.0, 56.0, 88.0], [40.0, 56.0, 88.0]]
+
   # 16bg facebook
   # width: [[5.0, 9.0, 15.0], [10.0, 18.0, 30.0], [20.0, 36.0, 60.0], [40.0, 72.0, 120.0], [80.0, 144.0, 240.0]]
   # height: [[5.0, 7.0, 13.0], [10.0, 14.0, 26.0], [20.0, 28.0, 52.0], [40.0, 56.0, 104.0], [40.0, 56.0, 104.0]]
   # depth: [[4.0, 6.0, 17.0], [8.0, 12.0, 34.0], [16.0, 24.0, 68.0], [32.0, 48.0, 136.0], [32.0, 48.0, 136.0]]
 
-  # 48bg giga 160 160 256
-  depth: [[6.0, 9.0, 22.0], [12.0, 18.0, 44.0], [24.0, 36.0, 88.0], [48.0, 72.0, 176.0], [96.0, 144.0, 352.0]]
-  height: [[6.0, 9.0, 14.0], [12.0, 18.0, 28.0], [24.0, 36.0, 56.0], [48.0, 72.0, 112.0], [48.0, 72.0, 112.0]]  # TODO last scale not done
-  width: [[5.0, 7.0, 11.0], [10.0, 14.0, 22.0], [20.0, 28.0, 44.0], [40.0, 56.0, 88.0], [40.0, 56.0, 88.0]]
-
-  # Matcher
-  num_candidates: 4
-  center_in_gt: False
-  
 
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [160, 160, 256] #null #[64, 64, 64]
+  patch_size: [128, 128, 256] #null #[64, 64, 64]
 
   p_gaussian_noise: 0 #0.1
   p_gaussian_smooth: 0 #0.1

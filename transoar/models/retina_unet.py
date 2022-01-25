@@ -6,6 +6,7 @@ from transoar.models.anchor_gen import AnchorGenerator3DS
 from transoar.models.sampler import HardNegativeSamplerBatched
 from transoar.models.coder import BoxCoderND
 from transoar.models.anchor_matcher import ATSSMatcher, box_iou
+from transoar._C import nms
 
 
 class RetinaUNet(nn.Module):
@@ -125,9 +126,11 @@ class RetinaUNet(nn.Module):
         for anchors_per_image, gt_boxes, gt_classes in zip(anchors, target_boxes, target_classes):
             # indices of ground truth box for each proposal
             match_quality_matrix, matched_idxs = self.proposal_matcher(
-                gt_boxes, anchors_per_image,
+                gt_boxes,
+                anchors_per_image,
                 num_anchors_per_level=self.anchor_generator.get_num_anchors_per_level(),
-                num_anchors_per_loc=self.anchor_generator.num_anchors_per_location()[0])
+                num_anchors_per_loc=self.anchor_generator.num_anchors_per_location()[0]
+            )
 
             # get the targets corresponding GT for each proposal
             # NB: need to clamp the indices because we can have a single
@@ -150,7 +153,7 @@ class RetinaUNet(nn.Module):
             bg_indices = matched_idxs == self.proposal_matcher.BELOW_LOW_THRESHOLD
             labels_per_image[bg_indices] = 0.0
 
-            # discard indices that are between thresholds
+            # discard indices that are between thresholds - only for IoU matcher
             inds_to_discard = matched_idxs == self.proposal_matcher.BETWEEN_THRESHOLDS
             labels_per_image[inds_to_discard] = -1.0
 
@@ -251,20 +254,17 @@ def batched_nms(boxes, scores, idxs, iou_threshold: float):
     boxes_for_nms = boxes + offsets[:, None]
     return nms(boxes_for_nms, scores, iou_threshold)
 
-def nms(boxes, scores, thresh):
-    ious = box_iou(boxes, boxes)
-    _, _idx = torch.sort(scores, descending=True)
+# def nms(boxes, scores, thresh):
+#     ious = box_iou(boxes, boxes)
+#     _, _idx = torch.sort(scores, descending=True)
     
-    keep = []
-    while _idx.nelement() > 0:
-        keep.append(_idx[0])
-        # get all elements that were not matched and discard all others.
-        non_matches = torch.where((ious[_idx[0]][_idx] <= thresh))[0]
-        _idx = _idx[non_matches]
-    return torch.tensor(keep).to(boxes).long()
-
-
-
+#     keep = []
+#     while _idx.nelement() > 0:
+#         keep.append(_idx[0])
+#         # get all elements that were not matched and discard all others.
+#         non_matches = torch.where((ious[_idx[0]][_idx] <= thresh))[0]
+#         _idx = _idx[non_matches]
+#     return torch.tensor(keep).to(boxes).long()
 
 
 class Encoder(nn.Module):

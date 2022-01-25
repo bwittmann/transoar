@@ -33,7 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
 
-from typing import Sequence, Callable, Tuple, TypeVar
+from typing import Sequence, Callable, Tuple
 from abc import ABC
 
 import torch
@@ -187,6 +187,7 @@ class ATSSMatcher(Matcher):
             candidate_idx.append(idx + start_idx)
 
             start_idx = end_idx
+
         # [num_boxes x num_candidates] (index of candidate anchors)
         candidate_idx = torch.cat(candidate_idx, dim=1)
 
@@ -315,7 +316,6 @@ def box_iou(boxes1: Tensor, boxes2: Tensor,  eps: float = 0) -> Tensor:
     if boxes1.numel() == 0 or boxes2.numel() == 0:
         return torch.tensor([]).to(boxes1)
     return box_iou_union_3d(boxes1.float(), boxes2.float(), eps=eps)[0]
-
 
 def box_iou_union_3d(boxes1: Tensor, boxes2: Tensor, eps: float = 0) -> Tuple[Tensor, Tensor]:
     """
