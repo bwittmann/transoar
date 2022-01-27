@@ -22,7 +22,8 @@ class DeformableTransformer(nn.Module):
         return_intermediate_dec=False,
         num_feature_levels=4,
         enc_n_points=4,
-        use_cuda=True
+        use_cuda=True,
+        dec_global_attn=False
     ):
         super().__init__()
 
@@ -35,7 +36,7 @@ class DeformableTransformer(nn.Module):
         )
         self.encoder = DeformableTransformerEncoder(encoder_layer, num_encoder_layers)
 
-        decoder_layer = DeformableTransformerDecoderLayer(d_model, dim_feedforward, dropout, activation, nhead)
+        decoder_layer = DeformableTransformerDecoderLayer(d_model, dim_feedforward, dropout, activation, nhead, dec_global_attn)
         self.decoder = DeformableTransformerDecoder(decoder_layer, num_decoder_layers, return_intermediate_dec)
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
@@ -205,15 +206,19 @@ class DeformableTransformerDecoderLayer(nn.Module):
         d_ffn=1024,
         dropout=0.1, 
         activation="relu",
-        n_heads=8
+        n_heads=8,
+        global_attn=False
     ):
         super().__init__()
 
         # cross attention
         self.cross_attn = nn.MultiheadAttention(d_model, n_heads)
-        self.cache_attn_mask = None
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
+
+        # attn mask
+        self.cache_attn_mask = None
+        self.global_attn = global_attn
 
         # self attention
         self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
@@ -272,7 +277,11 @@ class DeformableTransformerDecoderLayer(nn.Module):
             lvl = (idx >= queries_lvl_thresh).nonzero().shape[0]
 
             dummy_map = torch.zeros(feature_map_shapes[lvl].tolist())
-            dummy_map[tuple(query_attn_coords.T)] = 1
+
+            if self.global_attn:
+                dummy_map[...] = 1
+            else:
+                dummy_map[tuple(query_attn_coords.T)] = 1
 
             dummy_map_flattened = dummy_map.flatten().nonzero().to(device=queries.device)
 
@@ -281,8 +290,9 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
             attn_mask[idx][dummy_map_flattened] = False
 
-        assert ((~attn_mask).sum(axis=-1) == fov**3).all()
-        assert ((~attn_mask).sum(axis=0) == 1).all()
+        if not self.global_attn:
+            assert ((~attn_mask).sum(axis=-1) == fov**3).all()
+            assert ((~attn_mask).sum(axis=0) == 1).all()
 
         self.cache_attn_mask = attn_mask
         return attn_mask

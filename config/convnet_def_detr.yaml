@@ -1,8 +1,8 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test #test_convnet_def_detr_baseline_local_attn_one_higher #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
-device: cuda:3
+experiment_name: test_convnet_def_detr_lvl_global_attn #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
+device: cuda:4
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
@@ -53,17 +53,17 @@ neck:
   skip_con: False # from backbone to heads
   pos_encoding: sine
   num_feature_levels: 3
-  hidden_dim: 192 #832 # 192 # prev: 256
-  dropout: 0.0
+  hidden_dim: 192 #832 # prev: 256
+  dropout: 0.0  # prev: 0.1
   nheads: 6 #26 #6  #prev: 8
-  dim_feedforward: 256 #1024
+  dim_feedforward: 256 # prev: 1024
   enc_layers: 2 #6
   dec_layers: 2 #6
   enc_n_points: 4 #4
-  dec_n_points: 4 #4
   num_queries: 647 # [647 -> 3x3 cube]
   aux_loss: True
   use_cuda: True
+  dec_global_attn: True
 
 # Augmentation
 augmentation:
