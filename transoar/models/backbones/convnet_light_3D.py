@@ -12,6 +12,7 @@ class ConvNetLight(nn.Module):
         out_channels,
         kernel_sizes,
         strides,
+        padding,
         return_intermediate_outputs=True,
         learnable=False
     ):
@@ -21,13 +22,19 @@ class ConvNetLight(nn.Module):
         self._learnable = learnable
 
         layer1 = Block(
-            1, out_channels[0], kernel_sizes[0], strides[0]
+            1, out_channels[0], kernel_sizes[0], strides[0], padding[0]
         )
         layer2 = Block(
-            out_channels[0], out_channels[1], kernel_sizes[1], strides[1]
+            out_channels[0], out_channels[1], kernel_sizes[1], strides[1], padding[1]
         )
         layer3 = Block(
-            out_channels[1], out_channels[2], kernel_sizes[2], strides[2]
+            out_channels[1], out_channels[2], kernel_sizes[2], strides[2], padding[2]
+        )
+        layer4 = Block(
+            out_channels[2], out_channels[3], kernel_sizes[3], strides[3], padding[3]
+        )
+        layer5 = Block(
+            out_channels[3], out_channels[4], kernel_sizes[4], strides[4], padding[4]
         )
 
         if learnable:
@@ -35,7 +42,9 @@ class ConvNetLight(nn.Module):
                 [
                     layer1,
                     layer2,
-                    layer3
+                    layer3,
+                    layer4,
+                    layer5
                 ]
             )
         else:
@@ -55,7 +64,7 @@ class ConvNetLight(nn.Module):
 
         # Decide which layer outputs to return
         if self._return_intermediate_outputs:
-            return out
+            return out[-3:]
         else:
             return out[-1:]  # only return last output  
 
@@ -68,6 +77,7 @@ class Block(nn.Module):
         out_channels,
         kernel_size,
         stride,
+        padding,
         dilation=1
     ):
         super().__init__()
@@ -77,7 +87,8 @@ class Block(nn.Module):
             out_channels=out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            dilation=dilation
+            dilation=dilation,
+            padding=padding
         )
         self.bn = nn.GroupNorm(num_groups=4, num_channels=out_channels)
         self.relu = nn.ReLU(inplace=True)

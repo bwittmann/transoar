@@ -1,8 +1,5 @@
 """Main model of the transoar project."""
 
-import math
-
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -45,10 +42,10 @@ class TransoarNet(nn.Module):
             # Get individual input projection for each feature level
             num_feature_levels = config['neck']['num_feature_levels']
             if num_feature_levels > 1:
-                num_backbone_outs = len(config['backbone']['num_channels'])
+                num_backbone_outs = len(config['backbone']['num_channels'][-3:])
                 input_proj_list = []
                 for _ in range(num_backbone_outs):
-                    in_channels = config['backbone']['num_channels'][_]
+                    in_channels = config['backbone']['num_channels'][-3:][_]
                     input_proj_list.append(nn.Sequential(
                         nn.Conv3d(in_channels, hidden_dim, kernel_size=1),
                         nn.GroupNorm(32, hidden_dim),
@@ -71,9 +68,9 @@ class TransoarNet(nn.Module):
         self._pos_enc = build_pos_enc(config['neck'])
 
     def _reset_parameter(self):
-        nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
-        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
-        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
+        # nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
+        # nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
+        # nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
 
         for proj in self._input_proj:
             nn.init.xavier_uniform_(proj[0].weight, gain=1)
@@ -110,31 +107,8 @@ class TransoarNet(nn.Module):
             out_backbone_skip_proj = self._skip_proj(out_backbone_proj).permute(0, 2, 1)
             out_neck = out_neck + out_backbone_skip_proj
 
-        if len(out_neck) > 2:   # In the case of relative offset prediction to references
-            hs, init_reference_out, inter_references_out = out_neck
-
-            outputs_classes = []
-            outputs_coords = []
-            for lvl in range(hs.shape[0]):
-                if lvl == 0:
-                    reference = init_reference_out
-                else:
-                    reference = inter_references_out[lvl - 1]
-                reference = inverse_sigmoid(reference)
-                outputs_class = self._cls_head(hs[lvl])
-                tmp = self._bbox_reg_head(hs[lvl])
-
-                assert reference.shape[-1] == 3
-                tmp[..., :3] += reference
-
-                outputs_coord = tmp.sigmoid()
-                outputs_classes.append(outputs_class)
-                outputs_coords.append(outputs_coord)
-            pred_logits = torch.stack(outputs_classes)
-            pred_boxes = torch.stack(outputs_coords)
-        else:
-            pred_logits = self._cls_head(out_neck)
-            pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
+        pred_logits = self._cls_head(out_neck)
+        pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer

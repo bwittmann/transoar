@@ -1,7 +1,6 @@
 """Deformable DETR Transformer class adapted from https://github.com/fundamentalvision/Deformable-DETR."""
 
 import copy
-import math
 
 import torch
 import torch.nn.functional as F
@@ -22,7 +21,6 @@ class DeformableTransformer(nn.Module):
         activation="relu",
         return_intermediate_dec=False,
         num_feature_levels=4,
-        dec_n_points=4,
         enc_n_points=4,
         use_cuda=True
     ):
@@ -37,15 +35,11 @@ class DeformableTransformer(nn.Module):
         )
         self.encoder = DeformableTransformerEncoder(encoder_layer, num_encoder_layers)
 
-        decoder_layer = DeformableTransformerDecoderLayer(
-            d_model, dim_feedforward, dropout, activation,
-            num_feature_levels, nhead, dec_n_points, use_cuda
-        )
+        decoder_layer = DeformableTransformerDecoderLayer(d_model, dim_feedforward, dropout, activation, nhead)
         self.decoder = DeformableTransformerDecoder(decoder_layer, num_decoder_layers, return_intermediate_dec)
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
 
-        self.reference_points = nn.Linear(d_model, 3)
         self._reset_parameters()
 
     def _reset_parameters(self):
@@ -56,8 +50,6 @@ class DeformableTransformer(nn.Module):
             if isinstance(m, MSDeformAttn):
                 m._reset_parameters()
 
-        nn.init.xavier_uniform_(self.reference_points.weight.data, gain=1.0)
-        nn.init.constant_(self.reference_points.bias.data, 0.)
         nn.init.normal_(self.level_embed)
 
     def get_valid_ratio(self, mask):
@@ -113,15 +105,11 @@ class DeformableTransformer(nn.Module):
         query_embed, tgt = torch.split(query_embed, c, dim=1)                   # Tgt in contrast to detr not zeros, but learnable
         query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)
         tgt = tgt.unsqueeze(0).expand(bs, -1, -1)
-        reference_points = self.reference_points(query_embed).sigmoid()
-        init_reference_out = reference_points
 
         # decoder
-        hs, inter_references_out = self.decoder(
-            tgt, reference_points, memory, spatial_shapes, level_start_index, valid_ratios, query_embed, mask_flatten
-        )
+        hs = self.decoder(tgt, memory, spatial_shapes, level_start_index, lvl_pos_embed_flatten, query_embed)
 
-        return hs, init_reference_out, inter_references_out
+        return hs
 
 
 class DeformableTransformerEncoderLayer(nn.Module):
@@ -217,15 +205,13 @@ class DeformableTransformerDecoderLayer(nn.Module):
         d_ffn=1024,
         dropout=0.1, 
         activation="relu",
-        n_levels=4,
-        n_heads=8,
-        n_points=4,
-        use_cuda=True
+        n_heads=8
     ):
         super().__init__()
 
         # cross attention
-        self.cross_attn = MSDeformAttn(d_model, n_levels, n_heads, n_points, use_cuda)
+        self.cross_attn = nn.MultiheadAttention(d_model, n_heads)
+        self.cache_attn_mask = None
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 
@@ -242,6 +228,65 @@ class DeformableTransformerDecoderLayer(nn.Module):
         self.dropout4 = nn.Dropout(dropout)
         self.norm3 = nn.LayerNorm(d_model)
 
+
+    def generate_attn_mask(self, feature_map_shapes, queries, lvl_start_idx, fov=3, center_dist=3):
+        if self.cache_attn_mask is not None:
+            return self.cache_attn_mask
+        
+        num_queries = queries.shape[-2]
+        num_patches = feature_map_shapes.prod(axis=1).sum()
+
+        # Determine distance to border
+        border_dist = (fov - 1) / 2
+
+        # Init full attn mask
+        attn_mask = torch.ones((num_queries, num_patches), device=queries.device, dtype=torch.bool)
+
+        # Get center points in each feature map
+        queries_per_lvl = []
+        center_coords = []
+        for D, H, W in feature_map_shapes:
+            coord_d, coord_h, coord_w = torch.meshgrid(
+                torch.arange(border_dist, D - border_dist, center_dist),
+                torch.arange(border_dist, H - border_dist, center_dist),
+                torch.arange(border_dist, W - border_dist, center_dist)
+            )
+
+            coords = torch.stack((coord_d, coord_h, coord_w), -1) 
+            queries_per_lvl.append(int(coords.numel()/3))
+            center_coords.append(coords.flatten(0, -2))
+
+        center_coords = torch.cat(center_coords, dim=0)
+        queries_lvl_thresh = torch.cumsum(torch.tensor(queries_per_lvl), dim=0)
+
+        # Get coords surrounding the center points pending on their fov
+        attn_coords = []
+        for center_coord in center_coords:
+            d_range = torch.arange(center_coord[0] - border_dist, center_coord[0] + border_dist + 1, dtype=torch.long)
+            h_range = torch.arange(center_coord[1] - border_dist, center_coord[1] + border_dist + 1, dtype=torch.long)
+            w_range = torch.arange(center_coord[2] - border_dist, center_coord[2] + border_dist + 1, dtype=torch.long)
+            attn_coords.append(torch.cartesian_prod(d_range, h_range, w_range))
+
+        # Set patches to attend to to False in attn_mask
+        for idx, query_attn_coords in enumerate(attn_coords):
+            lvl = (idx >= queries_lvl_thresh).nonzero().shape[0]
+
+            dummy_map = torch.zeros(feature_map_shapes[lvl].tolist())
+            dummy_map[tuple(query_attn_coords.T)] = 1
+
+            dummy_map_flattened = dummy_map.flatten().nonzero().to(device=queries.device)
+
+            if lvl > 0:
+                dummy_map_flattened += lvl_start_idx[lvl]
+
+            attn_mask[idx][dummy_map_flattened] = False
+
+        assert ((~attn_mask).sum(axis=-1) == fov**3).all()
+        assert ((~attn_mask).sum(axis=0) == 1).all()
+
+        self.cache_attn_mask = attn_mask
+        return attn_mask
+
     @staticmethod
     def with_pos_embed(tensor, pos):
         return tensor if pos is None else tensor + pos
@@ -252,7 +297,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
         tgt = self.norm3(tgt)
         return tgt
 
-    def forward(self, tgt, query_pos, reference_points, src, src_spatial_shapes, level_start_index, src_padding_mask=None):
+    def forward(self, tgt, query_pos, lvl_pos, src, src_spatial_shapes, level_start_index):
         # self attention
         q = k = self.with_pos_embed(tgt, query_pos)
         tgt2 = self.self_attn(q.transpose(0, 1), k.transpose(0, 1), tgt.transpose(0, 1))[0].transpose(0, 1)
@@ -260,9 +305,11 @@ class DeformableTransformerDecoderLayer(nn.Module):
         tgt = self.norm2(tgt)
 
         # cross attention
-        tgt2 = self.cross_attn(self.with_pos_embed(tgt, query_pos),
-                               reference_points,    # TODO: why no pos encoding
-                               src, src_spatial_shapes, level_start_index, src_padding_mask)
+        attn_mask = self.generate_attn_mask(src_spatial_shapes, query_pos, level_start_index)
+        q = self.with_pos_embed(tgt, query_pos)
+        k = self.with_pos_embed(src, lvl_pos)
+        tgt2 = self.cross_attn(q.transpose(0, 1), k.transpose(0, 1), src.transpose(0, 1), attn_mask=attn_mask)[0].transpose(0, 1)
+
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
 
@@ -271,7 +318,6 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
         return tgt
 
-
 class DeformableTransformerDecoder(nn.Module):
     def __init__(self, decoder_layer, num_layers, return_intermediate=False):
         super().__init__()
@@ -279,28 +325,20 @@ class DeformableTransformerDecoder(nn.Module):
         self.num_layers = num_layers
         self.return_intermediate = return_intermediate
 
-    def forward(self, tgt, reference_points, src, src_spatial_shapes, src_level_start_index, src_valid_ratios,
-                query_pos=None, src_padding_mask=None):
+    def forward(self, tgt, src, src_spatial_shapes, src_level_start_index, lvl_pos, query_pos=None):
         output = tgt
 
         intermediate = []
-        intermediate_reference_points = []
         for layer in self.layers:
-            if reference_points.shape[-1] == 3:
-                reference_points_input = reference_points[:, :, None] * src_valid_ratios[:, None]   # Only have refererence points in valid areas
-            else:
-                raise ValueError("Currently iterative bbox refinement is not implemented.")
-
-            output = layer(output, query_pos, reference_points_input, src, src_spatial_shapes, src_level_start_index, src_padding_mask)
+            output = layer(output, query_pos, lvl_pos, src, src_spatial_shapes, src_level_start_index)
 
             if self.return_intermediate:
                 intermediate.append(output)
-                intermediate_reference_points.append(reference_points)
 
         if self.return_intermediate:
-            return torch.stack(intermediate), torch.stack(intermediate_reference_points)
+            return torch.stack(intermediate)
 
-        return output, reference_points
+        return output
 
 
 def _get_clones(module, N):

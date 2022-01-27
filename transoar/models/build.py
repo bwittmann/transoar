@@ -47,6 +47,7 @@ def build_backbone(config):
             out_channels=config['num_channels'],
             kernel_sizes=config['kernel_size'],
             strides=config['strides'],
+            padding=config['padding'],
             return_intermediate_outputs=config['return_intermediate_outputs'],
             learnable=config['learnable']
         )
@@ -76,7 +77,6 @@ def build_neck(config):
             activation="relu",
             return_intermediate_dec=True,
             num_feature_levels=config['num_feature_levels'],
-            dec_n_points=config['dec_n_points'],
             enc_n_points=config['enc_n_points'],
             use_cuda=config['use_cuda']
         )  

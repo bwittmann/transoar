@@ -65,10 +65,10 @@ def get_transforms(split, config):
             ),
 
             # Spatial transformations
-            Resized(        # Resize
-                keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
-                mode=['area', 'nearest']
-            ),
+            # Resized(        # Resize
+            #     keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
+            #     mode=['area', 'nearest']
+            # ),
             RandRotated(    # Rotation    
                 keys=['image', 'label'], prob=config['augmentation']['p_rotate'],
                 range_x=rotate_range, range_y=rotate_range, range_z=rotate_range,
@@ -144,10 +144,10 @@ def get_transforms(split, config):
                 keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
                 a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
-            Resized(
-                keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
-                mode=['area', 'nearest']
-            ),
+            # Resized(
+            #     keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
+            #     mode=['area', 'nearest']
+            # ),
             RandSpatialCropd(
                 keys=['image', 'label'], roi_size=patch_size,
                 random_size=False, random_center=True
