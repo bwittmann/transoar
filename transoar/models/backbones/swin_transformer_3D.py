@@ -272,8 +272,8 @@ class PatchMerging(nn.Module):
     def __init__(self, dim, norm_layer=nn.LayerNorm):
         super().__init__()
         self.dim = dim
-        self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
-        self.norm = norm_layer(4 * dim)
+        self.reduction = nn.Linear(8 * dim, 2 * dim, bias=False)
+        self.norm = norm_layer(8 * dim)
 
     def forward(self, x):
         """ Forward function.
@@ -287,11 +287,16 @@ class PatchMerging(nn.Module):
         if pad_input:
             x = F.pad(x, (0, 0, 0, W % 2, 0, H % 2))
 
-        x0 = x[:, :, 0::2, 0::2, :]  # B D H/2 W/2 C
-        x1 = x[:, :, 1::2, 0::2, :]  # B D H/2 W/2 C
-        x2 = x[:, :, 0::2, 1::2, :]  # B D H/2 W/2 C
-        x3 = x[:, :, 1::2, 1::2, :]  # B D H/2 W/2 C
-        x = torch.cat([x0, x1, x2, x3], -1)  # B D H/2 W/2 4*C
+        x0 = x[:, 0::2, 0::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x1 = x[:, 0::2, 1::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x2 = x[:, 0::2, 0::2, 1::2, :]  # B D/2 H/2 W/2 C
+        x3 = x[:, 0::2, 1::2, 1::2, :]  # B D/2 H/2 W/2 C
+
+        x4 = x[:, 1::2, 0::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x5 = x[:, 1::2, 1::2, 0::2, :]  # B D/2 H/2 W/2 C
+        x6 = x[:, 1::2, 0::2, 1::2, :]  # B D/2 H/2 W/2 C
+        x7 = x[:, 1::2, 1::2, 1::2, :]  # B D/2 H/2 W/2 C
+        x = torch.cat([x0, x1, x2, x3, x4, x5, x6, x7], -1)  # B D H/2 W/2 8*C
 
         x = self.norm(x)
         x = self.reduction(x)
@@ -390,12 +395,16 @@ class BasicLayer(nn.Module):
         attn_mask = compute_mask(Dp, Hp, Wp, window_size, shift_size, x.device)
         for blk in self.blocks:
             x = blk(x, attn_mask)
-        x = x.view(B, D, H, W, -1)
+        x_out = x.view(B, D, H, W, -1)
 
         if self.downsample is not None:
-            x = self.downsample(x)
+            x = self.downsample(x_out)
+        else:
+            x = x_out
+
         x = rearrange(x, 'b d h w c -> b c d h w')
-        return x
+        x_out = rearrange(x_out, 'b d h w c -> b c d h w')
+        return x_out, x
 
 
 class PatchEmbed3D(nn.Module):
@@ -563,17 +572,24 @@ class SwinTransformer3D(nn.Module):
     def forward(self, x):
         """Forward function."""
         x = self.patch_embed(x)
-
         x = self.pos_drop(x)
 
-        for layer in self.layers:
-            x = layer(x.contiguous())
+        out = []
+        for idx, layer in enumerate(self.layers):
+            x_out, x = layer(x.contiguous())
+            if idx != 0:
+                pad_d = (3 - x_out.shape[-3] % 3)
+                pad_h = (3 - x_out.shape[-2] % 3)
+                pad_w = (3 - x_out.shape[-1] % 3)
+                x_out = F.pad(x_out, (0, pad_d, 0, pad_h, 0, pad_w))
+
+                out.append([x_out, torch.zeros_like(x_out, dtype=torch.bool)[:, 0]])    # add mask as well
 
         x = rearrange(x, 'n c d h w -> n d h w c')
         x = self.norm(x)
         x = rearrange(x, 'n d h w c -> n c d h w')
 
-        return x
+        return out
 
     def train(self, mode=True):
         """Convert the model into training mode while keep layers freezed."""
