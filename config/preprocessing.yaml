@@ -2,7 +2,7 @@
 
 # General
 dataset_config: visceral
-dataset_name: transoar_test_1mm
+dataset_name: transoar_testing_focused_attn_160_160_256
 modality: CT
 seed: 10
 path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
@@ -11,7 +11,7 @@ path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
 # Preprocessing
 fixed_size: True
 foreground_normalization: True
-target_spacing: [1, 1, 1] #[False, [x, x, x]]; if False: use estimated target spacing
+resize_shape: [160, 160, 256]
 cropping: True
 key: image # [image, label]
 margin: 2

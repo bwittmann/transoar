@@ -29,7 +29,7 @@ class TransoarNet(nn.Module):
         self._backbone = build_backbone(config['backbone'])
 
         # Get neck
-        self._neck = build_neck(config['neck'])
+        self._neck = build_neck(config['neck'], config['bbox_properties'])
 
         # Get heads
         self._cls_head = nn.Linear(hidden_dim, num_classes + 1)

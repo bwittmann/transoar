@@ -17,12 +17,12 @@ from transoar.models.build import build_criterion
 
 
 def match(n, keywords):
-        out = False
-        for b in keywords:
-            if b in n:
-                out = True
-                break
-        return out
+    out = False
+    for b in keywords:
+        if b in n:
+            out = True
+            break
+    return out
 
 def train(config, args):
     os.environ["CUDA_VISIBLE_DEVICES"] = config['device'][-1]

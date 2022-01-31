@@ -1,8 +1,8 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test_convnet_def_detr_lvl_global_attn #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
-device: cuda:4
+experiment_name: test #_focused_attn #test_convnet_def_detr_lvl_global_attn #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
+device: cuda:3
 val_interval: 1
 debug_mode: True  # doesn't save checkpoints
 seed: 10
@@ -18,7 +18,7 @@ clip_max_norm: 0.1
 lr_drop: 400  # prev: 40
 
 # Data
-dataset: transoar_test_160160256_CT
+dataset: transoar_testing_focused_attn_160_160_256_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
@@ -54,13 +54,16 @@ neck:
   pos_encoding: sine
   num_feature_levels: 3
   hidden_dim: 192 #832 # prev: 256
-  dropout: 0.0  # prev: 0.1
+  dropout: 0.1  # prev: 0.1
   nheads: 6 #26 #6  #prev: 8
   dim_feedforward: 256 # prev: 1024
   enc_layers: 2 #6
   dec_layers: 2 #6
   enc_n_points: 4 #4
-  num_queries: 647 # [647 -> 3x3 cube]
+  num_queries: 1200 #[20 * 20 * 3] #647 # [647 -> 3x3 cube]
+  queries_per_organ: 20
+  input_shapes: [[21, 21, 33], [12, 12, 18], [6, 6, 9]]
+  num_organs: 20
   aux_loss: True
   use_cuda: True
   dec_global_attn: True

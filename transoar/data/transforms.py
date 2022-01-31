@@ -28,19 +28,19 @@ def crop_air(x):
     return x > -500
 
 def transform_preprocessing(
-    margin, crop_key, orientation, target_spacing
+    margin, crop_key, orientation, resize_shape
 ):
     transform_list = [
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
-        Spacingd(
-            keys=["image", "label"], pixdim=target_spacing,
-            mode=("bilinear", "nearest")
-        ),
         Orientationd(keys=["image", "label"], axcodes=orientation),
         CropForegroundd(
             keys=["image", "label"], source_key=crop_key, 
             margin=margin, select_fn=crop_air
+        ),
+        Resized(
+            keys=['image', 'label'], spatial_size=resize_shape,
+            mode=['area', 'nearest']
         )
     ]
 

@@ -78,7 +78,7 @@ def build_backbone(config):
 
     return model
 
-def build_neck(config):
+def build_neck(config, bbox_props):
     if config['name'] == 'detr':
         model = DetrTransformer(
             d_model=config['hidden_dim'],
@@ -103,7 +103,8 @@ def build_neck(config):
             num_feature_levels=config['num_feature_levels'],
             enc_n_points=config['enc_n_points'],
             use_cuda=config['use_cuda'],
-            dec_global_attn=config['dec_global_attn']
+            config=config,
+            bbox_props=bbox_props
         )  
 
     return model

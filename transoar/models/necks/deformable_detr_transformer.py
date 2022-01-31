@@ -1,6 +1,7 @@
 """Deformable DETR Transformer class adapted from https://github.com/fundamentalvision/Deformable-DETR."""
 
 import copy
+from collections import defaultdict
 
 import torch
 import torch.nn.functional as F
@@ -23,9 +24,12 @@ class DeformableTransformer(nn.Module):
         num_feature_levels=4,
         enc_n_points=4,
         use_cuda=True,
-        dec_global_attn=False
+        bbox_props=None,
+        config=None
     ):
         super().__init__()
+        self.bbox_props = bbox_props
+        self.config = config
 
         self.d_model = d_model
         self.nhead = nhead
@@ -36,12 +40,57 @@ class DeformableTransformer(nn.Module):
         )
         self.encoder = DeformableTransformerEncoder(encoder_layer, num_encoder_layers)
 
-        decoder_layer = DeformableTransformerDecoderLayer(d_model, dim_feedforward, dropout, activation, nhead, dec_global_attn)
+        attn_mask = self.generate_attn_mask()
+        decoder_layer = DeformableTransformerDecoderLayer(d_model, dim_feedforward, dropout, activation, nhead, attn_mask)
         self.decoder = DeformableTransformerDecoder(decoder_layer, num_decoder_layers, return_intermediate_dec)
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
 
         self._reset_parameters()
+
+    def generate_attn_mask(self, padding=0):
+        assert self.config['num_queries'] == self.config['queries_per_organ'] * self.config['num_feature_levels'] * self.config['num_organs']
+
+        # Init full attn mask
+        num_patches_per_lvl = torch.tensor(self.config['input_shapes']).prod(axis=1)
+        attn_mask = torch.ones((self.config['num_queries'], num_patches_per_lvl.sum()), dtype=torch.bool)
+
+        # Get per class volume to attend to at different feature map lvls
+        attn_volumes = defaultdict(list)
+        for class_, props in self.bbox_props.items():
+            attn_volume_normalized = torch.tensor(props['attn_area'])   # x1, y1, z1, x2, y2, z2
+
+            for fmap_shape in self.config['input_shapes']:
+                attn_volume = torch.tensor(
+                    [
+                        torch.floor(attn_volume_normalized[0] * fmap_shape[0]) - padding,   # x1
+                        torch.floor(attn_volume_normalized[1] * fmap_shape[1]) - padding,   # y1
+                        torch.floor(attn_volume_normalized[2] * fmap_shape[2]) - padding,   # z1
+                        torch.ceil(attn_volume_normalized[3] * fmap_shape[0]) + padding,    # x2
+                        torch.ceil(attn_volume_normalized[4] * fmap_shape[1]) + padding,    # y2
+                        torch.ceil(attn_volume_normalized[5] * fmap_shape[2]) + padding     # z2
+                    ]
+                )
+                attn_volumes[int(class_)].append(attn_volume.to(dtype=torch.int))
+
+        # Set attn mask to mask out region which is not in desired attn volume
+        query_classes = torch.repeat_interleave(torch.arange(1, self.config['num_organs'] + 1), self.config['queries_per_organ'] * self.config['num_feature_levels'])
+        query_fmap_lvls = torch.repeat_interleave(torch.arange(self.config['num_feature_levels']), self.config['queries_per_organ']).repeat(self.config['num_organs']) 
+        for query_attn_volume, query_class, query_fmap_lvl in zip(attn_mask, query_classes, query_fmap_lvls):
+            # Retrieve class attn volume of current query
+            dummy_fmap = torch.zeros(self.config['input_shapes'][query_fmap_lvl.item()])
+            class_attn_volume = attn_volumes[query_class.item()][query_fmap_lvl.item()]
+
+            # Restrict attn to region of interest
+            dummy_fmap[class_attn_volume[0]:class_attn_volume[3], class_attn_volume[1]:class_attn_volume[4], class_attn_volume[2]:class_attn_volume[5]] = 1
+            dummy_fmap_flattened = dummy_fmap.flatten().nonzero()
+
+            if query_fmap_lvl.item() > 0:
+                dummy_fmap_flattened += num_patches_per_lvl[query_fmap_lvl.item() - 1]
+
+            query_attn_volume[dummy_fmap_flattened] = False
+
+        return attn_mask
 
     def _reset_parameters(self):
         for p in self.parameters():
@@ -207,18 +256,15 @@ class DeformableTransformerDecoderLayer(nn.Module):
         dropout=0.1, 
         activation="relu",
         n_heads=8,
-        global_attn=False
+        attn_mask=None
     ):
         super().__init__()
+        self.attn_mask = attn_mask
 
         # cross attention
-        self.cross_attn = nn.MultiheadAttention(d_model, n_heads)
+        self.cross_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
-
-        # attn mask
-        self.cache_attn_mask = None
-        self.global_attn = global_attn
 
         # self attention
         self.self_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
@@ -232,73 +278,6 @@ class DeformableTransformerDecoderLayer(nn.Module):
         self.linear2 = nn.Linear(d_ffn, d_model)
         self.dropout4 = nn.Dropout(dropout)
         self.norm3 = nn.LayerNorm(d_model)
-
-
-    def generate_attn_mask(self, feature_map_shapes, queries, lvl_start_idx, fov=5, center_dist=3):
-        if self.cache_attn_mask is not None:
-            return self.cache_attn_mask
-        
-        num_queries = queries.shape[-2]
-        num_patches = feature_map_shapes.prod(axis=1).sum()
-
-        # Determine distance to border
-        border_dist = (center_dist - 1) / 2
-
-        # Init full attn mask
-        attn_mask = torch.ones((num_queries, num_patches), device=queries.device, dtype=torch.bool)
-
-        # Get center points in each feature map
-        queries_per_lvl = []
-        center_coords = []
-        for D, H, W in feature_map_shapes:
-            coord_d, coord_h, coord_w = torch.meshgrid(
-                torch.arange(border_dist, D - border_dist, center_dist),
-                torch.arange(border_dist, H - border_dist, center_dist),
-                torch.arange(border_dist, W - border_dist, center_dist)
-            )
-
-            coords = torch.stack((coord_d, coord_h, coord_w), -1) 
-            queries_per_lvl.append(int(coords.numel()/3))
-            center_coords.append(coords.flatten(0, -2))
-
-        center_coords = torch.cat(center_coords, dim=0)
-        queries_lvl_thresh = torch.cumsum(torch.tensor(queries_per_lvl), dim=0)
-
-        # Get coords surrounding the center points pending on their fov
-        attn_coords = []
-        for idx, center_coord in enumerate(center_coords):
-            lvl = (idx >= queries_lvl_thresh).nonzero().shape[0]
-            fmap_shape = feature_map_shapes[lvl]
-
-            d_range = torch.clip(torch.arange(center_coord[0] - fov, center_coord[0] + fov + 1, dtype=torch.long), min=0, max=fmap_shape[0] - 1)
-            h_range = torch.clip(torch.arange(center_coord[1] - fov, center_coord[1] + fov + 1, dtype=torch.long), min=0, max=fmap_shape[1] - 1)
-            w_range = torch.clip(torch.arange(center_coord[2] - fov, center_coord[2] + fov + 1, dtype=torch.long), min=0, max=fmap_shape[2] - 1)
-            attn_coords.append(torch.cartesian_prod(d_range, h_range, w_range))
-
-        # Set patches to attend to to False in attn_mask
-        for idx, query_attn_coords in enumerate(attn_coords):
-            lvl = (idx >= queries_lvl_thresh).nonzero().shape[0]
-
-            dummy_map = torch.zeros(feature_map_shapes[lvl].tolist())
-
-            if self.global_attn:
-                dummy_map[...] = 1
-            else:
-                dummy_map[tuple(query_attn_coords.T)] = 1
-
-            dummy_map_flattened = dummy_map.flatten().nonzero().to(device=queries.device)
-
-            if lvl > 0:
-                dummy_map_flattened += lvl_start_idx[lvl]
-
-            attn_mask[idx][dummy_map_flattened] = False
-
-        # if not self.global_attn:
-        #     assert ((~attn_mask).sum(axis=-1) == fov**3).all()
-        #     assert ((~attn_mask).sum(axis=0) == 1).all()
-
-        self.cache_attn_mask = attn_mask
-        return attn_mask
 
     @staticmethod
     def with_pos_embed(tensor, pos):
@@ -318,10 +297,9 @@ class DeformableTransformerDecoderLayer(nn.Module):
         tgt = self.norm2(tgt)
 
         # cross attention
-        attn_mask = self.generate_attn_mask(src_spatial_shapes, query_pos, level_start_index)
         q = self.with_pos_embed(tgt, query_pos)
         k = self.with_pos_embed(src, lvl_pos)
-        tgt2 = self.cross_attn(q.transpose(0, 1), k.transpose(0, 1), src.transpose(0, 1), attn_mask=attn_mask)[0].transpose(0, 1)
+        tgt2 = self.cross_attn(q.transpose(0, 1), k.transpose(0, 1), src.transpose(0, 1), attn_mask=self.attn_mask.to(device=tgt.device))[0].transpose(0, 1)
 
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
