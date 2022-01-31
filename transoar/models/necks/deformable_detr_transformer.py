@@ -234,7 +234,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
         self.norm3 = nn.LayerNorm(d_model)
 
 
-    def generate_attn_mask(self, feature_map_shapes, queries, lvl_start_idx, fov=3, center_dist=3):
+    def generate_attn_mask(self, feature_map_shapes, queries, lvl_start_idx, fov=5, center_dist=3):
         if self.cache_attn_mask is not None:
             return self.cache_attn_mask
         
@@ -242,7 +242,7 @@ class DeformableTransformerDecoderLayer(nn.Module):
         num_patches = feature_map_shapes.prod(axis=1).sum()
 
         # Determine distance to border
-        border_dist = (fov - 1) / 2
+        border_dist = (center_dist - 1) / 2
 
         # Init full attn mask
         attn_mask = torch.ones((num_queries, num_patches), device=queries.device, dtype=torch.bool)
@@ -266,10 +266,13 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
         # Get coords surrounding the center points pending on their fov
         attn_coords = []
-        for center_coord in center_coords:
-            d_range = torch.arange(center_coord[0] - border_dist, center_coord[0] + border_dist + 1, dtype=torch.long)
-            h_range = torch.arange(center_coord[1] - border_dist, center_coord[1] + border_dist + 1, dtype=torch.long)
-            w_range = torch.arange(center_coord[2] - border_dist, center_coord[2] + border_dist + 1, dtype=torch.long)
+        for idx, center_coord in enumerate(center_coords):
+            lvl = (idx >= queries_lvl_thresh).nonzero().shape[0]
+            fmap_shape = feature_map_shapes[lvl]
+
+            d_range = torch.clip(torch.arange(center_coord[0] - fov, center_coord[0] + fov + 1, dtype=torch.long), min=0, max=fmap_shape[0] - 1)
+            h_range = torch.clip(torch.arange(center_coord[1] - fov, center_coord[1] + fov + 1, dtype=torch.long), min=0, max=fmap_shape[1] - 1)
+            w_range = torch.clip(torch.arange(center_coord[2] - fov, center_coord[2] + fov + 1, dtype=torch.long), min=0, max=fmap_shape[2] - 1)
             attn_coords.append(torch.cartesian_prod(d_range, h_range, w_range))
 
         # Set patches to attend to to False in attn_mask
@@ -290,9 +293,9 @@ class DeformableTransformerDecoderLayer(nn.Module):
 
             attn_mask[idx][dummy_map_flattened] = False
 
-        if not self.global_attn:
-            assert ((~attn_mask).sum(axis=-1) == fov**3).all()
-            assert ((~attn_mask).sum(axis=0) == 1).all()
+        # if not self.global_attn:
+        #     assert ((~attn_mask).sum(axis=-1) == fov**3).all()
+        #     assert ((~attn_mask).sum(axis=0) == 1).all()
 
         self.cache_attn_mask = attn_mask
         return attn_mask
