@@ -65,7 +65,7 @@ class HungarianMatcher(nn.Module):
 
         # Compute the giou cost betwen boxes
         cost_giou = -generalized_bbox_iou_3d(
-            box_cxcyczwhd_to_xyzxyz(out_bbox),
+            box_cxcyczwhd_to_xyzxyz(out_bbox.clip(min=0)),
             box_cxcyczwhd_to_xyzxyz(tgt_bbox)
         )
 

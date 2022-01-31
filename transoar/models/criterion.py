@@ -63,7 +63,7 @@ class TransoarCriterion(nn.Module):
         loss_bbox = loss_bbox.sum() / num_boxes
 
         loss_giou = 1 - torch.diag(generalized_bbox_iou_3d(
-            box_cxcyczwhd_to_xyzxyz(src_boxes),
+            box_cxcyczwhd_to_xyzxyz(src_boxes.clip(min=0)),
             box_cxcyczwhd_to_xyzxyz(target_boxes))
         )
         loss_giou = loss_giou.sum() / num_boxes

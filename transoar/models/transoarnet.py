@@ -1,5 +1,6 @@
 """Main model of the transoar project."""
 
+from collections import defaultdict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,6 +25,9 @@ class TransoarNet(nn.Module):
                 config['backbone']['num_feature_patches'], 
                 config['neck']['num_queries']
             )
+
+        # Get anchors        
+        self._anchors = self._generate_anchors(config['neck'], config['bbox_properties']).to(device='cuda')
 
         # Get backbone
         self._backbone = build_backbone(config['backbone'])
@@ -68,8 +72,8 @@ class TransoarNet(nn.Module):
         self._pos_enc = build_pos_enc(config['neck'])
 
     def _reset_parameter(self):
-        # nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
-        # nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
+        nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
+        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
         # nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
 
         for proj in self._input_proj:
@@ -108,11 +112,11 @@ class TransoarNet(nn.Module):
             out_neck = out_neck + out_backbone_skip_proj
 
         pred_logits = self._cls_head(out_neck)
-        pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
+        pred_boxes = self._bbox_reg_head(out_neck).tanh()
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
-            'pred_boxes': pred_boxes[-1]
+            'pred_boxes': pred_boxes[-1] + self._anchors
         }
 
         if self._aux_loss:
@@ -123,8 +127,23 @@ class TransoarNet(nn.Module):
     @torch.jit.unused
     def _set_aux_loss(self, pred_logits, pred_boxes):
         # Hack to support dictionary with non-homogeneous values
-        return [{'pred_logits': a, 'pred_boxes': b}
+        return [{'pred_logits': a, 'pred_boxes': b + self._anchors}
                 for a, b in zip(pred_logits[:-1], pred_boxes[:-1])]
+
+    def _generate_anchors(self, model_config, bbox_props):
+        median_bboxes = defaultdict(list)
+        for class_, class_bbox_props in bbox_props.items():
+            median_bboxes[int(class_)] = class_bbox_props['median']
+
+        anchors = torch.zeros((model_config['num_queries'], 6))
+        query_classes = torch.repeat_interleave(
+            torch.arange(1, model_config['num_organs'] + 1), model_config['queries_per_organ'] * model_config['num_feature_levels']
+        )
+
+        for idx, query_class in enumerate(query_classes):
+            anchors[idx] = torch.tensor(median_bboxes[query_class.item()])
+
+        return anchors
 
 
 class MLP(nn.Module):
