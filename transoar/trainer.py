@@ -50,7 +50,7 @@ class Trainer:
             for item in bboxes:
                 target = {
                     'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': item[1].to(device=self._device)
+                    'labels': item[1].to(device=self._device) - 1
                 }
                 targets.append(target)
 
@@ -108,7 +108,7 @@ class Trainer:
             for item in bboxes:
                 target = {
                     'boxes': item[0].to(dtype=torch.float, device=self._device),
-                    'labels': item[1].to(device=self._device)
+                    'labels': item[1].to(device=self._device) - 1
                 }
                 targets.append(target)
 

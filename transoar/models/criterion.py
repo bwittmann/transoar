@@ -40,11 +40,16 @@ class TransoarCriterion(nn.Module):
         idx = self._get_src_permutation_idx(indices)
 
         target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
-        target_classes = torch.full(src_logits.shape[:2], 0,
-                                    dtype=torch.int64, device=src_logits.device)
-        target_classes[idx] = target_classes_o
+        src_logits_matched = src_logits[idx]
 
-        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.cls_weights.to(device=src_logits.device))
+        # target_classes = torch.full(src_logits.shape[:2], 0,
+        #                             dtype=torch.int64, device=src_logits.device)
+        # target_classes[idx] = target_classes_o
+
+        # query_classes = torch.repeat_interleave(torch.arange(0,  20), 60).unsqueeze(0).repeat(2, 1)
+
+        # loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.cls_weights.to(device=src_logits.device))
+        loss_ce = F.cross_entropy(src_logits_matched, target_classes_o)
 
         return loss_ce
 

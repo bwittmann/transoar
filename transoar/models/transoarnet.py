@@ -36,7 +36,7 @@ class TransoarNet(nn.Module):
         self._neck = build_neck(config['neck'], config['bbox_properties'])
 
         # Get heads
-        self._cls_head = nn.Linear(hidden_dim, num_classes + 1)
+        self._cls_head = nn.Linear(hidden_dim, num_classes)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         # Get projections and embeddings
@@ -112,7 +112,7 @@ class TransoarNet(nn.Module):
             out_neck = out_neck + out_backbone_skip_proj
 
         pred_logits = self._cls_head(out_neck)
-        pred_boxes = self._bbox_reg_head(out_neck).tanh()
+        pred_boxes = self._bbox_reg_head(out_neck).tanh() * 0.2
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
@@ -140,8 +140,16 @@ class TransoarNet(nn.Module):
             torch.arange(1, model_config['num_organs'] + 1), model_config['queries_per_organ'] * model_config['num_feature_levels']
         )
 
-        for idx, query_class in enumerate(query_classes):
-            anchors[idx] = torch.tensor(median_bboxes[query_class.item()])
+        anchor_offset = model_config['anchor_offsets']
+        possible_offsets = torch.tensor([0, anchor_offset, -anchor_offset])
+        offsets =  torch.cartesian_prod(
+            possible_offsets, possible_offsets, possible_offsets
+        ).repeat(model_config['num_organs'] * model_config['num_feature_levels'], 1)
+
+        for idx, (query_class, offset) in enumerate(zip(query_classes, offsets)):
+            query_median_box = torch.tensor(median_bboxes[query_class.item()])
+            query_median_box[:3] += offset 
+            anchors[idx] = query_median_box
 
         return anchors
 

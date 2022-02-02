@@ -14,10 +14,10 @@ def inference(out):
     pred_scores = [torch.max(probs, dim=-1)[0].detach().cpu().numpy() for probs in pred_probs]
 
     # Get rid of empty detections
-    valid_ids = [np.nonzero(batch_elem_classes) for batch_elem_classes in pred_classes]
-    pred_classes = [pred[ids] for pred, ids in zip(pred_classes, valid_ids)]
-    pred_boxes = [pred[ids] for pred, ids in zip(pred_boxes, valid_ids)]
-    pred_scores = [pred[ids] for pred, ids in zip(pred_scores, valid_ids)]
+    # valid_ids = [np.nonzero(batch_elem_classes) for batch_elem_classes in pred_classes]
+    # pred_classes = [pred[ids] for pred, ids in zip(pred_classes, valid_ids)]
+    # pred_boxes = [pred[ids] for pred, ids in zip(pred_boxes, valid_ids)]
+    # pred_scores = [pred[ids] for pred, ids in zip(pred_scores, valid_ids)]
 
     # Get detection with highest score for each class as final prediction
     for idx, (batch_classes, batch_scores) in enumerate(zip(pred_classes, pred_scores)):

@@ -1,10 +1,10 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test #_focused_attn #test_convnet_def_detr_lvl_global_attn #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
-device: cuda:3
+experiment_name: test #test_focused_attn_median_offset_factor02_no_cls0_no_enc_27_per_org #test_convnet_def_detr_lvl_global_attn #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
+device: cuda:5
 val_interval: 1
-debug_mode: True  # doesn't save checkpoints
+debug_mode: False  # doesn't save checkpoints
 seed: 10
 
 epochs: 500 # prev: 50
@@ -60,8 +60,9 @@ neck:
   enc_layers: 2 #6
   dec_layers: 2 #6
   enc_n_points: 4 #4
-  num_queries: 1200 #[20 * 20 * 3] #647 # [647 -> 3x3 cube]
-  queries_per_organ: 20
+  num_queries: 1620 #1620 #1200 #[20 * 20 * 3] #647 # [647 -> 3x3 cube]
+  queries_per_organ: 27 #20
+  anchor_offsets: 0.0 
   input_shapes: [[21, 21, 33], [12, 12, 18], [6, 6, 9]]
   num_organs: 20
   aux_loss: True

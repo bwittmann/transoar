@@ -45,6 +45,7 @@ class DeformableTransformer(nn.Module):
         self.decoder = DeformableTransformerDecoder(decoder_layer, num_decoder_layers, return_intermediate_dec)
 
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
+        self.dropout = nn.Dropout2d(0.5)
 
         self._reset_parameters()
 
@@ -148,7 +149,8 @@ class DeformableTransformer(nn.Module):
         # encoder
         memory = self.encoder(
             src_flatten, spatial_shapes, level_start_index, valid_ratios, lvl_pos_embed_flatten, mask_flatten
-        )    
+        )
+        # memory = src_flatten  
 
         # prepare input for decoder
         bs, _, c = memory.shape                                                 # [Batch, AllLvlPatches, HiddenDim]
@@ -159,6 +161,10 @@ class DeformableTransformer(nn.Module):
         # decoder
         hs = self.decoder(tgt, memory, spatial_shapes, level_start_index, lvl_pos_embed_flatten, query_embed)
 
+        # query drop
+        # hs = hs.permute((0, 2, 1, 3))
+        # hs = self.dropout(hs)
+        # hs = hs.permute((0, 2, 1, 3))
         return hs
 
 
