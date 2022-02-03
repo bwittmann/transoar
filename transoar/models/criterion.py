@@ -37,21 +37,28 @@ class TransoarCriterion(nn.Module):
         assert 'pred_logits' in outputs
         src_logits = outputs['pred_logits']
 
-        idx = self._get_src_permutation_idx(indices)
+        src_idx = self._get_src_permutation_idx(indices)
 
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
-        src_logits_matched = src_logits[idx]
+        target_classes_o = torch.cat([t["labels"] for t in targets])
+        src_logits_matched = src_logits[src_idx]
 
-        # target_classes = torch.full(src_logits.shape[:2], 0,
-        #                             dtype=torch.int64, device=src_logits.device)
-        # target_classes[idx] = target_classes_o
+        loss_ce = F.cross_entropy(src_logits_matched, target_classes_o) # TODO: operates on logits?
 
-        # query_classes = torch.repeat_interleave(torch.arange(0,  20), 60).unsqueeze(0).repeat(2, 1)
+        # Peak loss
+        loss_peak = torch.tensor(0.).to(device='cuda')
+        # for batch in range(src_logits.shape[0]):
+        #     batch_logits = src_logits[batch]
+        #     classes_logits = [logits.softmax(-1) for logits in torch.split(batch_logits, 27 * 3, dim=0)]    # TODO: dont hardcode.
+        #     matched_query_ids = indices[batch]
 
-        # loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.cls_weights.to(device=src_logits.device))
-        loss_ce = F.cross_entropy(src_logits_matched, target_classes_o)
+        #     for matched_query_id in matched_query_ids:
+        #         tgt_class, query_id = matched_query_id
+        #         class_logits = classes_logits[tgt_class]
 
-        return loss_ce
+        #         matched_query_id_offset = query_id - tgt_class * 27 * 3
+        #         loss_peak += F.cross_entropy(class_logits[:, tgt_class][None], torch.tensor([matched_query_id_offset]).to(device='cuda'))
+       
+        return loss_ce, loss_peak
 
     def loss_bboxes(self, outputs, targets, indices, num_boxes):
         """Compute the losses related to the bounding boxes, the L1 regression loss and the GIoU loss
@@ -59,12 +66,12 @@ class TransoarCriterion(nn.Module):
            The target boxes are expected in format (center_x, center_y, w, h), normalized by the image size.
         """
         assert 'pred_boxes' in outputs
-        idx = self._get_src_permutation_idx(indices)
-        src_boxes = outputs['pred_boxes'][idx]
-        target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        src_idx = self._get_src_permutation_idx(indices)
+
+        src_boxes = outputs['pred_boxes'][src_idx]
+        target_boxes = torch.cat([t['boxes'] for t in targets], dim=0)
 
         loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction='none')
-
         loss_bbox = loss_bbox.sum() / num_boxes
 
         loss_giou = 1 - torch.diag(generalized_bbox_iou_3d(
@@ -72,13 +79,18 @@ class TransoarCriterion(nn.Module):
             box_cxcyczwhd_to_xyzxyz(target_boxes))
         )
         loss_giou = loss_giou.sum() / num_boxes
+
         return loss_bbox, loss_giou
 
-    def _get_src_permutation_idx(self, indices):
-        # permute predictions following indices
-        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
-        src_idx = torch.cat([src for (src, _) in indices])
-        return batch_idx, src_idx
+    def _get_src_permutation_idx(self, matches):
+        batch_idx = []
+        src_idx = []
+        for idx, batch_matches in enumerate(matches):
+            for match in batch_matches:
+                batch_idx.append(idx)
+                src_idx.append(match[1])
+
+        return torch.tensor(batch_idx), torch.tensor(src_idx)
 
     def forward(self, outputs, targets):
         """ This performs the loss computation.
@@ -95,12 +107,13 @@ class TransoarCriterion(nn.Module):
 
         # Compute losses
         loss_bbox, loss_giou = self.loss_bboxes(outputs, targets, indices, num_boxes)
-        loss_cls = self.loss_class(outputs, targets, indices)
+        loss_cls, loss_peak = self.loss_class(outputs, targets, indices)
 
         loss_dict = {
             'bbox': loss_bbox,
             'giou': loss_giou,
-            'cls': loss_cls
+            'cls': loss_cls,
+            'peak': loss_peak
         }
 
         # Compute losses for the output of each intermediate layer
@@ -109,10 +122,11 @@ class TransoarCriterion(nn.Module):
                 indices = self.matcher(aux_outputs, targets)
 
                 loss_bbox, loss_giou = self.loss_bboxes(aux_outputs, targets, indices, num_boxes)
-                loss_cls = self.loss_class(aux_outputs, targets, indices)
+                loss_cls, loss_peak = self.loss_class(aux_outputs, targets, indices)
 
                 loss_dict[f'bbox_{i}'] = loss_bbox
                 loss_dict[f'giou_{i}'] = loss_giou
                 loss_dict[f'cls_{i}'] = loss_cls
+                loss_dict[f'peak_{i}'] = loss_peak
 
         return loss_dict

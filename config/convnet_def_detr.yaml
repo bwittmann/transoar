@@ -1,8 +1,8 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test #test_focused_attn_median_offset_factor02_no_cls0_no_enc_27_per_org #test_convnet_def_detr_lvl_global_attn #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
-device: cuda:5
+experiment_name: test #test_focused_attn_median_offset_factor02_no_cls0_no_enc_27_per_org_custom_matcher_anchor_offset01 #test_convnet_def_detr_lvl_global_attn #3mm_convnet_def_detr_no_flip_q300 #test_convnet_new_aug_no_flip_more_heads_64_64_156_enc1 #test_convnet_new_aug_bigger_bb
+device: cuda:3
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
 seed: 10
@@ -37,6 +37,7 @@ loss_coefs:
   cls: 2
   bbox: 5
   giou: 2
+  peak: 0
 
 # Model specific params
 backbone:

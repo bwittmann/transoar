@@ -42,6 +42,7 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
+        loss_peak_agg = 0
         for data, mask, bboxes, _ in tqdm(self._train_loader):
             # Put data to gpu
             data, mask = data.to(device=self._device), mask.to(device=self._device)
@@ -77,18 +78,21 @@ class Trainer:
             loss_bbox_agg += loss_dict['bbox'].item()
             loss_giou_agg += loss_dict['giou'].item()
             loss_cls_agg += loss_dict['cls'].item()
+            loss_peak_agg += loss_dict['peak'].item()
 
         loss = loss_agg / len(self._train_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
         loss_giou = loss_giou_agg / len(self._train_loader)
         loss_cls = loss_cls_agg / len(self._train_loader)
+        loss_peak = loss_peak_agg / len(self._train_loader)
 
         self._write_to_logger(
             num_epoch, 'train', 
             total_loss=loss,
             bbox_loss=loss_bbox,
             giou_loss=loss_giou,
-            cls_loss=loss_cls
+            cls_loss=loss_cls,
+            peak_loss=loss_peak
         )
 
     @torch.no_grad()
@@ -100,6 +104,7 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
+        loss_peak_agg = 0
         for data, mask, bboxes, _ in tqdm(self._val_loader):
             # Put data to gpu
             data, mask = data.to(device=self._device), mask.to(device=self._device)
@@ -135,11 +140,14 @@ class Trainer:
             loss_bbox_agg += loss_dict['bbox'].item()
             loss_giou_agg += loss_dict['giou'].item()
             loss_cls_agg += loss_dict['cls'].item()
+            loss_peak_agg += loss_dict['peak'].item()
 
         loss = loss_agg / len(self._val_loader)
         loss_bbox = loss_bbox_agg / len(self._val_loader)
         loss_giou = loss_giou_agg / len(self._val_loader)
         loss_cls = loss_cls_agg / len(self._val_loader)
+        loss_peak = loss_peak_agg / len(self._val_loader)
+
         metric_scores = self._evaluator.eval()
         self._evaluator.reset()
 
@@ -158,7 +166,8 @@ class Trainer:
             total_loss=loss,
             bbox_loss=loss_bbox,
             giou_loss=loss_giou,
-            cls_loss=loss_cls
+            cls_loss=loss_cls,
+            peak_loss=loss_peak
         )
 
         self._write_to_logger(

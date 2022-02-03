@@ -45,34 +45,40 @@ class HungarianMatcher(nn.Module):
             For each batch element, it holds:
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
         """
-        bs, num_queries = outputs["pred_logits"].shape[:2]
+        bs = outputs["pred_logits"].shape[0]
 
-        # We flatten to compute the cost matrices in a batch
-        out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  # [batch_size * num_queries, num_classes]
-        out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
+        # Split queries in individual classes   TODO: don't hardcode any information
+        classes_queries_boxes = [torch.split(batch_boxes, 27 * 3, dim=0) for batch_boxes in torch.unbind(outputs["pred_boxes"], dim=0)]
+        classes_queries_probs = [[logits.softmax(-1) for logits in torch.split(batch_logits, 27 * 3, dim=0)] for batch_logits in torch.unbind(outputs["pred_logits"], dim=0)]
+        assert len(classes_queries_probs[0]) == 20 and len(classes_queries_boxes[0]) == 20
 
-        # Also concat the target labels and boxes
-        tgt_ids = torch.cat([v["labels"] for v in targets])
-        tgt_bbox = torch.cat([v["boxes"] for v in targets])
+        # Get targets
+        tgt_ids = [v["labels"] for v in targets]
+        tgt_boxes = [v["boxes"] for v in targets]
 
-        # Compute the classification cost. Contrary to the loss, we don't use the NLL,
-        # but approximate it in 1 - proba[target class].
-        # The 1 is a constant that doesn't change the matching, it can be ommitted.
-        cost_class = -out_prob[:, tgt_ids]
+        matches = []
+        for batch in range(bs):
+            batch_matches = []
+            batch_tgt_ids = tgt_ids[batch]
+            batch_tgt_boxes = tgt_boxes[batch]
 
-        # Compute the L1 cost between boxes
-        cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
+            batch_queries_probs = classes_queries_probs[batch]
+            batch_queries_boxes = classes_queries_boxes[batch]
 
-        # Compute the giou cost between boxes
-        cost_giou = -generalized_bbox_iou_3d(
-            box_cxcyczwhd_to_xyzxyz(out_bbox.clip(min=0)),
-            box_cxcyczwhd_to_xyzxyz(tgt_bbox)
-        )
+            for tgt_id, tgt_box in zip(batch_tgt_ids, batch_tgt_boxes):
+                class_queries_boxes = batch_queries_boxes[tgt_id]
+                class_queries_probs = batch_queries_probs[tgt_id]
 
-        # Final cost matrix
-        C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
-        C = C.view(bs, num_queries, -1).cpu()
+                # Determine individual costs
+                cost_class = -class_queries_probs[:, tgt_id]
+                cost_bbox = torch.cdist(class_queries_boxes, tgt_box[None], p=1).squeeze()
+                cost_giou = -generalized_bbox_iou_3d(box_cxcyczwhd_to_xyzxyz(class_queries_boxes.clip(min=0)), box_cxcyczwhd_to_xyzxyz(tgt_box[None])).squeeze()
 
-        sizes = [len(v["boxes"]) for v in targets]
-        indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
-        return [(torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)) for i, j in indices]
+                # Determine final cost and best performing query
+                C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
+                best_query = C.argmin() # TODO: add hard negative?
+                batch_matches.append([tgt_id.item(), (best_query + tgt_id * 27 * 3).item()])
+
+            matches.append(batch_matches)
+
+        return matches
