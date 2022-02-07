@@ -28,7 +28,7 @@ class ClsHead(nn.Module):
         out_channels = config['anchors_per_position'] * config['classifier_classes']
 
         block_1 = [
-            nn.Conv3d(config['fpn_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv3d(config['hidden_dim'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
             nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
             nn.ReLU(inplace=True)
         ]
@@ -94,7 +94,7 @@ class RegHead(nn.Module):
         out_channels = config['anchors_per_position'] * 6
 
         block_1 = [
-            nn.Conv3d(config['fpn_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv3d(config['hidden_dim'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
             nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
             nn.ReLU(inplace=True)
         ]

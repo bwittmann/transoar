@@ -1,10 +1,10 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test_nms #test_orig_train_params_wh_160_flip_wd_switch
-device: cuda:4
+experiment_name: retina_unet_def_attn #test_orig_train_params_wh_160_flip_wd_switch
+device: cuda:1
 val_interval: 1
-debug_mode: True  # doesn't save checkpoints
+debug_mode: False  # doesn't save checkpoints
 seed: 10
 
 epochs: 1500 # prev: 50
@@ -18,7 +18,7 @@ clip_max_norm: 0.1
 lr_drop: 400  # prev: 40
 
 # Data
-dataset: transoar_test_1mm_CT
+dataset: transoar_test_160160256_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
@@ -46,13 +46,27 @@ model:
   in_channels: 1
   start_channels: 32
   max_channels: 320
-  
+
+  # Def attn encoder
+  use_def_attn: True
+  pos_encoding: sine
+  hidden_dim: 192
+  nheads: 6
+  enc_layers: 2
+  dec_layers: 2
+  dim_feedforward: 1024
+  dropout: 0.1
+  num_feature_levels: 5
+  dec_n_points: 4
+  enc_n_points: 4
+  use_cuda: False
+
   # Decoder
   decoder_levels: [2, 3, 4, 5, 6]
   fpn_channels: 128
 
   # Heads
-  head_channels: 128
+  head_channels: 192
   classifier_classes: 20
   loss_weight: 1.0  # for bce and giou
   prior_prob: 0.01 # for weight init of cls head
@@ -85,21 +99,10 @@ model:
   height: [[8.0, 11.0, 16.0], [16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [64.0, 88.0, 128.0]]
   width: [[6.0, 8.0, 11.0], [12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0]]
 
-  # 48bg giga 160 160 256
-  # width: [[6.0, 9.0, 22.0], [12.0, 18.0, 44.0], [24.0, 36.0, 88.0], [48.0, 72.0, 176.0], [96.0, 144.0, 352.0]]
-  # height: [[6.0, 9.0, 14.0], [12.0, 18.0, 28.0], [24.0, 36.0, 56.0], [48.0, 72.0, 112.0], [48.0, 72.0, 112.0]]  # TODO last scale not done
-  # depth: [[5.0, 7.0, 11.0], [10.0, 14.0, 22.0], [20.0, 28.0, 44.0], [40.0, 56.0, 88.0], [40.0, 56.0, 88.0]]
-
-  # 16bg facebook
-  # width: [[5.0, 9.0, 15.0], [10.0, 18.0, 30.0], [20.0, 36.0, 60.0], [40.0, 72.0, 120.0], [80.0, 144.0, 240.0]]
-  # height: [[5.0, 7.0, 13.0], [10.0, 14.0, 26.0], [20.0, 28.0, 52.0], [40.0, 56.0, 104.0], [40.0, 56.0, 104.0]]
-  # depth: [[4.0, 6.0, 17.0], [8.0, 12.0, 34.0], [16.0, 24.0, 68.0], [32.0, 48.0, 136.0], [32.0, 48.0, 136.0]]
-
-
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [128, 128, 256] #null #[64, 64, 64]
+  patch_size: [160, 160, 256] #null #[64, 64, 64]
 
   p_gaussian_noise: 0 #0.1
   p_gaussian_smooth: 0 #0.1
@@ -108,7 +111,7 @@ augmentation:
   p_adjust_contrast: 0 #0.2
   p_rotate: 0.5
   p_zoom: 0.5
-  p_shear: 0.5
+  p_shear: 0
   p_translate: 0.5 # 0
   p_flip: 0.5
 

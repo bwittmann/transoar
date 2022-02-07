@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from transoar.models.build import build_pos_enc, build_def_attn_encoder
+
 from transoar.models.head import DetectionHeadHNMNative, ClsHead, RegHead, SegHead
 from transoar.models.anchor_gen import AnchorGenerator3DS
 from transoar.models.sampler import HardNegativeSamplerBatched
@@ -19,6 +21,21 @@ class RetinaUNet(nn.Module):
         decoder_strides = encoder.out_strides
 
         decoder = Decoder(config, decoder_channels, decoder_strides)
+
+        # Build def attn encoder
+        if config['use_def_attn']:
+            def_attn_encoder = build_def_attn_encoder(config)
+            pos_enc = build_pos_enc(config)
+
+            # Build input projection to attn encoder
+            input_proj_list = []
+            for _ in range(config['num_feature_levels']):
+                input_proj_list.append(nn.Sequential(
+                    nn.Conv3d(config['fpn_channels'], config['hidden_dim'], kernel_size=1),
+                    nn.GroupNorm(32, config['hidden_dim']),
+                ))
+
+            self.input_proj = nn.ModuleList(input_proj_list)
 
         # Build detection and segmentation head
         cls_head = ClsHead(config)
@@ -51,6 +68,12 @@ class RetinaUNet(nn.Module):
 
         self.encoder = encoder
         self.decoder = decoder
+
+        if config['use_def_attn']:
+            self.use_def_attn = config['use_def_attn']
+            self.def_attn_encoder = def_attn_encoder
+            self.pos_enc = pos_enc
+
         self.head = detection_head
         self.segmenter = segmentation_head
 
@@ -72,7 +95,8 @@ class RetinaUNet(nn.Module):
 
         pred_detection, anchors, pred_seg = self(img)
         labels, matched_gt_boxes = self.assign_targets_to_anchors(
-            anchors, target_boxes, target_classes)
+            anchors, target_boxes, target_classes
+        )
 
         losses = {}
         head_losses, pos_idx, neg_idx = self.head.compute_loss(
@@ -110,7 +134,21 @@ class RetinaUNet(nn.Module):
 
     def forward(self, inp):
         features_maps_all = self.decoder(self.encoder(inp))
-        feature_maps_head = [features_maps_all[i] for i in self.decoder_levels]
+        feature_maps_red = [features_maps_all[i] for i in self.decoder_levels]
+
+        if self.use_def_attn:
+            srcs = []
+            masks = []
+            pos = []
+            for idx, fmap in enumerate(feature_maps_red):
+                srcs.append(self.input_proj[idx](fmap))
+                mask = torch.zeros_like(fmap[:, 0], dtype=torch.bool) # False is not masked
+                masks.append(mask)
+                pos.append(self.pos_enc(mask))
+            
+            feature_maps_head = self.def_attn_encoder(srcs, masks, pos)
+        else:
+            feature_maps_head = feature_maps_red
 
         pred_detection = self.head(feature_maps_head)
         anchors = self.anchor_generator(inp, feature_maps_head)

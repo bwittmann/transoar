@@ -83,6 +83,23 @@ def build_neck(config):
 
     return model
 
+def build_def_attn_encoder(config):
+    model = DeformableTransformer(
+        d_model=config['hidden_dim'],
+        nhead=config['nheads'],
+        num_encoder_layers=config['enc_layers'],
+        num_decoder_layers=config['dec_layers'],
+        dim_feedforward=config['dim_feedforward'],
+        dropout=config['dropout'],
+        activation="relu",
+        return_intermediate_dec=True,
+        num_feature_levels=config['num_feature_levels'],
+        dec_n_points=config['dec_n_points'],
+        enc_n_points=config['enc_n_points'],
+        use_cuda=config['use_cuda']
+    )  
+    return model
+
 def build_criterion(config):
     matcher = HungarianMatcher(
         cost_class=config['set_cost_class'],
