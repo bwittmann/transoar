@@ -118,7 +118,7 @@ def train(config, args):
         warm_iterations=4000,
         warm_lr=1e-06,
         poly_gamma=0.9,
-        num_iterations=90000
+        num_iterations=150000 #90000
     )
 
     # Load checkpoint if applicable

@@ -27,15 +27,15 @@ class RetinaUNet(nn.Module):
             def_attn_encoder = build_def_attn_encoder(config)
             pos_enc = build_pos_enc(config)
 
-            # Build input projection to attn encoder
-            input_proj_list = []
-            for _ in range(config['num_feature_levels']):
-                input_proj_list.append(nn.Sequential(
-                    nn.Conv3d(config['fpn_channels'], config['hidden_dim'], kernel_size=1),
-                    nn.GroupNorm(32, config['hidden_dim']),
-                ))
+        # Build input projection to attn encoder
+        input_proj_list = []
+        for _ in range(config['num_feature_levels']):
+            input_proj_list.append(nn.Sequential(
+                nn.Conv3d(config['fpn_channels'], config['hidden_dim'], kernel_size=1),
+                nn.GroupNorm(32, config['hidden_dim']),
+            ))
 
-            self.input_proj = nn.ModuleList(input_proj_list)
+        self.input_proj = nn.ModuleList(input_proj_list)
 
         # Build detection and segmentation head
         cls_head = ClsHead(config)
@@ -69,8 +69,8 @@ class RetinaUNet(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
+        self.use_def_attn = config['use_def_attn']
         if config['use_def_attn']:
-            self.use_def_attn = config['use_def_attn']
             self.def_attn_encoder = def_attn_encoder
             self.pos_enc = pos_enc
 
@@ -148,6 +148,7 @@ class RetinaUNet(nn.Module):
             
             feature_maps_head = self.def_attn_encoder(srcs, masks, pos)
         else:
+            # feature_maps_head = [self.input_proj[idx](fmap) for idx, fmap in enumerate(feature_maps_red)]
             feature_maps_head = feature_maps_red
 
         pred_detection = self.head(feature_maps_head)

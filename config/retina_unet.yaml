@@ -1,7 +1,7 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: retina_unet_def_attn #test_orig_train_params_wh_160_flip_wd_switch
+experiment_name: test #retina_unet_e2500_320_320_512 #test_orig_train_params_wh_160_flip_wd_switch
 device: cuda:1
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
@@ -18,14 +18,14 @@ clip_max_norm: 0.1
 lr_drop: 400  # prev: 40
 
 # Data
-dataset: transoar_test_160160256_CT
+dataset: transoar_testing_focused_attn_320_320_512_CT #transoar_test_160160256_CT #transoar_testing_focused_attn_320_320_512_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
 batch_size: 2
 shuffle: True
-num_workers: 4
+num_workers: 8
 
 # Hungarian matching
 set_cost_class: 2
@@ -48,9 +48,9 @@ model:
   max_channels: 320
 
   # Def attn encoder
-  use_def_attn: True
+  use_def_attn: False
   pos_encoding: sine
-  hidden_dim: 192
+  hidden_dim: 128 #192
   nheads: 6
   enc_layers: 2
   dec_layers: 2
@@ -66,7 +66,7 @@ model:
   fpn_channels: 128
 
   # Heads
-  head_channels: 192
+  head_channels: 128 #192
   classifier_classes: 20
   loss_weight: 1.0  # for bce and giou
   prior_prob: 0.01 # for weight init of cls head
@@ -95,9 +95,14 @@ model:
   stride: 1
 
   # 48bg giga 160 160 256 - new conf
-  depth: [[6.0, 10.0, 32.0], [12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0]]
-  height: [[8.0, 11.0, 16.0], [16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [64.0, 88.0, 128.0]]
-  width: [[6.0, 8.0, 11.0], [12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0]]
+  # depth: [[6.0, 10.0, 32.0], [12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0]]  # TODO 512?
+  # height: [[8.0, 11.0, 16.0], [16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [64.0, 88.0, 128.0]]
+  # width: [[6.0, 8.0, 11.0], [12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0]]
+
+  # 320 320 512 whd
+  depth: [[12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0], [192.0, 320.0, 1024.0]]
+  height: [[16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [128.0, 176.0, 256.0], [128.0, 176.0, 256.0]]
+  width: [[12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0], [96.0, 128.0, 176.0]]
 
 # Augmentation
 augmentation:
