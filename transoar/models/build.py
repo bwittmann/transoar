@@ -113,7 +113,8 @@ def build_criterion(config):
     matcher = HungarianMatcher(
         cost_class=config['set_cost_class'],
         cost_bbox=config['set_cost_bbox'],
-        cost_giou=config['set_cost_giou']
+        cost_giou=config['set_cost_giou'],
+        anchor_matching=config['anchor_matching']
     )
 
     criterion = TransoarCriterion(

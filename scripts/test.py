@@ -1,7 +1,9 @@
 """Script to evalute performance on the val and test set."""
 
+import os
 import argparse
 from pathlib import Path
+from collections import defaultdict
 
 import torch
 from tqdm import tqdm
@@ -22,7 +24,9 @@ class Tester:
         self._save_preds = args.save_preds
         self._save_attn_map = args.save_attn_map
         self._class_dict = config['labels']
-        self._device = 'cuda:' + str(args.num_gpu) if args.num_gpu > 0 else 'cpu'
+
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.num_gpu)
+        self._device = 'cuda' if args.num_gpu >= 0 else 'cpu'
 
         # Get path to checkpoint
         avail_checkpoints = [path for path in path_to_run.iterdir() if 'model_' in str(path)]
@@ -70,6 +74,7 @@ class Tester:
             ]
     
         with torch.no_grad():
+            query_info = defaultdict(list)
             for idx, (data, mask, bboxes, seg_mask) in enumerate(tqdm(self._test_loader)):
                 # Put data to gpu
                 data, mask = data.to(device=self._device), mask.to(device=self._device)
@@ -81,13 +86,13 @@ class Tester:
 
                 # Only use complete data for performance evaluation
                 if targets['labels'].shape[0] < len(self._class_dict):
-                    continue
+                    pass    #continue
 
                 # Make prediction
                 out = self._model(data, mask)
 
                 # Format out to fit evaluator and estimate best predictions per class
-                pred_boxes, pred_classes, pred_scores = inference(out)
+                pred_boxes, pred_classes, pred_scores, query_info = inference(out, query_info)
                 gt_boxes = [targets['boxes'].detach().cpu().numpy()]
                 gt_classes = [targets['labels'].detach().cpu().numpy()]
 
@@ -118,6 +123,7 @@ class Tester:
                     )
 
             # Get and store final results
+            # [torch.tensor([id_ for score, id_ in query_info[c]]).unique().shape for c in query_info.keys()]
             metric_scores = self._evaluator.eval()
             write_json(metric_scores, self._path_to_results / ('results_' + self._set_to_eval))
 

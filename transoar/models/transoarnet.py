@@ -27,7 +27,7 @@ class TransoarNet(nn.Module):
             )
 
         # Get anchors        
-        self._anchors = self._generate_anchors(config['neck'], config['bbox_properties']).to(device='cuda')
+        self.anchors = self._generate_anchors(config['neck'], config['bbox_properties']).cuda()
 
         # Get backbone
         self._backbone = build_backbone(config['backbone'])
@@ -36,7 +36,7 @@ class TransoarNet(nn.Module):
         self._neck = build_neck(config['neck'], config['bbox_properties'])
 
         # Get heads
-        self._cls_head = nn.Linear(hidden_dim, num_classes)
+        self._cls_head = nn.Linear(hidden_dim, 2)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         # Get projections and embeddings
@@ -116,7 +116,7 @@ class TransoarNet(nn.Module):
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
-            'pred_boxes': pred_boxes[-1] + self._anchors
+            'pred_boxes': pred_boxes[-1] + self.anchors
         }
 
         if self._aux_loss:
@@ -127,7 +127,7 @@ class TransoarNet(nn.Module):
     @torch.jit.unused
     def _set_aux_loss(self, pred_logits, pred_boxes):
         # Hack to support dictionary with non-homogeneous values
-        return [{'pred_logits': a, 'pred_boxes': b + self._anchors}
+        return [{'pred_logits': a, 'pred_boxes': b + self.anchors}
                 for a, b in zip(pred_logits[:-1], pred_boxes[:-1])]
 
     def _generate_anchors(self, model_config, bbox_props):

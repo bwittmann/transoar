@@ -14,7 +14,13 @@ class HungarianMatcher(nn.Module):
     while the others are un-matched (and thus treated as non-objects).
     """
 
-    def __init__(self, cost_class: float = 1, cost_bbox: float = 1, cost_giou: float = 1):
+    def __init__(
+        self,
+        cost_class: float = 1,
+        cost_bbox: float = 1,
+        cost_giou: float = 1,
+        anchor_matching: bool = False
+    ):
         """Creates the matcher
         Params:
             cost_class: This is the relative weight of the classification error in the matching cost
@@ -27,8 +33,10 @@ class HungarianMatcher(nn.Module):
         self.cost_giou = cost_giou
         assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, "all costs can't be 0"
 
+        self.anchor_matching = anchor_matching
+
     @torch.no_grad()
-    def forward(self, outputs, targets):
+    def forward(self, outputs, targets, anchors):
         """ Performs the matching
         Params:
             outputs: This is a dict that contains at least these entries:
@@ -48,7 +56,11 @@ class HungarianMatcher(nn.Module):
         bs = outputs["pred_logits"].shape[0]
 
         # Split queries in individual classes   TODO: don't hardcode any information
-        classes_queries_boxes = [torch.split(batch_boxes, 27 * 3, dim=0) for batch_boxes in torch.unbind(outputs["pred_boxes"], dim=0)]
+        if self.anchor_matching:
+            classes_queries_boxes = [torch.split(anchors, 27 * 3, dim=0) for _ in range(bs)]
+        else:
+            classes_queries_boxes = [torch.split(batch_boxes, 27 * 3, dim=0) for batch_boxes in torch.unbind(outputs["pred_boxes"], dim=0)]
+
         classes_queries_probs = [[logits.softmax(-1) for logits in torch.split(batch_logits, 27 * 3, dim=0)] for batch_logits in torch.unbind(outputs["pred_logits"], dim=0)]
         assert len(classes_queries_probs[0]) == 20 and len(classes_queries_boxes[0]) == 20
 
@@ -66,17 +78,18 @@ class HungarianMatcher(nn.Module):
             batch_queries_boxes = classes_queries_boxes[batch]
 
             for tgt_id, tgt_box in zip(batch_tgt_ids, batch_tgt_boxes):
+                tgt_id = tgt_id - 1  # Since class 0 has id 1
                 class_queries_boxes = batch_queries_boxes[tgt_id]
                 class_queries_probs = batch_queries_probs[tgt_id]
 
                 # Determine individual costs
-                cost_class = -class_queries_probs[:, tgt_id]
+                cost_class = -class_queries_probs[:, -1]
                 cost_bbox = torch.cdist(class_queries_boxes, tgt_box[None], p=1).squeeze()
                 cost_giou = -generalized_bbox_iou_3d(box_cxcyczwhd_to_xyzxyz(class_queries_boxes.clip(min=0)), box_cxcyczwhd_to_xyzxyz(tgt_box[None])).squeeze()
 
                 # Determine final cost and best performing query
                 C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
-                best_query = C.argmin() # TODO: add hard negative?
+                best_query = C.argmin() # TODO: add hard negative or dropout
                 batch_matches.append([tgt_id.item(), (best_query + tgt_id * 27 * 3).item()])
 
             matches.append(batch_matches)

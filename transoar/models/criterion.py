@@ -26,11 +26,13 @@ class TransoarCriterion(nn.Module):
         self.matcher = matcher
         
         # Hack to make deterministic, https://github.com/pytorch/pytorch/issues/46024
-        self.cls_weights = torch.tensor(
-            [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
-        ).type(torch.FloatTensor)
+        # self.cls_weights = torch.tensor(
+        #     [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+        # ).type(torch.FloatTensor)
+        self.cls_weights = torch.tensor([1, 81]).type(torch.FloatTensor)
 
-    def loss_class(self, outputs, targets, indices):
+
+    def loss_class(self, outputs, indices):
         """Classification loss (NLL)
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         """
@@ -39,26 +41,12 @@ class TransoarCriterion(nn.Module):
 
         src_idx = self._get_src_permutation_idx(indices)
 
-        target_classes_o = torch.cat([t["labels"] for t in targets])
-        src_logits_matched = src_logits[src_idx]
+        target_classes = torch.full(src_logits.shape[:2], 0, dtype=torch.int64, device=src_logits.device)
+        target_classes[src_idx] = 1
 
-        loss_ce = F.cross_entropy(src_logits_matched, target_classes_o) # TODO: operates on logits?
+        loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, weight=self.cls_weights.cuda(), label_smoothing=0.0)
 
-        # Peak loss
-        loss_peak = torch.tensor(0.).to(device='cuda')
-        # for batch in range(src_logits.shape[0]):
-        #     batch_logits = src_logits[batch]
-        #     classes_logits = [logits.softmax(-1) for logits in torch.split(batch_logits, 27 * 3, dim=0)]    # TODO: dont hardcode.
-        #     matched_query_ids = indices[batch]
-
-        #     for matched_query_id in matched_query_ids:
-        #         tgt_class, query_id = matched_query_id
-        #         class_logits = classes_logits[tgt_class]
-
-        #         matched_query_id_offset = query_id - tgt_class * 27 * 3
-        #         loss_peak += F.cross_entropy(class_logits[:, tgt_class][None], torch.tensor([matched_query_id_offset]).to(device='cuda'))
-       
-        return loss_ce, loss_peak
+        return loss_ce
 
     def loss_bboxes(self, outputs, targets, indices, num_boxes):
         """Compute the losses related to the bounding boxes, the L1 regression loss and the GIoU loss
@@ -92,7 +80,7 @@ class TransoarCriterion(nn.Module):
 
         return torch.tensor(batch_idx), torch.tensor(src_idx)
 
-    def forward(self, outputs, targets):
+    def forward(self, outputs, targets, anchors):
         """ This performs the loss computation.
         Parameters:
              outputs: dict of tensors, see the output specification of the model for the format
@@ -100,33 +88,31 @@ class TransoarCriterion(nn.Module):
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         """
         # Retrieve the matching between the outputs of the last layer and the targets
-        indices = self.matcher(outputs, targets)
+        indices = self.matcher(outputs, targets, anchors)
 
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_boxes = sum(len(t["labels"]) for t in targets)
 
         # Compute losses
         loss_bbox, loss_giou = self.loss_bboxes(outputs, targets, indices, num_boxes)
-        loss_cls, loss_peak = self.loss_class(outputs, targets, indices)
+        loss_cls = self.loss_class(outputs, indices)
 
         loss_dict = {
             'bbox': loss_bbox,
             'giou': loss_giou,
-            'cls': loss_cls,
-            'peak': loss_peak
+            'cls': loss_cls
         }
 
         # Compute losses for the output of each intermediate layer
         if 'aux_outputs' in outputs:
             for i, aux_outputs in enumerate(outputs['aux_outputs']):
-                indices = self.matcher(aux_outputs, targets)
+                indices = self.matcher(aux_outputs, targets, anchors)
 
                 loss_bbox, loss_giou = self.loss_bboxes(aux_outputs, targets, indices, num_boxes)
-                loss_cls, loss_peak = self.loss_class(aux_outputs, targets, indices)
+                loss_cls = self.loss_class(aux_outputs, indices)
 
                 loss_dict[f'bbox_{i}'] = loss_bbox
                 loss_dict[f'giou_{i}'] = loss_giou
                 loss_dict[f'cls_{i}'] = loss_cls
-                loss_dict[f'peak_{i}'] = loss_peak
 
         return loss_dict
