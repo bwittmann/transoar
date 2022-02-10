@@ -19,6 +19,7 @@ class HungarianMatcher(nn.Module):
         cost_class: float = 1,
         cost_bbox: float = 1,
         cost_giou: float = 1,
+        cost_center_dist: float = 1,
         anchor_matching: bool = False
     ):
         """Creates the matcher
@@ -31,7 +32,8 @@ class HungarianMatcher(nn.Module):
         self.cost_class = cost_class
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
-        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, "all costs can't be 0"
+        self.cost_center_dist = cost_center_dist
+        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0 or cost_center_dist != 0, "all costs can't be 0"
 
         self.anchor_matching = anchor_matching
 
@@ -85,10 +87,11 @@ class HungarianMatcher(nn.Module):
                 # Determine individual costs
                 cost_class = -class_queries_probs[:, -1]
                 cost_bbox = torch.cdist(class_queries_boxes, tgt_box[None], p=1).squeeze()
+                cost_center_dist = torch.cdist(class_queries_boxes[:, :3], tgt_box[:3][None], p=2).squeeze()
                 cost_giou = -generalized_bbox_iou_3d(box_cxcyczwhd_to_xyzxyz(class_queries_boxes.clip(min=0)), box_cxcyczwhd_to_xyzxyz(tgt_box[None])).squeeze()
 
                 # Determine final cost and best performing query
-                C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
+                C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou + self.cost_center_dist * cost_center_dist
                 best_query = C.argmin() # TODO: add hard negative or dropout
                 batch_matches.append([tgt_id.item(), (best_query + tgt_id * 27 * 3).item()])
 

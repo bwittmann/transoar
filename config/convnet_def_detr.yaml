@@ -1,8 +1,8 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test #test_focused_attn_median_offset_factor02_no_cls0_27_per_org_custom_matcher_bce_cls_loss_w81
-device: cuda:7
+experiment_name: test #anchor_matcher_0104tan_01offset_only_cdist
+device: cuda:4
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
 seed: 10
@@ -29,9 +29,10 @@ num_workers: 4
 
 # Matching
 anchor_matching: True
-set_cost_class: 2
-set_cost_bbox: 5
-set_cost_giou: 2
+set_cost_class: 0 #2
+set_cost_bbox: 0 #5
+set_cost_giou: 0 #2
+set_cost_center: 1
 
 # Losses
 loss_coefs:
