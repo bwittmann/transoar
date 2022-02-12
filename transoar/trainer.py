@@ -44,9 +44,9 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
-        for data, mask, bboxes, _ in tqdm(self._train_loader):
+        for data, _, bboxes, _ in tqdm(self._train_loader):
             # Put data to gpu
-            data, mask = data.to(device=self._device), mask.to(device=self._device)
+            data = data.to(device=self._device)
         
             targets = []
             for item in bboxes:
@@ -58,7 +58,7 @@ class Trainer:
 
             # Make prediction
             with autocast(): 
-                out = self._model(data, mask)
+                out = self._model(data)
                 loss_dict = self._criterion(out, targets, self._model.anchors)
 
                 # Create absolute loss and mult with loss coefficient
@@ -104,9 +104,9 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
-        for data, mask, bboxes, _ in tqdm(self._val_loader):
+        for data, _, bboxes, _ in tqdm(self._val_loader):
             # Put data to gpu
-            data, mask = data.to(device=self._device), mask.to(device=self._device)
+            data = data.to(device=self._device)
         
             targets = []
             for item in bboxes:
@@ -118,7 +118,7 @@ class Trainer:
 
             # Make prediction
             with autocast():
-                out = self._model(data, mask)
+                out = self._model(data)
                 loss_dict = self._criterion(out, targets, self._model.anchors)
 
                 # Create absolute loss and mult with loss coefficient

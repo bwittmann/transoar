@@ -11,6 +11,7 @@ from transoar.models.backbones.swin_transformer_3D import SwinTransformer3D
 from transoar.models.backbones.fpn import FPN
 from transoar.models.necks.detr_transformer import DetrTransformer
 from transoar.models.necks.deformable_detr_transformer import DeformableTransformer
+from transoar.models.necks.focused_attn_decoder import FocusedAttnDecoder
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
 
 
@@ -119,6 +120,18 @@ def build_neck(config, bbox_props):
             config=config,
             bbox_props=bbox_props
         )  
+    elif config['name'] == 'focused_attn':
+        model = FocusedAttnDecoder(
+            d_model=config['hidden_dim'],
+            nhead=config['nheads'],
+            num_decoder_layers=config['dec_layers'], 
+            dim_feedforward=config['dim_feedforward'],
+            dropout=config['dropout'],
+            activation="relu",
+            return_intermediate_dec=True,
+            bbox_props=bbox_props,
+            config=config
+        )
 
     return model
 

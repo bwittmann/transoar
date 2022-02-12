@@ -103,16 +103,16 @@ class FPN(nn.Module):
             self.C0 = nn.Sequential(conv(n_channels, start_filts, ks=3, pad=1, norm=norm, relu=relu),
                                     conv(start_filts, start_filts, ks=3, pad=1, norm=norm, relu=relu))
 
-            self.C1 = conv(start_filts, start_filts, ks=7, stride=(2, 2, 1) if conv.dim == 3 else 2, pad=3, norm=norm, relu=relu)
+            self.C1 = conv(start_filts, start_filts, ks=7, stride=(2, 2, 2) if conv.dim == 3 else 2, pad=3, norm=norm, relu=relu)
 
         else:
-            self.C1 = conv(n_channels, start_filts, ks=7, stride=(2, 2, 1) if conv.dim == 3 else 2, pad=3, norm=norm, relu=relu)
+            self.C1 = conv(n_channels, start_filts, ks=7, stride=(2, 2, 2) if conv.dim == 3 else 2, pad=3, norm=norm, relu=relu)
 
         start_filts_exp = start_filts * self.block_expansion
 
         C2_layers = []
         C2_layers.append(nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-                         if conv.dim == 2 else nn.MaxPool3d(kernel_size=3, stride=(2, 2, 1), padding=1))
+                         if conv.dim == 2 else nn.MaxPool3d(kernel_size=3, stride=(2, 2, 2), padding=1))
         C2_layers.append(self.block(start_filts, start_filts, conv=conv, stride=1, norm=norm, relu=relu,
                                     downsample=(start_filts, self.block_expansion, 1)))
         for i in range(1, self.n_blocks[0]):
@@ -152,8 +152,8 @@ class FPN(nn.Module):
             self.P1_upsample = Interpolate(scale_factor=2, mode='bilinear')
             self.P2_upsample = Interpolate(scale_factor=2, mode='bilinear')
         else:
-            self.P1_upsample = Interpolate(scale_factor=(2, 2, 1), mode='trilinear')
-            self.P2_upsample = Interpolate(scale_factor=(2, 2, 1), mode='trilinear')
+            self.P1_upsample = Interpolate(scale_factor=(2, 2, 2), mode='trilinear')
+            self.P2_upsample = Interpolate(scale_factor=(2, 2, 2), mode='trilinear')
 
         self.out_channels = end_filts
         self.P5_conv1 = conv(start_filts*32 + n_latent_dims, self.out_channels, ks=1, stride=1, relu=None) #
@@ -187,11 +187,14 @@ class FPN(nn.Module):
         else:
             c0_out = x
 
+        # Down
         c1_out = self.C1(c0_out)
         c2_out = self.C2(c1_out)
         c3_out = self.C3(c2_out)
         c4_out = self.C4(c3_out)
         c5_out = self.C5(c4_out)
+
+        # Up
         if self.sixth_pooling:
             c6_out = self.C6(c5_out)
             p6_pre_out = self.P6_conv1(c6_out)
@@ -202,13 +205,6 @@ class FPN(nn.Module):
         p4_pre_out = self.P4_conv1(c4_out) + F.interpolate(p5_pre_out, scale_factor=2)
         p3_pre_out = self.P3_conv1(c3_out) + F.interpolate(p4_pre_out, scale_factor=2)
         p2_pre_out = self.P2_conv1(c2_out) + F.interpolate(p3_pre_out, scale_factor=2)
-
-        # plot feature map shapes for debugging.
-        # for ii in [c0_out, c1_out, c2_out, c3_out, c4_out, c5_out, c6_out]:
-        #     print ("encoder shapes:", ii.shape)
-        #
-        # for ii in [p6_out, p5_out, p4_out, p3_out, p2_out, p1_out]:
-        #     print("decoder shapes:", ii.shape)
 
         p2_out = self.P2_conv2(p2_pre_out)
         p3_out = self.P3_conv2(p3_pre_out)

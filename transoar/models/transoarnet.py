@@ -10,20 +10,8 @@ from transoar.models.build import build_backbone, build_neck, build_pos_enc
 class TransoarNet(nn.Module):
     def __init__(self, config):
         super().__init__()
-        hidden_dim = config['neck']['hidden_dim']
-        num_queries = config['neck']['num_queries']
-        num_channels = config['backbone']['num_channels']
-
-        # Use auxiliary decoding losses if required
-        self._aux_loss = config['neck']['aux_loss']
-
-        # Skip connection from backbone outputs to heads
-        self._skip_con = config['neck']['skip_con']
-        if self._skip_con:
-            self._skip_proj = nn.Linear(
-                config['backbone']['num_feature_patches'], 
-                config['neck']['num_queries']
-            )
+        self._aux_loss = config['neck']['aux_loss'] # Use auxiliary decoding losses if required
+        self._num_fmap = config['backbone']['num_fmap']
 
         # Get anchors        
         self.anchors = self._generate_anchors(config['neck'], config['bbox_properties']).cuda()
@@ -35,10 +23,13 @@ class TransoarNet(nn.Module):
         self._neck = build_neck(config['neck'], config['bbox_properties'])
 
         # Get heads
+        hidden_dim = config['neck']['hidden_dim']
         self._cls_head = nn.Linear(hidden_dim, 2)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
-        self._query_embed = nn.Embedding(num_queries, hidden_dim)
+        num_queries = config['neck']['num_queries']
+        num_channels = config['backbone']['end_filts']
+        self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
         self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 
         # Get positional encoding
@@ -52,27 +43,17 @@ class TransoarNet(nn.Module):
             nn.init.xavier_uniform_(proj[0].weight, gain=1)
             nn.init.constant_(proj[0].bias, 0)
 
-    def forward(self, x, mask):
+    def forward(self, x):
         out_backbone = self._backbone(x)
 
-        srcs = self._input_proj(out_backbone[0][0])
-        masks = out_backbone[0][1]
-        pos = self._pos_enc(masks)
+        srcs = self._input_proj(out_backbone[self._num_fmap])
+        pos = self._pos_enc(srcs)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
             srcs,
-            masks,
             self._query_embed.weight,
             pos
         )
-
-        if self._skip_con:
-            if isinstance(srcs, torch.Tensor):
-                out_backbone_proj = srcs.flatten(2)
-            else:
-                out_backbone_proj = torch.cat([src.flatten(2) for src in srcs], dim=-1)
-            out_backbone_skip_proj = self._skip_proj(out_backbone_proj).permute(0, 2, 1)
-            out_neck = out_neck + out_backbone_skip_proj
 
         pred_logits = self._cls_head(out_neck)
         pred_boxes = self._bbox_reg_head(out_neck).tanh() * 0.2

@@ -59,11 +59,11 @@ class HungarianMatcher(nn.Module):
 
         # Split queries in individual classes   TODO: don't hardcode any information
         if self.anchor_matching:
-            classes_queries_boxes = [torch.split(anchors, 27 * 3, dim=0) for _ in range(bs)]
+            classes_queries_boxes = [torch.split(anchors, 27, dim=0) for _ in range(bs)]
         else:
-            classes_queries_boxes = [torch.split(batch_boxes, 27 * 3, dim=0) for batch_boxes in torch.unbind(outputs["pred_boxes"], dim=0)]
+            classes_queries_boxes = [torch.split(batch_boxes, 27, dim=0) for batch_boxes in torch.unbind(outputs["pred_boxes"], dim=0)]
 
-        classes_queries_probs = [[logits.softmax(-1) for logits in torch.split(batch_logits, 27 * 3, dim=0)] for batch_logits in torch.unbind(outputs["pred_logits"], dim=0)]
+        classes_queries_probs = [[logits.softmax(-1) for logits in torch.split(batch_logits, 27, dim=0)] for batch_logits in torch.unbind(outputs["pred_logits"], dim=0)]
         assert len(classes_queries_probs[0]) == 20 and len(classes_queries_boxes[0]) == 20
 
         # Get targets
@@ -93,7 +93,7 @@ class HungarianMatcher(nn.Module):
                 # Determine final cost and best performing query
                 C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou + self.cost_center_dist * cost_center_dist
                 best_query = C.argmin() # TODO: add hard negative or dropout
-                batch_matches.append([tgt_id.item(), (best_query + tgt_id * 27 * 3).item()])
+                batch_matches.append([tgt_id.item(), (best_query + tgt_id * 27).item()])
 
             matches.append(batch_matches)
 

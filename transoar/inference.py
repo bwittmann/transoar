@@ -1,7 +1,5 @@
 """Inference script to infer final output from model prediction."""
 
-from collections import defaultdict
-
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -9,8 +7,8 @@ import torch.nn.functional as F
 def inference(out, query_info=None):
     # Get probabilities from output logits
     pred_probs = F.softmax(out['pred_logits'], dim=-1)
-    classes_pred_probs = [torch.split(batch_probs, 27 * 3, dim=0) for batch_probs in pred_probs]
-    classes_pred_boxes = [torch.split(batch_boxes, 27 * 3, dim=0) for batch_boxes in out['pred_boxes']]
+    classes_pred_probs = [torch.split(batch_probs, 27, dim=0) for batch_probs in pred_probs]
+    classes_pred_boxes = [torch.split(batch_boxes, 27, dim=0) for batch_boxes in out['pred_boxes']]
 
     boxes = []
     classes = []
