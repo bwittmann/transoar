@@ -13,7 +13,6 @@ class TransoarNet(nn.Module):
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
         num_channels = config['backbone']['num_channels']
-        num_classes = config['num_classes']
 
         # Use auxiliary decoding losses if required
         self._aux_loss = config['neck']['aux_loss']
@@ -39,34 +38,8 @@ class TransoarNet(nn.Module):
         self._cls_head = nn.Linear(hidden_dim, 2)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
-        # Get projections and embeddings
-        if 'num_feature_levels' in config['neck']:
-            self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
-
-            # Get individual input projection for each feature level
-            num_feature_levels = config['neck']['num_feature_levels']
-            if num_feature_levels > 1:
-                num_backbone_outs = len(config['backbone']['num_channels'][-3:])
-                input_proj_list = []
-                for _ in range(num_backbone_outs):
-                    in_channels = config['backbone']['num_channels'][-3:][_]
-                    input_proj_list.append(nn.Sequential(
-                        nn.Conv3d(in_channels, hidden_dim, kernel_size=1),
-                        nn.GroupNorm(32, hidden_dim),
-                    ))
-
-                self._input_proj = nn.ModuleList(input_proj_list)
-            else:
-                self._input_proj = nn.ModuleList([
-                nn.Sequential(
-                    nn.Conv3d(config['backbone']['num_channels'][0], hidden_dim, kernel_size=1),
-                    nn.GroupNorm(32, hidden_dim),
-                )])
-            
-            self._reset_parameter()
-        else:
-            self._query_embed = nn.Embedding(num_queries, hidden_dim)
-            self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
+        self._query_embed = nn.Embedding(num_queries, hidden_dim)
+        self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
@@ -74,27 +47,17 @@ class TransoarNet(nn.Module):
     def _reset_parameter(self):
         nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
         nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
-        # nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
 
         for proj in self._input_proj:
             nn.init.xavier_uniform_(proj[0].weight, gain=1)
             nn.init.constant_(proj[0].bias, 0)
 
     def forward(self, x, mask):
-        out_backbone = self._backbone(x, mask)
+        out_backbone = self._backbone(x)
 
-        if len(out_backbone) > 1:   # For approaches that utilize multiple feature maps
-            srcs = []
-            masks = []
-            pos = []
-            for idx, (src, mask) in enumerate(out_backbone):
-                srcs.append(self._input_proj[idx](src))
-                masks.append(mask)
-                pos.append(self._pos_enc(mask))
-        else:
-            srcs = self._input_proj(out_backbone[0][0])
-            masks = out_backbone[0][1]
-            pos = self._pos_enc(masks)
+        srcs = self._input_proj(out_backbone[0][0])
+        masks = out_backbone[0][1]
+        pos = self._pos_enc(masks)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
             srcs,

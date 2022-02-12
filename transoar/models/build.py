@@ -8,6 +8,7 @@ from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.backbones.convnet_light_3D import ConvNetLight
 from transoar.models.backbones.swin_transformer_3D import SwinTransformer3D
+from transoar.models.backbones.fpn import FPN
 from transoar.models.necks.detr_transformer import DetrTransformer
 from transoar.models.necks.deformable_detr_transformer import DeformableTransformer
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
@@ -74,6 +75,18 @@ def build_backbone(config):
             patch_norm=config['patch_norm'],
             frozen_stages=config['frozen_stages'],
             use_checkpoint=config['use_checkpoint']
+        )
+    elif config['name'] == 'fpn':
+        model = FPN(
+            start_filts=config['start_filts'],
+            end_filts=config['end_filts'],
+            res_architecture=config['res_architecture'],
+            sixth_pooling=config['sixth_pooling'],
+            operate_stride1=config['operate_stride1'],
+            n_channels=config['n_channels'],
+            norm=config['norm'],
+            relu=config['relu'],
+            n_latent_dims=config['n_latent_dims']
         )
 
     return model
