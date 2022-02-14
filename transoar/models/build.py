@@ -8,7 +8,7 @@ from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.backbones.convnet_light_3D import ConvNetLight
 from transoar.models.backbones.swin_transformer_3D import SwinTransformer3D
-from transoar.models.backbones.fpn import FPN
+from transoar.models.backbones.fpn import SwinFPN
 from transoar.models.necks.detr_transformer import DetrTransformer
 from transoar.models.necks.deformable_detr_transformer import DeformableTransformer
 from transoar.models.necks.focused_attn_decoder import FocusedAttnDecoder
@@ -78,7 +78,8 @@ def build_backbone(config):
             use_checkpoint=config['use_checkpoint']
         )
     elif config['name'] == 'fpn':
-        model = FPN(
+        model = SwinFPN(
+            # FPN
             start_filts=config['start_filts'],
             end_filts=config['end_filts'],
             res_architecture=config['res_architecture'],
@@ -87,7 +88,28 @@ def build_backbone(config):
             n_channels=config['n_channels'],
             norm=config['norm'],
             relu=config['relu'],
-            n_latent_dims=config['n_latent_dims']
+            n_latent_dims=config['n_latent_dims'],
+
+            # Swin
+            use_swin=config['use_swin'],
+            pretrained=config['pretrained'],
+            pretrained2d=config['pretrained_2d'],
+            patch_size=config['patch_size'],
+            in_chans=config['in_chans'],
+            embed_dim=config['embed_dim'],
+            depths=config['depths'],
+            num_heads=config['num_heads'],
+            window_size=config['window_size'],
+            mlp_ratio=config['mlp_ratio'],
+            qkv_bias=config['qkv_bias'],
+            qk_scale=config['qk_scale'],
+            drop_rate=config['drop_rate'],
+            attn_drop_rate=config['attn_drop_rate'],
+            drop_path_rate=config['drop_path_rate'],
+            norm_layer=nn.LayerNorm,
+            patch_norm=config['patch_norm'],
+            frozen_stages=config['frozen_stages'],
+            use_checkpoint=config['use_checkpoint']
         )
 
     return model
