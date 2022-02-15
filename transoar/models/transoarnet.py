@@ -24,7 +24,7 @@ class TransoarNet(nn.Module):
 
         # Get heads
         hidden_dim = config['neck']['hidden_dim']
-        self._cls_head = nn.Linear(hidden_dim, 2)
+        self._cls_head = nn.Linear(hidden_dim, 1)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         num_queries = config['neck']['num_queries']
@@ -35,22 +35,24 @@ class TransoarNet(nn.Module):
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
+        self._reset_parameter()
+
     def _reset_parameter(self):
         nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
         nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
 
-        for proj in self._input_proj:
-            nn.init.xavier_uniform_(proj[0].weight, gain=1)
-            nn.init.constant_(proj[0].bias, 0)
+        nn.init.constant_(self._cls_head.weight.data, 0)
+        nn.init.constant_(self._cls_head.bias.data, 0)
+
 
     def forward(self, x):
         out_backbone = self._backbone(x)
 
-        srcs = self._input_proj(out_backbone[self._num_fmap])
-        pos = self._pos_enc(srcs)
+        src = self._input_proj(out_backbone[self._num_fmap])
+        pos = self._pos_enc(src)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
-            srcs,
+            src,
             self._query_embed.weight,
             pos
         )
@@ -76,20 +78,23 @@ class TransoarNet(nn.Module):
 
     def _generate_anchors(self, model_config, bbox_props):
         median_bboxes = defaultdict(list)
+        # Get median bbox for each class 
         for class_, class_bbox_props in bbox_props.items():
-            median_bboxes[int(class_)] = class_bbox_props['median']
+            median_bboxes[int(class_)] = class_bbox_props['median'] #cxcyczwhd
 
+        # Init anchors and corresponding classes
         anchors = torch.zeros((model_config['num_queries'], 6))
         query_classes = torch.repeat_interleave(
             torch.arange(1, model_config['num_organs'] + 1), model_config['queries_per_organ'] * model_config['num_feature_levels']
         )
 
+        # Generate offsets for each anchor
         anchor_offset = model_config['anchor_offsets']
         possible_offsets = torch.tensor([0, anchor_offset, -anchor_offset])
-        offsets =  torch.cartesian_prod(
-            possible_offsets, possible_offsets, possible_offsets
-        ).repeat(model_config['num_organs'] * model_config['num_feature_levels'], 1)
+        offsets = torch.cartesian_prod(possible_offsets, possible_offsets, possible_offsets)
+        offsets = offsets.repeat(model_config['num_organs'] * model_config['num_feature_levels'], 1)
 
+        # Generate anchors by applying offsets to median box
         for idx, (query_class, offset) in enumerate(zip(query_classes, offsets)):
             query_median_box = torch.tensor(median_bboxes[query_class.item()])
             query_median_box[:3] += offset 

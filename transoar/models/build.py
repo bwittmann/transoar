@@ -163,7 +163,7 @@ def build_criterion(config):
         cost_bbox=config['set_cost_bbox'],
         cost_giou=config['set_cost_giou'],
         cost_center_dist=config['set_cost_center'],
-        anchor_matching=config['anchor_matching']
+        anchor_matching=config['anchor_matching'] 
     )
 
     criterion = TransoarCriterion(

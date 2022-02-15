@@ -2,7 +2,6 @@
 
 import torch
 from torch import nn
-from scipy.optimize import linear_sum_assignment
 
 from transoar.utils.bboxes import box_cxcyczwhd_to_xyzxyz, generalized_bbox_iou_3d
 
@@ -20,7 +19,7 @@ class HungarianMatcher(nn.Module):
         cost_bbox: float = 1,
         cost_giou: float = 1,
         cost_center_dist: float = 1,
-        anchor_matching: bool = False
+        anchor_matching: bool = True
     ):
         """Creates the matcher
         Params:
@@ -38,7 +37,7 @@ class HungarianMatcher(nn.Module):
         self.anchor_matching = anchor_matching
 
     @torch.no_grad()
-    def forward(self, outputs, targets, anchors):
+    def forward(self, outputs, targets, anchors, num_top_queries=1):
         """ Performs the matching
         Params:
             outputs: This is a dict that contains at least these entries:
@@ -57,44 +56,42 @@ class HungarianMatcher(nn.Module):
         """
         bs = outputs["pred_logits"].shape[0]
 
-        # Split queries in individual classes   TODO: don't hardcode any information
-        if self.anchor_matching:
-            classes_queries_boxes = [torch.split(anchors, 27, dim=0) for _ in range(bs)]
-        else:
-            classes_queries_boxes = [torch.split(batch_boxes, 27, dim=0) for batch_boxes in torch.unbind(outputs["pred_boxes"], dim=0)]
+        # Generate soft query labels based on IoU with target
+        soft_labels = torch.zeros_like(outputs['pred_logits'][..., 0])
 
-        classes_queries_probs = [[logits.softmax(-1) for logits in torch.split(batch_logits, 27, dim=0)] for batch_logits in torch.unbind(outputs["pred_logits"], dim=0)]
-        assert len(classes_queries_probs[0]) == 20 and len(classes_queries_boxes[0]) == 20
+        # Split queries in individual classes
+        if self.anchor_matching:
+            classes_queries_boxes = anchors[None].repeat((bs, 1, 1)).reshape(bs, 20, 27, -1) #TODO: don't hardcode any information
+        else:
+            classes_queries_boxes = outputs["pred_boxes"].reshape(bs, 20, 27, -1)
+        classes_queries_probs = outputs["pred_logits"].reshape(bs, 20, 27, -1)
 
         # Get targets
-        tgt_ids = [v["labels"] for v in targets]
-        tgt_boxes = [v["boxes"] for v in targets]
+        tgt = [{label.item(): box for box, label in zip(target['boxes'], target['labels'])} for target in targets]
 
-        matches = []
-        for batch in range(bs):
-            batch_matches = []
-            batch_tgt_ids = tgt_ids[batch]
-            batch_tgt_boxes = tgt_boxes[batch]
+        matches = torch.zeros((bs, 20, 27), dtype=torch.long)
+        for batch, (batch_pred_logits, batch_pred_boxes) in enumerate(zip(classes_queries_probs, classes_queries_boxes)):
+            for class_, (class_pred_logits, class_pred_boxes) in enumerate(zip(batch_pred_logits, batch_pred_boxes), 1):
+                try:
+                    tgt_box = tgt[batch][class_]
+                except KeyError:
+                    soft_labels[batch, class_ -1: class_ -1 + 27] = -1  # class not in tgt
+                    continue
 
-            batch_queries_probs = classes_queries_probs[batch]
-            batch_queries_boxes = classes_queries_boxes[batch]
+                # Determine cost based on different metrices
+                cost_class = -class_pred_logits.sigmoid().squeeze()
+                cost_bbox = torch.cdist(class_pred_boxes, tgt_box[None], p=1).squeeze()
+                cost_center_dist = torch.cdist(class_pred_boxes[:, :3], tgt_box[:3][None], p=2).squeeze()
+                cost_giou = -generalized_bbox_iou_3d(box_cxcyczwhd_to_xyzxyz(class_pred_boxes.clip(min=0)), box_cxcyczwhd_to_xyzxyz(tgt_box[None])).squeeze()
 
-            for tgt_id, tgt_box in zip(batch_tgt_ids, batch_tgt_boxes):
-                tgt_id = tgt_id - 1  # Since class 0 has id 1
-                class_queries_boxes = batch_queries_boxes[tgt_id]
-                class_queries_probs = batch_queries_probs[tgt_id]
-
-                # Determine individual costs
-                cost_class = -class_queries_probs[:, -1]
-                cost_bbox = torch.cdist(class_queries_boxes, tgt_box[None], p=1).squeeze()
-                cost_center_dist = torch.cdist(class_queries_boxes[:, :3], tgt_box[:3][None], p=2).squeeze()
-                cost_giou = -generalized_bbox_iou_3d(box_cxcyczwhd_to_xyzxyz(class_queries_boxes.clip(min=0)), box_cxcyczwhd_to_xyzxyz(tgt_box[None])).squeeze()
-
-                # Determine final cost and best performing query
                 C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou + self.cost_center_dist * cost_center_dist
-                best_query = C.argmin() # TODO: add hard negative or dropout
-                batch_matches.append([tgt_id.item(), (best_query + tgt_id * 27).item()])
+                best_query_ids = torch.topk(C, num_top_queries, largest=False)[-1]
 
-            matches.append(batch_matches)
+                # Assign soft labels and match
+                soft_labels[batch,  (class_ - 1) * 27 : class_ * 27] = ((cost_giou - cost_giou.max()) / (cost_giou.min() - cost_giou.max())).clip(min=0) # nomalize
 
-        return matches
+                for query_id in best_query_ids:
+                    matches[batch, class_ -1, query_id] = 1
+
+        return matches, soft_labels
+    

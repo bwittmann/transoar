@@ -7,8 +7,6 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from transoar.models.ops.modules import MSDeformAttn
-
 
 class FocusedAttnDecoder(nn.Module):
     def __init__(
@@ -84,9 +82,6 @@ class FocusedAttnDecoder(nn.Module):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
-        for m in self.modules():
-            if isinstance(m, MSDeformAttn):
-                m._reset_parameters()
 
     def forward(self, srcs, query_embed, pos_embeds):
         assert query_embed is not None
@@ -95,7 +90,7 @@ class FocusedAttnDecoder(nn.Module):
         src_flatten = srcs.flatten(2).transpose(1, 2)                                # [Batch, Patches, HiddenDim] 
         pos_embed_flatten = pos_embeds.flatten(2).transpose(1, 2)                    # [Batch, Patches, HiddenDim] 
         
-        bs, _, c = src_flatten.shape                                                 # [Batch, AllLvlPatches, HiddenDim]
+        bs, _, c = src_flatten.shape
         query_embed, tgt = torch.split(query_embed, c, dim=1)                        # Tgt in contrast to detr not zeros, but learnable
         query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)
         tgt = tgt.unsqueeze(0).expand(bs, -1, -1)
