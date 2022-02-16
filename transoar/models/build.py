@@ -1,5 +1,6 @@
 """Module containing functionality to build different parts of the model."""
 
+from re import A
 import torch.nn as nn
 
 from transoar.models.matcher import HungarianMatcher
@@ -7,6 +8,7 @@ from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.backbones.convnet_light_3D import ConvNetLight
+from transoar.models.backbones.attn_fpn import AttnFPN
 from transoar.models.backbones.swin_transformer_3D import SwinTransformer3D
 from transoar.models.backbones.fpn import SwinFPN
 from transoar.models.necks.detr_transformer import DetrTransformer
@@ -110,6 +112,10 @@ def build_backbone(config):
             patch_norm=config['patch_norm'],
             frozen_stages=config['frozen_stages'],
             use_checkpoint=config['use_checkpoint']
+        )
+    elif config['name'] == 'attn_fpn':
+        model = AttnFPN(
+            config
         )
 
     return model
