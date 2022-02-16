@@ -46,6 +46,17 @@ class FocusedAttnDecoder(nn.Module):
         for class_, props in self.bbox_props.items():
             attn_volume_normalized = torch.tensor(props['attn_area'])   # x1, y1, z1, x2, y2, z2
 
+            # Show information about class boxes
+            # from transoar.utils.bboxes import box_cxcyczwhd_to_xyzxyz
+            # median_box = box_cxcyczwhd_to_xyzxyz(torch.tensor(props['median']))
+            # max_box = box_cxcyczwhd_to_xyzxyz(torch.tensor(props['max']))
+            # print(
+            #     class_,
+            #     # (attn_volume_normalized[3:] -  attn_volume_normalized[:3]).tolist(),
+            #     (median_box[3:] -  median_box[:3]).tolist(),
+            #     (max_box[3:] -  max_box[:3]).tolist(),
+            # )
+
             for fmap_shape in self.config['input_shapes']:
                 attn_volume = torch.tensor(
                     [

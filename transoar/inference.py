@@ -24,11 +24,19 @@ def inference(out, query_info=None):
             batch_scores.append(pred_probs[batch, class_, valid_id].detach().cpu().numpy())
             batch_classes.append(class_ + 1)
 
-            # if query_info is not None:
-            #     query_info[class_ + 1].append([class_probs[:, -1].max().item(), class_probs[:, -1].argmax().item()])
+            if query_info is not None:
+                query_info[class_ + 1].append(
+                    [
+                        pred_probs[batch, class_, valid_id].item(),
+                        pred_query_ids[batch, class_].item()
+                    ]
+                )
 
         boxes.append(np.concatenate(batch_boxes))
         classes.append(np.array(batch_classes))
         scores.append(np.array(batch_scores))
 
-    return boxes, classes, scores
+    if query_info is not None:
+        return boxes, classes, scores, query_info
+    else:
+        return boxes, classes, scores

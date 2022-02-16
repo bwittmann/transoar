@@ -58,19 +58,16 @@ class Tester:
   
     def run(self):
         if self._save_attn_map:
-            backbone_features_list, enc_attn_weights_list, dec_attn_weights_list = [], [], []
+            backbone_features_list, dec_attn_weights_list = [], []
             
             # Register hooks to efficiently access relevant weights
             hooks = [
-                self._model._backbone.layers[-1].register_forward_hook(
+                self._model._backbone.P2_conv2.register_forward_hook(
                     lambda self, input, output: backbone_features_list.append(output)
                 ),
-                self._model._neck.encoder.layers[-1].self_attn.register_forward_hook(
-                    lambda self, input, output: enc_attn_weights_list.append(output[1])
-                ),
-                self._model._neck.decoder.layers[-1].multihead_attn.register_forward_hook(
+                self._model._neck.decoder.layers[-1].cross_attn.register_forward_hook(
                     lambda self, input, output: dec_attn_weights_list.append(output[1])
-                ),
+                )
             ]
     
         with torch.no_grad():
@@ -89,7 +86,7 @@ class Tester:
                     pass    #continue
 
                 # Make prediction
-                out = self._model(data, mask)
+                out = self._model(data)
 
                 # Format out to fit evaluator and estimate best predictions per class
                 pred_boxes, pred_classes, pred_scores, query_info = inference(out, query_info)
@@ -114,11 +111,10 @@ class Tester:
                 if self._save_attn_map:
                     # Get current attn weights
                     backbone_features = backbone_features_list.pop(-1).squeeze()
-                    enc_attn_weights = enc_attn_weights_list.pop(-1).squeeze()
                     dec_attn_weights = dec_attn_weights_list.pop(-1).squeeze()
 
                     save_attn_visualization(
-                        out, backbone_features, enc_attn_weights, dec_attn_weights, list(data.shape[-3:]),
+                        out, backbone_features, dec_attn_weights, list(data.shape[-3:]),
                         seg_mask[0]
                     )
 

@@ -1,6 +1,5 @@
 """Module containing the loss functions of the transoar project."""
 
-from signal import valid_signals
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
