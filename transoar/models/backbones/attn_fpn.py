@@ -5,6 +5,13 @@ from math import floor
 import torch
 import torch.nn as nn
 
+from transoar.models.backbones.encoder_blocks import (
+    EncoderCnnBlock,
+    EncoderSwinBlock,
+    PatchMerging,
+    ConvPatchMerging
+)
+
 class AttnFPN(nn.Module):
     def __init__(self, fpn_config):
         super().__init__()
@@ -18,83 +25,8 @@ class AttnFPN(nn.Module):
         up = self._decoder(down)
         return up
 
-class Encoder(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        # Get initial channels
-        in_channels = config['in_channels']
-        out_channels = config['start_channels']
-
-        num_stages = len(config['conv_kernels'])
-
-        # Down
-        self._stages = nn.ModuleList()
-        for stage_id in range(num_stages):
-
-            stage = EncoderBlock(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=config['conv_kernels'][stage_id],
-                stride=config['strides'][stage_id]
-            )
-            self._stages.append(stage)
-
-            in_channels = out_channels
-            out_channels = floor(out_channels * config['channel_gain'])
-
-            if out_channels > config['max_channels']:
-                out_channels = config['max_channels']
-
-    def forward(self, x):
-        # Forward down
-        outputs = {}
-        for stage_id, module in enumerate(self._stages):
-            x = module(x)
-            outputs['C' + str(stage_id)] = x
-        return outputs 
-
-class EncoderBlock(nn.Module):
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride,
-        padding=1,
-        bias=False,
-        affine=True,
-        eps=1e-05
-
-    ):
-        super().__init__()
-
-        conv_block_1 = [
-            nn.Conv3d(
-                in_channels=in_channels, out_channels=out_channels,
-                kernel_size=kernel_size, stride=stride, padding=padding,
-                bias=bias
-            ),
-            nn.InstanceNorm3d(num_features=out_channels, affine=affine, eps=eps),
-            nn.ReLU(inplace=True)
-        ]
-
-        conv_block_2 = [
-            nn.Conv3d(
-                in_channels=out_channels, out_channels=out_channels,
-                kernel_size=kernel_size, stride=1, padding=padding,
-                bias=bias
-            ),
-            nn.InstanceNorm3d(num_features=out_channels, affine=affine, eps=eps),
-            nn.ReLU(inplace=True)
-        ]
-
-        self._block = nn.Sequential(
-            *conv_block_1,
-            *conv_block_2
-        )
-
-    def forward(self, x):
-        return self._block(x)
+    def init_weights(self):
+        pass    # TODO
 
 class Decoder(nn.Module):
     def __init__(self, config):
@@ -145,4 +77,61 @@ class Decoder(nn.Module):
 
         # Forward out
         outputs = {'P' + str(level): self._out[level](fm) for level, fm in enumerate(reversed(out_up))}
+        return outputs
+
+class Encoder(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        # Get initial channels
+        in_channels = config['in_channels']
+        out_channels = config['start_channels']
+
+        # Get number of encoder stages
+        num_stages = len(config['conv_kernels'])
+
+        # Define stochastic depth for drop path of swin blocks
+        swin_depth = config['depths']
+        drop_path_rate = [x.item() for x in torch.linspace(0, config['drop_path_rate'], sum(swin_depth))]
+
+        # Define downsample operation for swin blocks
+        downsample_layer = ConvPatchMerging if config['conv_merging'] else PatchMerging
+
+        # Down
+        self._stages = nn.ModuleList()
+        for stage_id in range(num_stages):
+
+            # Get encoder blocks
+            if config['use_encoder_attn'] and stage_id > 1: # Initial patch embedding done with convs
+                stage = EncoderSwinBlock(
+                    dim=in_channels,
+                    depth=config['depths'][stage_id - 2],
+                    num_heads=config['num_heads'][stage_id - 2],
+                    window_size=config['window_size'],
+                    mlp_ratio=config['mlp_ratio'],
+                    qkv_bias=config['qkv_bias'],
+                    qk_scale=config['qk_scale'],
+                    drop=config['drop_rate'],
+                    attn_drop=config['attn_drop_rate'],
+                    drop_path=drop_path_rate[sum(swin_depth[:stage_id - 2]):sum(swin_depth[:stage_id - 1])],
+                    downsample=downsample_layer
+                )
+            else:
+                stage = EncoderCnnBlock(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=config['conv_kernels'][stage_id],
+                    stride=config['strides'][stage_id]
+                )
+
+            self._stages.append(stage)
+
+            in_channels = out_channels
+            out_channels *= 2
+
+    def forward(self, x):
+        # Forward down
+        outputs = {}
+        for stage_id, module in enumerate(self._stages):
+            x = module(x)
+            outputs['C' + str(stage_id)] = x
         return outputs

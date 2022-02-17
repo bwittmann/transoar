@@ -28,7 +28,7 @@ class TransoarNet(nn.Module):
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         num_queries = config['neck']['num_queries']
-        num_channels = config['backbone']['end_filts']
+        num_channels = config['backbone']['fpn_channels']
         self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
         self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 

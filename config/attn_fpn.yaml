@@ -45,51 +45,18 @@ backbone:
   name: attn_fpn
   
   # Encoder
-  use_attn: False
+  use_encoder_attn: True # Activates swin encoder
 
   # Standard params
   conv_kernels: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]  # C0, C1, C2, C3, C4, C5
   strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]]
   in_channels: 1  #  Input channels 
-  start_channels: 32  # Channels after first encoder block 
-  channel_gain: 2 # Channel gain after each encoder block 
-  max_channels: 320
+  start_channels: 24  # Channels after first encoder block
 
   # Swin transformer params
-
-  # Decoder
-  use_attn: False
-  
-  # Standard params
-  fpn_channels: 128 # Final output channels
-    
-
-
-
-  # FPN
-  start_filts: 24
-  end_filts: 48
-  res_architecture: resnet50
-  n_channels: 1
-  norm: null
-  relu: relu
-  n_latent_dims: 0
-  operate_stride1: False  # Takes forever to train
-  sixth_pooling: False
-
-  # Input proj
-  num_fmap: 0
-
-  # Swin
-  use_swin: False #True
-  pretrained: null
-  pretrained_2d: True
-  patch_size: [4, 4, 4]
-  in_chans: 1
-  embed_dim: 96
-  depths: [2, 1, 1, 1]
+  depths: [2, 2, 2, 2]
   num_heads: [3, 6, 12, 24]
-  window_size: [5, 5, 5]  # [7, 7, 7]
+  window_size: [5, 5, 5]
   mlp_ratio: 4
   qkv_bias: True
   qk_scale: null
@@ -97,8 +64,18 @@ backbone:
   attn_drop_rate: 0.
   drop_path_rate: 0.2
   patch_norm: False
-  frozen_stages: -1
-  use_checkpoint: False
+  conv_merging: True  # Not tested yet
+
+  # Decoder
+  use_decoder_attn: False # Activated def attn decoder
+  
+  # Standard params
+  max_channels: 300
+  fpn_channels: 128 # Final output channels
+  num_fmap: 1
+
+  # Def attn params
+
 
 neck:
   name: focused_attn
