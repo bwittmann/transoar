@@ -11,7 +11,7 @@ class TransoarNet(nn.Module):
     def __init__(self, config):
         super().__init__()
         self._aux_loss = config['neck']['aux_loss'] # Use auxiliary decoding losses if required
-        self._num_fmap = config['backbone']['num_fmap']
+        self._out_fmap = config['backbone']['out_fmap']
 
         # Get anchors        
         self.anchors = self._generate_anchors(config['neck'], config['bbox_properties']).cuda()
@@ -28,9 +28,7 @@ class TransoarNet(nn.Module):
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         num_queries = config['neck']['num_queries']
-        num_channels = config['backbone']['fpn_channels']
         self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
-        self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
 
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
@@ -48,7 +46,7 @@ class TransoarNet(nn.Module):
     def forward(self, x):
         out_backbone = self._backbone(x)
 
-        src = self._input_proj(out_backbone[self._num_fmap])
+        src = out_backbone[self._out_fmap]
         pos = self._pos_enc(src)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         

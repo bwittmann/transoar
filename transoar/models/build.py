@@ -8,7 +8,7 @@ from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.senet_3D import SENet, SEResNetBottleneck
 from transoar.models.backbones.resnet_3D import ResNet, Bottleneck, get_inplanes
 from transoar.models.backbones.convnet_light_3D import ConvNetLight
-from transoar.models.backbones.attn_fpn import AttnFPN
+from transoar.models.backbones.attn_fpn.attn_fpn import AttnFPN
 from transoar.models.backbones.swin_transformer_3D import SwinTransformer3D
 from transoar.models.backbones.fpn import SwinFPN
 from transoar.models.necks.detr_transformer import DetrTransformer

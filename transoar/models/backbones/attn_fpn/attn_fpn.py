@@ -1,24 +1,25 @@
 """Module containing code of the transoar projects backbone."""
 
-from math import floor
-
 import torch
 import torch.nn as nn
 
-from transoar.models.backbones.encoder_blocks import (
+from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
+from transoar.models.backbones.attn_fpn.decoder_blocks import DecoderDefAttnBlock
+from transoar.models.backbones.attn_fpn.encoder_blocks import (
     EncoderCnnBlock,
     EncoderSwinBlock,
     PatchMerging,
     ConvPatchMerging
 )
 
+
 class AttnFPN(nn.Module):
-    def __init__(self, fpn_config):
+    def __init__(self, fpn_config, debug=False):
         super().__init__()
 
         # Build encoder and decoder
-        self._encoder = Encoder(fpn_config)
-        self._decoder = Decoder(fpn_config)
+        self._encoder = Encoder(fpn_config, debug)
+        self._decoder = Decoder(fpn_config, debug)
 
     def forward(self, src):
         down = self._encoder(src)
@@ -29,13 +30,16 @@ class AttnFPN(nn.Module):
         pass    # TODO
 
 class Decoder(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, debug):
         super().__init__()
+        self._debug = debug
         self._num_stages = len(config['conv_kernels'])
+        self._refine_fmaps = config['use_decoder_attn']
+        self._refine_feature_levels = config['feature_levels']
 
         # Determine channels
         out_channels = torch.tensor([config['start_channels'] * 2**stage for stage in range(self._num_stages)])
-        encoder_out_channels = out_channels.clip(max=config['max_channels']).tolist()
+        encoder_out_channels = out_channels.tolist()
         decoder_out_channels = out_channels.clip(max=config['fpn_channels']).tolist()
 
         # Lateral 
@@ -46,7 +50,7 @@ class Decoder(nn.Module):
         # Out
         self._out = nn.ModuleList()
         for out_channels in decoder_out_channels:
-            self._out.append(nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, padding=1))
+            self._out.append(nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, padding=1))  # TODO: kernel_size 1
 
         #  Up
         self._up = nn.ModuleList()
@@ -57,6 +61,30 @@ class Decoder(nn.Module):
                     kernel_size=config['strides'][level], stride=config['strides'][level]
                 )
             )
+        
+        # Refine
+        if self._refine_fmaps:
+            # Build positional encoding
+            if config['pos_encoding'] == 'sine':
+                self._pos_enc = PositionEmbeddingSine3D(channels=config['hidden_dim'])
+            elif config['pos_encoding'] == 'learned':
+                self._pos_enc = PositionEmbeddingLearned3D(channels=config['hidden_dim'])
+
+            # Build deformable arrention module
+            self._refine = DecoderDefAttnBlock(
+                d_model=config['hidden_dim'],
+                nhead=config['nheads'],
+                num_layers=config['layers'],
+                dim_feedforward=config['dim_feedforward'],
+                dropout=config['dropout'],
+                feature_levels=config['feature_levels'],
+                n_points=config['n_points'],
+                use_cuda=config['use_cuda']
+            )
+
+            # Build input projection
+            
+
 
     def forward(self, x):
         # Forward lateral
@@ -77,11 +105,31 @@ class Decoder(nn.Module):
 
         # Forward out
         outputs = {'P' + str(level): self._out[level](fm) for level, fm in enumerate(reversed(out_up))}
+
+        # Forward refine
+        if self._refine_fmaps:
+            fmaps = [outputs[fmap_id] for fmap_id in self._refine_feature_levels]
+            pos_enc = [self._pos_enc(fmap) for fmap in fmaps]
+            fmaps_refined = self._refine(fmaps, pos_enc)
+
+            # Update output dict
+            for fmap_id, fmap_refined in zip(self._refine_feature_levels, fmaps_refined):
+                outputs[fmap_id] = fmap_refined
+
+        # Print shapes for debugging
+        if self._debug:
+            print('AttnFPN decoder shapes:')
+            for fmap_id, fmap in outputs.items():
+                print(fmap_id, list(fmap.shape))
+                self._debug = False
+
         return outputs
 
 class Encoder(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, debug):
         super().__init__()
+        self._debug = debug
+
         # Get initial channels
         in_channels = config['in_channels']
         out_channels = config['start_channels']
@@ -134,4 +182,12 @@ class Encoder(nn.Module):
         for stage_id, module in enumerate(self._stages):
             x = module(x)
             outputs['C' + str(stage_id)] = x
+
+        # Print shapes for debugging
+        if self._debug:
+            print('AttnFPN encoder shapes:')
+            for fmap_id, fmap in outputs.items():
+                print(fmap_id, list(fmap.shape))
+                self._debug = False
+
         return outputs

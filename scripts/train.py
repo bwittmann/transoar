@@ -49,32 +49,33 @@ def train(config, args):
     print(f'num_neck_params\t\t{num_neck_params:>10}\t{num_neck_params/num_params:.4f}%')
     print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
 
-    param_dicts = [
-        {
-            'params': [
-                p for n, p in model.named_parameters() if not match(n, ['backbone', 'reference_points', 'sampling_offsets']) and p.requires_grad
-            ],
-            'lr': float(config['lr'])
-        },
-        {
-            'params': [p for n, p in model.named_parameters() if match(n, ['backbone']) and p.requires_grad],
-            'lr': float(config['lr_backbone'])
-        } 
-    ]
+    # TODO
+    # param_dicts = [
+    #     {
+    #         'params': [
+    #             p for n, p in model.named_parameters() if not match(n, ['backbone', 'reference_points', 'sampling_offsets']) and p.requires_grad
+    #         ],
+    #         'lr': float(config['lr'])
+    #     },
+    #     {
+    #         'params': [p for n, p in model.named_parameters() if match(n, ['backbone']) and p.requires_grad],
+    #         'lr': float(config['lr_backbone'])
+    #     } 
+    # ]
 
-    # Append additional param dict for def detr
-    if sum([match(n, ['reference_points', 'sampling_offsets']) for n, _ in model.named_parameters()]) > 0:
-        param_dicts.append(
-            {
-                "params": [
-                    p for n, p in model.named_parameters() if match(n, ['reference_points', 'sampling_offsets']) and p.requires_grad
-                ],
-                'lr': float(config['lr']) * config['lr_linear_proj_mult']
-            }
-        )
+    # # Append additional param dict for def detr
+    # if sum([match(n, ['reference_points', 'sampling_offsets']) for n, _ in model.named_parameters()]) > 0:
+    #     param_dicts.append(
+    #         {
+    #             "params": [
+    #                 p for n, p in model.named_parameters() if match(n, ['reference_points', 'sampling_offsets']) and p.requires_grad
+    #             ],
+    #             'lr': float(config['lr']) * config['lr_linear_proj_mult']
+    #         }
+    #     )
 
     optim = torch.optim.AdamW(
-        param_dicts, lr=float(config['lr']), weight_decay=float(config['weight_decay'])
+        model.parameters(), lr=float(config['lr']), weight_decay=float(config['weight_decay'])
     )
     scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
 
