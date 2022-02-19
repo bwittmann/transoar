@@ -8,9 +8,9 @@ debug_mode: True  # doesn't save checkpoints
 seed: 10
 
 epochs: 2700 # prev: 50
-lr: 2e-4
 lr_backbone: 2e-5
-lr_linear_proj_mult: 0.1
+lr_neck: 2e-4
+lr_heads: 2e-4
 weight_decay: 1e-4
 clip_max_norm: 0.1
 
@@ -69,13 +69,13 @@ backbone:
   use_decoder_attn: True # Activated def attn
   
   # Standard params
-  fpn_channels: 384 # Final output channels
+  fpn_channels: 192 # Final output channels
   out_fmap: P3  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
   feature_levels: [P3, P4, P5]
-  hidden_dim: 384 #832 # 192 # prev: 256
+  hidden_dim: 192 #832 # 192 # prev: 256
   dim_feedforward: 1024
   dropout: 0.1 #0.1
   nheads: 6 #26 #6  #prev: 8
@@ -88,10 +88,10 @@ neck:
   name: focused_attn
   
   pos_encoding: sine
-  hidden_dim: 384 # prev: 256
+  hidden_dim: 192 # prev: 256
   dropout: 0.1  # prev: 0.1
   nheads: 8
-  dim_feedforward: 1024 # prev: 256
+  dim_feedforward: 540 #1024 # prev: 256
   dec_layers: 3 #6
 
   num_queries: 540

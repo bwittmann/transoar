@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn as nn
 import monai
 
 from transoar.trainer import Trainer
@@ -26,7 +27,7 @@ def match(n, keywords):
 
 def train(config, args):
     os.environ["CUDA_VISIBLE_DEVICES"] = config['device'][-1]
-    device = 'cuda' # TODO: fix this hack for def detr cuda module
+    device = 'cuda'
 
     # Build necessary components
     train_loader = get_loader(config, 'train')
@@ -41,41 +42,31 @@ def train(config, args):
 
     # Analysis of model parameter distribution
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['backbone', 'input_proj', 'skip']))
-    num_neck_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['neck', 'query']))
-    num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['head']))
+    num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['_backbone']))
+    num_neck_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['_neck', '_query']))
+    num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['_cls_head', '_bbox_reg_head']))
 
-    print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%') # TODO: Incorp into logging
+    print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%')
     print(f'num_neck_params\t\t{num_neck_params:>10}\t{num_neck_params/num_params:.4f}%')
     print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
 
-    # TODO
-    # param_dicts = [
-    #     {
-    #         'params': [
-    #             p for n, p in model.named_parameters() if not match(n, ['backbone', 'reference_points', 'sampling_offsets']) and p.requires_grad
-    #         ],
-    #         'lr': float(config['lr'])
-    #     },
-    #     {
-    #         'params': [p for n, p in model.named_parameters() if match(n, ['backbone']) and p.requires_grad],
-    #         'lr': float(config['lr_backbone'])
-    #     } 
-    # ]
-
-    # # Append additional param dict for def detr
-    # if sum([match(n, ['reference_points', 'sampling_offsets']) for n, _ in model.named_parameters()]) > 0:
-    #     param_dicts.append(
-    #         {
-    #             "params": [
-    #                 p for n, p in model.named_parameters() if match(n, ['reference_points', 'sampling_offsets']) and p.requires_grad
-    #             ],
-    #             'lr': float(config['lr']) * config['lr_linear_proj_mult']
-    #         }
-    #     )
+    param_dicts = [
+        {
+            'params': [p for n, p in model.named_parameters() if match(n, ['_backbone']) and p.requires_grad],
+            'lr': float(config['lr_backbone'])
+        },
+        {
+            'params': [p for n, p in model.named_parameters() if match(n, ['_neck, _query']) and p.requires_grad],
+            'lr': float(config['lr_neck'])
+        },
+        {
+            'params': [p for n, p in model.named_parameters() if match(n, ['_cls_head', '_bbox_reg_head']) and p.requires_grad],
+            'lr': float(config['lr_heads'])
+        },
+    ]
 
     optim = torch.optim.AdamW(
-        model.parameters(), lr=float(config['lr']), weight_decay=float(config['weight_decay'])
+        param_dicts, lr=float(config['lr_backbone']), weight_decay=float(config['weight_decay'])
     )
     scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
 

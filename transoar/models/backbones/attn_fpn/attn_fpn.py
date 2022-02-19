@@ -82,10 +82,6 @@ class Decoder(nn.Module):
                 use_cuda=config['use_cuda']
             )
 
-            # Build input projection
-            
-
-
     def forward(self, x):
         # Forward lateral
         fpn_maps = [self._lateral[level](fm) for level, fm in enumerate(x.values())]
@@ -124,6 +120,7 @@ class Decoder(nn.Module):
                 self._debug = False
 
         return outputs
+
 
 class Encoder(nn.Module):
     def __init__(self, config, debug):
