@@ -174,7 +174,9 @@ def build_criterion(config):
 
     criterion = TransoarCriterion(
         num_classes=config['num_classes'],
-        matcher=matcher
+        matcher=matcher,
+        seg_proxy=config['backbone']['use_seg_proxy_loss'],
+        seg_fg_bg=config['backbone']['fg_bg']
     )
 
     return criterion

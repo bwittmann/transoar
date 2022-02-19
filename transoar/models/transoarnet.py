@@ -22,10 +22,15 @@ class TransoarNet(nn.Module):
         # Get neck
         self._neck = build_neck(config['neck'], config['bbox_properties'])
 
-        # Get heads
+        # Get detection heads
         hidden_dim = config['neck']['hidden_dim']
         self._cls_head = nn.Linear(hidden_dim, 1)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
+
+        # Get segmentation head
+        in_channels = config['backbone']['start_channels']
+        out_channels = 2 if config['backbone']['fg_bg'] else config['neck']['num_organs'] + 1 # inc bg
+        self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
 
         num_queries = config['neck']['num_queries']
         self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
@@ -46,21 +51,26 @@ class TransoarNet(nn.Module):
     def forward(self, x):
         out_backbone = self._backbone(x)
 
-        src = out_backbone[self._out_fmap]
-        pos = self._pos_enc(src)
+        # Get required fmaps from backbone
+        det_src = out_backbone[self._out_fmap]
+        seg_src = out_backbone['P0']
+
+        pos = self._pos_enc(det_src)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
-            src,
+            det_src,
             self._query_embed.weight,
             pos
         )
 
         pred_logits = self._cls_head(out_neck)
         pred_boxes = self._bbox_reg_head(out_neck).tanh() * 0.2
+        pred_seg = self._seg_head(seg_src)
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
-            'pred_boxes': pred_boxes[-1] + self.anchors
+            'pred_boxes': pred_boxes[-1] + self.anchors,
+            'pred_seg': pred_seg
         }
 
         if self._aux_loss:
@@ -100,7 +110,6 @@ class TransoarNet(nn.Module):
 
         return anchors
 
-
 class MLP(nn.Module):
     """ Very simple multi-layer perceptron (also called FFN)"""
 
@@ -116,9 +125,3 @@ class MLP(nn.Module):
         for i, layer in enumerate(self.layers):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
-
-def inverse_sigmoid(x, eps=1e-5):
-    x = x.clamp(min=0, max=1)
-    x1 = x.clamp(min=eps)
-    x2 = (1 - x).clamp(min=eps)
-    return torch.log(x1/x2)

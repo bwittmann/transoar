@@ -44,22 +44,24 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
-        for data, _, bboxes, _ in tqdm(self._train_loader):
+        loss_seg_ce_agg = 0
+        loss_seg_dice_agg = 0
+        for data, _, bboxes, seg_targets in tqdm(self._train_loader):
             # Put data to gpu
-            data = data.to(device=self._device)
+            data, seg_targets = data.to(device=self._device), seg_targets.to(device=self._device)
         
-            targets = []
+            det_targets = []
             for item in bboxes:
                 target = {
                     'boxes': item[0].to(dtype=torch.float, device=self._device),
                     'labels': item[1].to(device=self._device)
                 }
-                targets.append(target)
+                det_targets.append(target)
 
             # Make prediction
             with autocast(): 
                 out = self._model(data)
-                loss_dict = self._criterion(out, targets, self._model.anchors)
+                loss_dict = self._criterion(out, det_targets, seg_targets, self._model.anchors)
 
                 # Create absolute loss and mult with loss coefficient
                 loss_abs = 0
@@ -81,18 +83,25 @@ class Trainer:
             loss_bbox_agg += loss_dict['bbox'].item()
             loss_giou_agg += loss_dict['giou'].item()
             loss_cls_agg += loss_dict['cls'].item()
+            loss_seg_ce_agg += loss_dict['segce'].item()
+            loss_seg_dice_agg += loss_dict['segdice'].item()
 
         loss = loss_agg / len(self._train_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
         loss_giou = loss_giou_agg / len(self._train_loader)
         loss_cls = loss_cls_agg / len(self._train_loader)
+        loss_seg_ce = loss_seg_ce_agg / len(self._train_loader)
+        loss_seg_dice = loss_seg_dice_agg / len(self._train_loader)
+        
 
         self._write_to_logger(
             num_epoch, 'train', 
             total_loss=loss,
             bbox_loss=loss_bbox,
             giou_loss=loss_giou,
-            cls_loss=loss_cls
+            cls_loss=loss_cls,
+            seg_ce_loss=loss_seg_ce,
+            seg_dice_loss=loss_seg_dice
         )
 
     @torch.no_grad()
@@ -104,22 +113,24 @@ class Trainer:
         loss_bbox_agg = 0
         loss_giou_agg = 0
         loss_cls_agg = 0
-        for data, _, bboxes, _ in tqdm(self._val_loader):
+        loss_seg_ce_agg = 0
+        loss_seg_dice_agg = 0
+        for data, _, bboxes, seg_targets in tqdm(self._val_loader):
             # Put data to gpu
-            data = data.to(device=self._device)
+            data, seg_targets = data.to(device=self._device), seg_targets.to(device=self._device)
         
-            targets = []
+            det_targets = []
             for item in bboxes:
                 target = {
                     'boxes': item[0].to(dtype=torch.float, device=self._device),
                     'labels': item[1].to(device=self._device)
                 }
-                targets.append(target)
+                det_targets.append(target)
 
             # Make prediction
             with autocast():
                 out = self._model(data)
-                loss_dict = self._criterion(out, targets, self._model.anchors)
+                loss_dict = self._criterion(out, det_targets, seg_targets, self._model.anchors)
 
                 # Create absolute loss and mult with loss coefficient
                 loss_abs = 0
@@ -132,19 +143,23 @@ class Trainer:
                 pred_boxes=pred_boxes,
                 pred_classes=pred_classes,
                 pred_scores=pred_scores,
-                gt_boxes=[target['boxes'].detach().cpu().numpy() for target in targets],
-                gt_classes=[target['labels'].detach().cpu().numpy() for target in targets]
+                gt_boxes=[target['boxes'].detach().cpu().numpy() for target in det_targets],
+                gt_classes=[target['labels'].detach().cpu().numpy() for target in det_targets]
             )
 
             loss_agg += loss_abs.item()
             loss_bbox_agg += loss_dict['bbox'].item()
             loss_giou_agg += loss_dict['giou'].item()
             loss_cls_agg += loss_dict['cls'].item()
+            loss_seg_ce_agg += loss_dict['segce'].item()
+            loss_seg_dice_agg += loss_dict['segdice'].item()
 
         loss = loss_agg / len(self._val_loader)
         loss_bbox = loss_bbox_agg / len(self._val_loader)
         loss_giou = loss_giou_agg / len(self._val_loader)
         loss_cls = loss_cls_agg / len(self._val_loader)
+        loss_seg_ce = loss_seg_ce_agg / len(self._val_loader)
+        loss_seg_dice = loss_seg_dice_agg / len(self._val_loader)
 
         metric_scores = self._evaluator.eval()
         self._evaluator.reset()
@@ -164,7 +179,9 @@ class Trainer:
             total_loss=loss,
             bbox_loss=loss_bbox,
             giou_loss=loss_giou,
-            cls_loss=loss_cls
+            cls_loss=loss_cls,
+            seg_ce_loss=loss_seg_ce,
+            seg_dice_loss=loss_seg_dice
         )
 
         self._write_to_logger(
@@ -189,11 +206,12 @@ class Trainer:
             self._train_one_epoch(epoch)
 
             # Log learning rates
-            self._write_to_logger(
-                epoch, 'lr',
-                neck=self._optimizer.param_groups[0]['lr'],
-                backbone=self._optimizer.param_groups[1]['lr']
-            )
+            # self._write_to_logger(
+            #     epoch, 'lr',
+            #     backbone=self._optimizer.param_groups[0]['lr'],
+            #     neck=self._optimizer.param_groups[1]['lr'],
+            #     heads=self._optimizer.param_groups[2]['lr']
+            # )
 
             if epoch % self._config['val_interval'] == 0:
                 self._validate(epoch)

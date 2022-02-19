@@ -44,7 +44,7 @@ def train(config, args):
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['_backbone']))
     num_neck_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['_neck', '_query']))
-    num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['_cls_head', '_bbox_reg_head']))
+    num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['_cls_head', '_bbox_reg_head', '_seg_head']))
 
     print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%')
     print(f'num_neck_params\t\t{num_neck_params:>10}\t{num_neck_params/num_params:.4f}%')
@@ -60,7 +60,7 @@ def train(config, args):
             'lr': float(config['lr_neck'])
         },
         {
-            'params': [p for n, p in model.named_parameters() if match(n, ['_cls_head', '_bbox_reg_head']) and p.requires_grad],
+            'params': [p for n, p in model.named_parameters() if match(n, ['_cls_head', '_bbox_reg_head', '_seg_head']) and p.requires_grad],
             'lr': float(config['lr_heads'])
         },
     ]
