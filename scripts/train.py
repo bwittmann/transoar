@@ -52,17 +52,12 @@ def train(config, args):
 
     param_dicts = [
         {
-            'params': [p for n, p in model.named_parameters() if match(n, ['_backbone']) and p.requires_grad],
-            'lr': float(config['lr_backbone'])
+            'params': [p for n, p in model.named_parameters() if match(n, ['_backbone']) and p.requires_grad]
         },
         {
-            'params': [p for n, p in model.named_parameters() if match(n, ['_neck, _query']) and p.requires_grad],
-            'lr': float(config['lr_neck'])
-        },
-        {
-            'params': [p for n, p in model.named_parameters() if match(n, ['_cls_head', '_bbox_reg_head', '_seg_head']) and p.requires_grad],
-            'lr': float(config['lr_heads'])
-        },
+            'params': [p for n, p in model.named_parameters() if not match(n, ['_backbone']) and p.requires_grad],
+            'lr': float(config['lr'])
+        }
     ]
 
     optim = torch.optim.AdamW(

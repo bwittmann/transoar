@@ -16,7 +16,7 @@ from transoar.models.backbones.attn_fpn.encoder_blocks import (
 
 
 class AttnFPN(nn.Module):
-    def __init__(self, fpn_config, debug=True):
+    def __init__(self, fpn_config, debug=False):
         super().__init__()
 
         # Build encoder and decoder

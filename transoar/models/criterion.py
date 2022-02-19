@@ -62,6 +62,8 @@ class TransoarCriterion(nn.Module):
         return loss_bbox, loss_giou
 
     def loss_segmentation(self, outputs, targets):
+        assert 'pred_seg' in outputs
+
         # Get only fg and bg labels
         if self._seg_fg_bg:
            targets[targets > 0] = 1
@@ -72,8 +74,6 @@ class TransoarCriterion(nn.Module):
         loss_dice = self._dice_loss(outputs['pred_seg'], targets)
         
         return loss_ce, loss_dice
-
-
 
     def forward(self, outputs, det_targets, seg_targets, anchors):
         # Retrieve the matching between the outputs of the last layer and the targets
