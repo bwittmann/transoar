@@ -13,8 +13,8 @@ import monai
 from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_config, write_json, get_meta_data
-from transoar.models.scheduler import LinearWarmupPolyLR
-from transoar.models.retina_unet import RetinaUNet
+from transoar.models.retinanet.scheduler import LinearWarmupPolyLR
+from transoar.models.retinanet.retina_unet import RetinaUNet
 
 
 def match(n, keywords):

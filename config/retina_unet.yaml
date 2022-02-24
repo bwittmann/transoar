@@ -1,7 +1,7 @@
-# Config file for light convnet + deformable detr combination
+# Config file for AttnFPN backbone and RetinaNet head
 
 # General training
-experiment_name: test #retina_unet_attnfpn_original_optim #retina_unet_def_attn_e2500_320_320_512 #test_orig_train_params_wh_160_flip_wd_switch
+experiment_name: test #retina_unet_attnfpn_original_optim
 device: cuda:3
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints

@@ -8,7 +8,6 @@ from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
 from transoar.evaluator import DetectionEvaluator
-from transoar.inference import inference
 
 
 class Trainer:

@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 
-from transoar.models.head import DetectionHeadHNMNative, ClsHead, RegHead, SegHead
+from transoar.models.retinanet.head import DetectionHeadHNMNative, ClsHead, RegHead, SegHead
 from transoar.models.backbones.attn_fpn import AttnFPN
-from transoar.models.anchor_gen import AnchorGenerator3DS
+from transoar.models.anchors.anchor_gen import AnchorGenerator3DS
 from transoar.models.sampler import HardNegativeSamplerBatched
 from transoar.models.coder import BoxCoderND
-from transoar.models.anchor_matcher import ATSSMatcher, box_iou
+from transoar.models.anchors.anchor_matcher import ATSSMatcher, box_iou
 from transoar._C import nms
 
 

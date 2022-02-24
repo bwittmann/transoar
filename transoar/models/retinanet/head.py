@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 
-from transoar.models.loss import BCEWithLogitsLossOneHot, GIoULoss, SoftDiceLoss
+from transoar.models.retinanet.loss import BCEWithLogitsLossOneHot, GIoULoss, SoftDiceLoss
 
     
 class ClsHead(nn.Module):
