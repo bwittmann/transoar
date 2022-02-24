@@ -13,10 +13,8 @@ import monai
 from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_config, write_json, get_meta_data
-from transoar.models.transoarnet import TransoarNet
 from transoar.models.scheduler import LinearWarmupPolyLR
 from transoar.models.retina_unet import RetinaUNet
-from transoar.models.build import build_criterion
 
 
 def match(n, keywords):
@@ -39,7 +37,7 @@ def train(config, args):
     else:
         val_loader = get_loader(config, 'val')
 
-    model = RetinaUNet(config['model']).to(device=device)
+    model = RetinaUNet(config).to(device=device)
 
     # model.half()    # https://medium.com/@dwightfoster03/fp16-in-pytorch-a042e9967f7e
     # for layer in model.children():
@@ -58,68 +56,58 @@ def train(config, args):
     # print(f'num_neck_params\t\t{num_neck_params:>10}\t{num_neck_params/num_params:.4f}%')
     # print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
 
-    # param_dicts = [
-    #     {
-    #         'params': [
-    #             p for n, p in model.named_parameters() if not match(n, ['backbone', 'reference_points', 'sampling_offsets']) and p.requires_grad
-    #         ],
-    #         'lr': float(config['lr'])
-    #     },
-    #     {
-    #         'params': [p for n, p in model.named_parameters() if match(n, ['backbone']) and p.requires_grad],
-    #         'lr': float(config['lr_backbone'])
-    #     } 
-    # ]
-
-    # # Append additional param dict for def detr
-    # if sum([match(n, ['reference_points', 'sampling_offsets']) for n, _ in model.named_parameters()]) > 0:
-    #     param_dicts.append(
-    #         {
-    #             "params": [
-    #                 p for n, p in model.named_parameters() if match(n, ['reference_points', 'sampling_offsets']) and p.requires_grad
-    #             ],
-    #             'lr': float(config['lr']) * config['lr_linear_proj_mult']
-    #         }
-    #     )
-
-    # optim = torch.optim.AdamW(
-    #     model.parameters(), lr=float(config['lr']), weight_decay=float(config['weight_decay'])
-    # )
-    # scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
-
-    for module in model.modules():
-        if isinstance(module, (nn.InstanceNorm3d, nn.GroupNorm)):
-            for param in module.parameters():
-                assert not hasattr(param, 'no_wd')
-                setattr(param, 'no_wd', True)
-
-    wd_groups = [
+    param_dicts = [
         {
-            'params': filter(lambda p: hasattr(p, "no_wd"), model.parameters()),
-            'weight_decay': 0
+            'params': [
+                p for n, p in model.named_parameters() if not match(n, ['attn_fpn']) and p.requires_grad
+            ],
+            'lr': float(config['lr'])
         },
         {
-            'params': filter(lambda p: not hasattr(p, "no_wd"), model.parameters()),
-            'weight_decay': 3e-05
-
+            'params': [p for n, p in model.named_parameters() if match(n, ['attn_fpn']) and p.requires_grad],
+            'lr': float(config['lr_backbone'])
         } 
     ]
 
-    optim = torch.optim.SGD(
-        wd_groups,
-        0.01,
-        weight_decay=3e-05,
-        momentum=0.9,
-        nesterov=True
-    )
 
-    scheduler = LinearWarmupPolyLR(
-        optimizer=optim,
-        warm_iterations=4000,
-        warm_lr=1e-06,
-        poly_gamma=0.9,
-        num_iterations=150000 #90000
+    optim = torch.optim.AdamW(
+        param_dicts, lr=float(config['lr']), weight_decay=float(config['weight_decay'])
     )
+    scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
+
+    # for module in model.modules():
+    #     if isinstance(module, (nn.InstanceNorm3d, nn.GroupNorm)):
+    #         for param in module.parameters():
+    #             assert not hasattr(param, 'no_wd')
+    #             setattr(param, 'no_wd', True)
+
+    # wd_groups = [
+    #     {
+    #         'params': filter(lambda p: hasattr(p, "no_wd"), model.parameters()),
+    #         'weight_decay': 0
+    #     },
+    #     {
+    #         'params': filter(lambda p: not hasattr(p, "no_wd"), model.parameters()),
+    #         'weight_decay': 3e-05
+
+    #     } 
+    # ]
+
+    # optim = torch.optim.SGD(
+    #     wd_groups,
+    #     0.01,
+    #     weight_decay=3e-05,
+    #     momentum=0.9,
+    #     nesterov=True
+    # )
+
+    # scheduler = LinearWarmupPolyLR(
+    #     optimizer=optim,
+    #     warm_iterations=4000,
+    #     warm_lr=1e-06,
+    #     poly_gamma=0.9,
+    #     num_iterations=150000 #90000
+    # )
 
     # Load checkpoint if applicable
     if args.resume is not None:

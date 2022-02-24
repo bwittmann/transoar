@@ -1,24 +1,23 @@
 # Config file for light convnet + deformable detr combination
 
 # General training
-experiment_name: test #retina_unet_e2500_320_320_512 #test_orig_train_params_wh_160_flip_wd_switch
-device: cuda:1
+experiment_name: test #retina_unet_attnfpn_original_optim #retina_unet_def_attn_e2500_320_320_512 #test_orig_train_params_wh_160_flip_wd_switch
+device: cuda:3
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
 seed: 10
 
-epochs: 1500 # prev: 50
+epochs: 2500 # prev: 50
 lr: 2e-4
 lr_backbone: 2e-5
-lr_linear_proj_mult: 0.1
 weight_decay: 1e-4
 clip_max_norm: 0.1
 
 # Scheduler
-lr_drop: 400  # prev: 40
+lr_drop: 2300
 
 # Data
-dataset: transoar_testing_focused_attn_320_320_512_CT #transoar_test_160160256_CT #transoar_testing_focused_attn_320_320_512_CT
+dataset: transoar_test_160160256_CT #transoar_testing_focused_attn_320_320_512_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
@@ -27,55 +26,63 @@ batch_size: 2
 shuffle: True
 num_workers: 8
 
-# Hungarian matching
-set_cost_class: 2
-set_cost_bbox: 5
-set_cost_giou: 2
-
-# Losses
-loss_coefs:
-  cls: 2
-  bbox: 5
-  giou: 2
-
-# Model specific params
-model:
+# Model
+backbone:
   # Encoder
-  conv_kernels: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]
-  strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [1, 1, 2]]
-  in_channels: 1
-  start_channels: 32
-  max_channels: 320
+  use_encoder_attn: False # Activates swin encoder
 
-  # Def attn encoder
-  use_def_attn: False
-  pos_encoding: sine
-  hidden_dim: 128 #192
-  nheads: 6
-  enc_layers: 2
-  dec_layers: 2
-  dim_feedforward: 1024
-  dropout: 0.1
-  num_feature_levels: 5
-  dec_n_points: 4
-  enc_n_points: 4
-  use_cuda: False
+  # Standard params
+  conv_kernels: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]  # C0, C1, C2, C3, C4, C5
+  strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]]
+  in_channels: 1  #  Input channels 
+  start_channels: 24  # Channels after first encoder block
+
+  # Swin transformer params
+  depths: [2, 2, 2, 2]
+  num_heads: [3, 6, 12, 24]
+  window_size: [5, 5, 5]
+  mlp_ratio: 4
+  qkv_bias: True
+  qk_scale: null
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.2
+  conv_merging: False # Not tested yet
 
   # Decoder
-  decoder_levels: [2, 3, 4, 5, 6]
-  fpn_channels: 128
+  use_decoder_attn: False # Activated def attn
+  
+  # Standard params
+  fpn_channels: 192 #384 # Final output channels
+  out_fmap: P2  # P0, P1, P2, P3, P4, P5
+
+  # Def attn params
+  pos_encoding: sine
+  feature_levels: [P2, P3, P4, P5]
+  hidden_dim: 192 # 384 #832 #192 # prev: 256
+  dim_feedforward: 512 #1024
+  dropout: 0.1 #0.1
+  nheads: 6
+  layers: 2 #6
+  n_points: 4 #4
+  use_cuda: False
+
+neck:
+  # Input
+  input_levels: [P2, P3, P4, P5]
+  cls_reg_channels: 192
+  seg_channels: 24
 
   # Heads
-  head_channels: 128 #192
+  head_channels: 192
   classifier_classes: 20
   loss_weight: 1.0  # for bce and giou
   prior_prob: 0.01 # for weight init of cls head
   learnabel_scale: True # for reg head
-  out_channels: [32, 64, 128, 128, 128, 128, 128]  # TODO make self config
 
   # Matcher
-  num_candidates: 4   # TODO put to 20 or to 1? since always same nr of gt boxes?
-  center_in_gt: False # TODO try, as this only works poor when objects are very small
+  num_candidates: 4
+  center_in_gt: False
 
   # Sampler
   batch_size_per_image: 32
@@ -95,14 +102,14 @@ model:
   stride: 1
 
   # 48bg giga 160 160 256 - new conf
-  # depth: [[6.0, 10.0, 32.0], [12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0]]  # TODO 512?
-  # height: [[8.0, 11.0, 16.0], [16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [64.0, 88.0, 128.0]]
-  # width: [[6.0, 8.0, 11.0], [12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0]]
+  depth: [[6.0, 10.0, 32.0], [12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0]]  # TODO 512?
+  height: [[8.0, 11.0, 16.0], [16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0]]
+  width: [[6.0, 8.0, 11.0], [12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0]]
 
   # 320 320 512 whd
-  depth: [[12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0], [192.0, 320.0, 1024.0]]
-  height: [[16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [128.0, 176.0, 256.0], [128.0, 176.0, 256.0]]
-  width: [[12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0], [96.0, 128.0, 176.0]]
+  # depth: [[12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0], [192.0, 320.0, 1024.0]]
+  # height: [[16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [128.0, 176.0, 256.0], [128.0, 176.0, 256.0]]
+  # width: [[12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0], [96.0, 128.0, 176.0]] # TODO
 
 # Augmentation
 augmentation:

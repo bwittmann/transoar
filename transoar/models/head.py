@@ -5,21 +5,7 @@ import torch.nn as nn
 
 from transoar.models.loss import BCEWithLogitsLossOneHot, GIoULoss, SoftDiceLoss
 
-# class Head(nn.Module):
-#     def __init__(self, config):
-#         super().__init__()
-
-#         self._cls_head = ClsHead(config)
-#         self._reg_head = RegHead(config)
-#         self._seg_head = SegHead(config)
-
-#         self._sampler = HardNegativeSamplerBatched(
-#             config['batch_size_per_image'], config['positive_fraction'], config['min_neg'],
-#             config['pool_size']
-#         )
-
-#         self._box_coder = BoxCoderND(weights=(1.,) * 6)
-      
+    
 class ClsHead(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -28,7 +14,7 @@ class ClsHead(nn.Module):
         out_channels = config['anchors_per_position'] * config['classifier_classes']
 
         block_1 = [
-            nn.Conv3d(config['hidden_dim'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv3d(config['cls_reg_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
             nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
             nn.ReLU(inplace=True)
         ]
@@ -94,7 +80,7 @@ class RegHead(nn.Module):
         out_channels = config['anchors_per_position'] * 6
 
         block_1 = [
-            nn.Conv3d(config['hidden_dim'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv3d(config['cls_reg_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
             nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
             nn.ReLU(inplace=True)
         ]
@@ -116,7 +102,7 @@ class RegHead(nn.Module):
 
         # Learnable scale
         if self._learnable_scale:
-            num_levels = len(config['decoder_levels'])
+            num_levels = len(config['input_levels'])
             self._scales = nn.ModuleList([Scale() for _ in range(num_levels)])
 
         # Loss fct
@@ -159,10 +145,9 @@ class SegHead(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        self._in_channels = config['out_channels']
-        self._decoder_levels = config['decoder_levels']
+        self._in_channels = config['seg_channels']
 
-        self._out = nn.Conv3d(self._in_channels[0], 2, kernel_size=1, stride=1)
+        self._out = nn.Conv3d(self._in_channels, 2, kernel_size=1, stride=1)
 
         self._dice_loss = SoftDiceLoss(
             nonlin=torch.nn.Softmax(dim=1), batch_dice=True, smooth_nom=1e-05, smooth_denom=1e-05,
@@ -175,7 +160,7 @@ class SegHead(nn.Module):
         self._alpha = 0.5
 
     def forward(self, x):
-        x = x[0]
+        x = x['P0']
         return {"seg_logits": self._out(x)}
 
     def compute_loss(self, pred_seg, target):

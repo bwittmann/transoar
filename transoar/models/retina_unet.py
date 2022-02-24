@@ -1,9 +1,8 @@
 import torch
 import torch.nn as nn
 
-from transoar.models.build import build_pos_enc, build_def_attn_encoder
-
 from transoar.models.head import DetectionHeadHNMNative, ClsHead, RegHead, SegHead
+from transoar.models.backbones.attn_fpn import AttnFPN
 from transoar.models.anchor_gen import AnchorGenerator3DS
 from transoar.models.sampler import HardNegativeSamplerBatched
 from transoar.models.coder import BoxCoderND
@@ -14,36 +13,20 @@ from transoar._C import nms
 class RetinaUNet(nn.Module):
     def __init__(self, config):
         super().__init__()
+        # Get configs for backbone and neck
+        config_backbone = config['backbone']
+        config_neck = config['neck']
 
-        # Build encoder and decoder
-        encoder = Encoder(config)
-        decoder_channels = encoder.out_channels
-        decoder_strides = encoder.out_strides
-
-        decoder = Decoder(config, decoder_channels, decoder_strides)
-
-        # Build def attn encoder
-        if config['use_def_attn']:
-            def_attn_encoder = build_def_attn_encoder(config)
-            pos_enc = build_pos_enc(config)
-
-        # Build input projection to attn encoder
-        input_proj_list = []
-        for _ in range(config['num_feature_levels']):
-            input_proj_list.append(nn.Sequential(
-                nn.Conv3d(config['fpn_channels'], config['hidden_dim'], kernel_size=1),
-                nn.GroupNorm(32, config['hidden_dim']),
-            ))
-
-        self.input_proj = nn.ModuleList(input_proj_list)
+        # Build AttnFPN backbone
+        self.attn_fpn = AttnFPN(config_backbone)
 
         # Build detection and segmentation head
-        cls_head = ClsHead(config)
-        reg_head = RegHead(config)
+        cls_head = ClsHead(config_neck)
+        reg_head = RegHead(config_neck)
 
         sampler = HardNegativeSamplerBatched(
-            config['batch_size_per_image'], config['positive_fraction'], config['min_neg'],
-            config['pool_size']
+            config_neck['batch_size_per_image'], config_neck['positive_fraction'],
+            config_neck['min_neg'], config_neck['pool_size']
         )
         box_coder = BoxCoderND(weights=(1.,) * 6)
 
@@ -52,27 +35,19 @@ class RetinaUNet(nn.Module):
             coder=box_coder, sampler=sampler
         )
 
-        segmentation_head = SegHead(config)
+        segmentation_head = SegHead(config_neck)
 
         # Build anchor generator
         anchor_gen = AnchorGenerator3DS(
-            config['width'], config['height'], config['depth'], stride=config['stride']
+            config_neck['width'], config_neck['height'], config_neck['depth'], stride=config_neck['stride']
         )
 
         # Build matcher
         matcher = ATSSMatcher(
-            num_candidates=config['num_candidates'], center_in_gt=config['center_in_gt'], similarity_fn=box_iou
+            num_candidates=config_neck['num_candidates'], center_in_gt=config_neck['center_in_gt'], similarity_fn=box_iou
         )
 
-        self.decoder_levels = config['decoder_levels']
-
-        self.encoder = encoder
-        self.decoder = decoder
-
-        self.use_def_attn = config['use_def_attn']
-        if config['use_def_attn']:
-            self.def_attn_encoder = def_attn_encoder
-            self.pos_enc = pos_enc
+        self.input_levels = config_neck['input_levels']
 
         self.head = detection_head
         self.segmenter = segmentation_head
@@ -80,13 +55,12 @@ class RetinaUNet(nn.Module):
         self.anchor_generator = anchor_gen
         self.proposal_matcher = matcher
 
-        self.num_foreground_classes = config ['classifier_classes']
-        self.score_thresh = config['score_thresh']
-        self.topk_candidates = config['topk_candidates']
-        self.detections_per_img = config['detections_per_img']
-        self.remove_small_boxes = config['remove_small_boxes']
-        self.nms_thresh = config['nms_thresh']
-
+        self.num_foreground_classes = config_neck['classifier_classes']
+        self.score_thresh = config_neck['score_thresh']
+        self.topk_candidates = config_neck['topk_candidates']
+        self.detections_per_img = config_neck['detections_per_img']
+        self.remove_small_boxes = config_neck['remove_small_boxes']
+        self.nms_thresh = config_neck['nms_thresh']
 
     def train_step(self, img, targets, evaluation=False):
         target_boxes = targets["target_boxes"]
@@ -99,7 +73,7 @@ class RetinaUNet(nn.Module):
         )
 
         losses = {}
-        head_losses, pos_idx, neg_idx = self.head.compute_loss(
+        head_losses, _, _ = self.head.compute_loss(
             pred_detection, labels, matched_gt_boxes, anchors)
         losses.update(head_losses)
 
@@ -133,23 +107,8 @@ class RetinaUNet(nn.Module):
         return prediction
 
     def forward(self, inp):
-        features_maps_all = self.decoder(self.encoder(inp))
-        feature_maps_red = [features_maps_all[i] for i in self.decoder_levels]
-
-        if self.use_def_attn:
-            srcs = []
-            masks = []
-            pos = []
-            for idx, fmap in enumerate(feature_maps_red):
-                srcs.append(self.input_proj[idx](fmap))
-                mask = torch.zeros_like(fmap[:, 0], dtype=torch.bool) # False is not masked
-                masks.append(mask)
-                pos.append(self.pos_enc(mask))
-            
-            feature_maps_head = self.def_attn_encoder(srcs, masks, pos)
-        else:
-            # feature_maps_head = [self.input_proj[idx](fmap) for idx, fmap in enumerate(feature_maps_red)]
-            feature_maps_head = feature_maps_red
+        features_maps_all = self.attn_fpn(inp)
+        feature_maps_head = [features_maps_all[i] for i in self.input_levels]
 
         pred_detection = self.head(feature_maps_head)
         anchors = self.anchor_generator(inp, feature_maps_head)
@@ -292,152 +251,3 @@ def batched_nms(boxes, scores, idxs, iou_threshold: float):
     offsets = idxs.to(boxes) * (max_coordinate + 1)
     boxes_for_nms = boxes + offsets[:, None]
     return nms(boxes_for_nms, scores, iou_threshold)
-
-# def nms(boxes, scores, thresh):
-#     ious = box_iou(boxes, boxes)
-#     _, _idx = torch.sort(scores, descending=True)
-    
-#     keep = []
-#     while _idx.nelement() > 0:
-#         keep.append(_idx[0])
-#         # get all elements that were not matched and discard all others.
-#         non_matches = torch.where((ious[_idx[0]][_idx] <= thresh))[0]
-#         _idx = _idx[non_matches]
-#     return torch.tensor(keep).to(boxes).long()
-
-
-class Encoder(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-
-        # self._config = config
-        in_channels = config['in_channels']
-        out_channels = config['start_channels']
-
-        num_stages = len(config['conv_kernels'])
-        self._out_stages = list(range(num_stages))
-
-        self.out_channels = []
-        self.out_strides = []
-        self._stages = nn.ModuleList()
-        for stage_id in range(num_stages):
-            self.out_channels.append(out_channels)
-
-            if len(self.out_strides) == 0:
-                self.out_strides.append(config['strides'][stage_id])
-            else:
-                self.out_strides.append(config['strides'][stage_id]) # * self.out_strides[-1])
-
-            
-            stage = EncoderBlock(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=config['conv_kernels'][stage_id],
-                stride=config['strides'][stage_id]
-            )
-            self._stages.append(stage)
-
-            in_channels = out_channels
-            out_channels = out_channels * 2
-
-            if out_channels > config['max_channels']:
-                out_channels = config['max_channels']
-
-    def forward(self, x):
-        outputs = []
-        for stage_id, module in enumerate(self._stages):
-            x = module(x)
-            if stage_id in self._out_stages:
-                outputs.append(x)
-        return outputs 
-
-class EncoderBlock(nn.Module):
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size,
-        stride,
-        padding=1,
-        bias=False,
-        affine=True,
-        eps=1e-05
-
-    ):
-        super().__init__()
-
-        conv_block_1 = [
-            nn.Conv3d(
-                in_channels=in_channels, out_channels=out_channels,
-                kernel_size=kernel_size, stride=stride, padding=padding,
-                bias=bias
-            ),
-            nn.InstanceNorm3d(num_features=out_channels, affine=affine, eps=eps),
-            nn.ReLU(inplace=True)
-        ]
-
-        conv_block_2 = [
-            nn.Conv3d(
-                in_channels=out_channels, out_channels=out_channels,
-                kernel_size=kernel_size, stride=1, padding=padding,
-                bias=bias
-            ),
-            nn.InstanceNorm3d(num_features=out_channels, affine=affine, eps=eps),
-            nn.ReLU(inplace=True)
-        ]
-
-        self._block = nn.Sequential(
-            *conv_block_1,
-            *conv_block_2
-        )
-
-    def forward(self, x):
-        return self._block(x)
-
-class Decoder(nn.Module):
-    def __init__(self, config, encoder_out_channels, strides):
-        super().__init__() 
-        self._num_levels = len(encoder_out_channels)
-
-        decoder_out_channels = torch.clip(torch.tensor(encoder_out_channels), max=(config['fpn_channels'])).tolist()
-
-        # Lateral 
-        self._lateral = nn.ModuleList()
-        for in_channels, out_channels in zip(encoder_out_channels, decoder_out_channels):
-            self._lateral.append(nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=1))
-
-        # Out
-        self._out = nn.ModuleList()
-        for out_channels in decoder_out_channels:
-            self._out.append(nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=3, padding=1))
-
-        #  Up
-        self._up = nn.ModuleList()
-        for level in range(1, len(decoder_out_channels)):
-            self._up.append(nn.ConvTranspose3d(
-                in_channels=decoder_out_channels[level], out_channels=decoder_out_channels[level-1],
-                kernel_size=config['strides'][level], stride=config['strides'][level]
-                ))
-
-    def forward(self, x):
-        out_list = []
-
-        # Forward lateral
-        fpn_maps = [self._lateral[level](fm) for level, fm in enumerate(x)]
-
-        # Forward up
-        for idx, x in enumerate(reversed(fpn_maps), 1):
-            level = self._num_levels - idx - 1
-
-            if idx != 1:
-                x = x + up
-
-            if idx != self._num_levels:
-                up = self._up[level](x)
-
-            out_list.append(x)
-
-        # Forward out
-        out_list = [self._out[level](fm) for level, fm in enumerate(reversed(out_list))]
-
-        return out_list

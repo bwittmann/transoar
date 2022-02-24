@@ -24,8 +24,10 @@ class PositionEmbeddingSine3D(nn.Module):
             scale = 2 * math.pi
         self.scale = scale
 
-    def forward(self, mask):
+    def forward(self, src):
+        mask = torch.zeros_like(src[:, 0], dtype=torch.bool)
         not_mask = ~mask
+
         x_embed = not_mask.cumsum(1, dtype=torch.float32)
         y_embed = not_mask.cumsum(2, dtype=torch.float32)
         z_embed = not_mask.cumsum(3, dtype=torch.float32)

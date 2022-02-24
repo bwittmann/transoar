@@ -55,7 +55,7 @@ class Trainer:
             for item in bboxes:
                 targets['target_boxes'].append(item[0].to(dtype=torch.float, device=self._device))
                 targets['target_classes'].append(item[1].to(device=self._device))
-            targets['target_seg'] = seg_mask.squeeze().to(device=self._device)
+            targets['target_seg'] = seg_mask.squeeze(1).to(device=self._device)
 
             # Make prediction 
             with autocast():
@@ -66,9 +66,9 @@ class Trainer:
             self._scaler.scale(loss_abs).backward()
 
             # Clip grads to counter exploding grads
-            # max_norm = self._config['clip_max_norm']
-            # if max_norm > 0:
-            #     torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm)
+            max_norm = self._config['clip_max_norm']
+            if max_norm > 0:
+                torch.nn.utils.clip_grad_norm_(self._model.parameters(), max_norm)
 
             self._scaler.step(self._optimizer)
             self._scaler.update()
@@ -79,7 +79,6 @@ class Trainer:
             loss_seg_ce_agg += losses['seg_ce'].item()
             loss_seg_dice_agg += losses['seg_dice'].item()
 
-            self._scheduler.step()
 
         loss = loss_agg / len(self._train_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
@@ -114,7 +113,7 @@ class Trainer:
             for item in bboxes:
                 targets['target_boxes'].append(item[0].to(dtype=torch.float, device=self._device))
                 targets['target_classes'].append(item[1].to(device=self._device))
-            targets['target_seg'] = seg_mask.squeeze().to(device=self._device)
+            targets['target_seg'] = seg_mask.squeeze(1).to(device=self._device)
 
             # Make prediction 
             with autocast():
@@ -196,6 +195,8 @@ class Trainer:
 
             if epoch % self._config['val_interval'] == 0:
                 self._validate(epoch)
+
+            self._scheduler.step()
 
             if not self._config['debug_mode']:
                 self._save_checkpoint(epoch, 'model_last.pt')

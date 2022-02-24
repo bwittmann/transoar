@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transoar.models.build import build_backbone, build_neck, build_pos_enc
+from transoar.models.build import build_neck, build_pos_enc
 
 class TransoarNet(nn.Module):
     def __init__(self, config):
