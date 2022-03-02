@@ -119,9 +119,9 @@ augmentation:
   p_adjust_contrast: 0 #0.2
   p_rotate: 0.5
   p_zoom: 0.5
-  p_shear: 0.5
-  p_translate: 0.5 # 0
-  p_flip: 0 #0.5
+  p_shear: 0
+  p_translate: 0.5
+  p_flip: 0
 
   gaussian_noise_mean: 0.0
   gaussian_noise_std: 0.1
