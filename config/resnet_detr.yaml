@@ -1,24 +1,24 @@
-# Config file for resnet + detr combination
+# Config file for ResNet-DETR
 
 # General training
-experiment_name: 3mm_resnet_detr_no_flip_lfirst3_q100_compare
-device: cuda:7
+experiment_name: test
+device: cuda:4
 val_interval: 1
-debug_mode: False # doesn't save checkpoints
+debug_mode: True  # Doesn't save checkpoints
 seed: 10
 
-epochs: 1100 #2000
+epochs: 2500
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4
 clip_max_norm: 0.1
 
 # Scheduler
-lr_drop: 700 #1300
+lr_drop: 2300
 
 # Data
-dataset: transoar_test_3mm_CT
-overfit: False # use same set consisting of one image for train and val
+dataset: transoar_testing_focused_attn_160_160_256_CT
+overfit: False # Use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
@@ -33,7 +33,7 @@ set_cost_giou: 2
 
 # Losses
 loss_coefs:
-  cls: 1
+  cls: 2      # Detection
   bbox: 5
   giou: 2
 
@@ -51,14 +51,14 @@ backbone:
 
 neck:
   name: detr
-  skip_con: False # from backbone to heads
+  
   pos_encoding: sine
   hidden_dim: 192
   dropout: 0.0  # prev: 0.1
   nheads: 6
   dim_feedforward: 1024 #2048
-  enc_layers: 2 # prev: 6
-  dec_layers: 2 # prev: 6
+  enc_layers: 3 # prev: 6
+  dec_layers: 3 # prev: 6
   pre_norm: False
   num_queries: 100
   aux_loss: True
@@ -66,18 +66,18 @@ neck:
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: null #[64, 64, 64]
+  patch_size: [160, 160, 256] #null #[64, 64, 64]
 
-  p_gaussian_noise: 0.0 #0.1
-  p_gaussian_smooth: 0.0 #0.1
+  p_gaussian_noise: 0 #0.1
+  p_gaussian_smooth: 0 #0.1
   p_intensity_scale: 0.5 #0.2
   p_intensity_shift: 0.5 #0.2
-  p_adjust_contrast: 0.0 #0.2
+  p_adjust_contrast: 0 #0.2
   p_rotate: 0.5
   p_zoom: 0.5
-  p_shear: 0.5
+  p_shear: 0
   p_translate: 0.5
-  p_flip: 0.0
+  p_flip: 0.5
 
   gaussian_noise_mean: 0.0
   gaussian_noise_std: 0.1

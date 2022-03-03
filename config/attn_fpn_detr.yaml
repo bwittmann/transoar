@@ -1,24 +1,24 @@
-# Config file for AttnFPN backbone
+# Config file for AttnFPN-DETR
 
 # General training
-experiment_name: attn_fpn_cnn_b2_ch192_ff512_l2_P3 #test #attn_fpn_cnn_b2_ch384_ff1024_l2_P3 #test #anchor_matcher_1fmap_fpn_soft_labels_1match_1giou_fmap404064
+experiment_name: test
 device: cuda:4
 val_interval: 1
-debug_mode: True  # doesn't save checkpoints
+debug_mode: True  # Doesn't save checkpoints
 seed: 10
 
-epochs: 2700
-lr: 2e-4
-lr_backbone: 2e-5
+epochs: 2500
+lr: 1e-4
+lr_backbone: 1e-5
 weight_decay: 1e-4
 clip_max_norm: 0.1
 
 # Scheduler
-lr_drop: 2500
+lr_drop: 2300
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
-overfit: False # use same set consisting of one image for train and val
+overfit: False # Use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
@@ -26,12 +26,10 @@ batch_size: 2
 shuffle: True
 num_workers: 4
 
-# Matching
-anchor_matching: True
-set_cost_class: 0 #2
-set_cost_bbox: 0 #5
-set_cost_giou: 1 #2
-set_cost_center: 0
+# Hungarian matching
+set_cost_class: 1
+set_cost_bbox: 5
+set_cost_giou: 2
 
 # Losses
 loss_coefs:
@@ -88,23 +86,18 @@ backbone:
   use_seg_proxy_loss: False #True
   fg_bg: True
 
-
 neck:
-  name: focused_attn
+  name: detr
   
   pos_encoding: sine
-  hidden_dim: 192
-  dropout: 0.1
-  nheads: 8
-  dim_feedforward: 512 #1024
-  dec_layers: 2 #6
-
-  num_queries: 540
-  input_shapes: [[20, 20, 32]]
-  num_feature_levels: 1
-  queries_per_organ: 27
-  anchor_offsets: 0.1
-  num_organs: 20
+  hidden_dim: 192 # prev: 256
+  dropout: 0.0  # prev: 0.1
+  nheads: 6
+  dim_feedforward: 1024 #2048
+  enc_layers: 3 # prev: 6
+  dec_layers: 3 # prev: 6
+  pre_norm: False
+  num_queries: 100
   aux_loss: True
 
 # Augmentation

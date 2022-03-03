@@ -7,7 +7,6 @@ from monai.transforms import (
     EnsureChannelFirstd,
     LoadImaged,
     Orientationd,
-    Spacingd,
     ScaleIntensityRanged,
     Resized,
     RandSpatialCropd,
