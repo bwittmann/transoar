@@ -22,6 +22,7 @@ def build_neck(config):
         num_encoder_layers=config['enc_layers'],
         num_decoder_layers=config['dec_layers'],
         normalize_before=config['pre_norm'],
+        use_encoder=config['use_encoder'],
         return_intermediate_dec=True
     )
 

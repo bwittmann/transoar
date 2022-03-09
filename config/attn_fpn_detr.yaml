@@ -1,20 +1,20 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: test
-device: cuda:7
+experiment_name: test #attn_fpn_detr_P4_enc
+device: cuda:4
 val_interval: 1
-debug_mode: True  # Doesn't save checkpoints
+debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
-epochs: 1100
+epochs: 5000 #1100
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4
 clip_max_norm: -1   # Not used
 
 # Scheduler
-lr_drop: 700
+lr_drop: 100000 #700
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
@@ -53,7 +53,7 @@ backbone:
   start_channels: 24  # Channels after first encoder block
 
   # Swin transformer params
-  depths: [1, 1, 1, 1]
+  depths: [2, 2, 2, 2]
   num_heads: [3, 6, 12, 24]
   window_size: [5, 5, 5]
   mlp_ratio: 4
@@ -69,7 +69,7 @@ backbone:
   
   # Standard params
   fpn_channels: 192 #384 # Final output channels
-  out_fmap: P3  # P0, P1, P2, P3, P4, P5
+  out_fmap: P4  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -89,6 +89,7 @@ backbone:
 neck:
   name: detr
   input_level: P5
+  use_encoder: True
   
   pos_encoding: sine
   hidden_dim: 192 # prev: 256
