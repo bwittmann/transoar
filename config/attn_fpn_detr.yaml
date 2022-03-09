@@ -2,19 +2,19 @@
 
 # General training
 experiment_name: test
-device: cuda:4
+device: cuda:7
 val_interval: 1
 debug_mode: True  # Doesn't save checkpoints
 seed: 10
 
-epochs: 2500
+epochs: 1100
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4
-clip_max_norm: 0.1
+clip_max_norm: -1   # Not used
 
 # Scheduler
-lr_drop: 2300
+lr_drop: 700
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
@@ -88,6 +88,7 @@ backbone:
 
 neck:
   name: detr
+  input_level: P5
   
   pos_encoding: sine
   hidden_dim: 192 # prev: 256
