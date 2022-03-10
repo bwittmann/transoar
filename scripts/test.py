@@ -1,17 +1,17 @@
 """Script to evalute performance on the val and test set."""
 
 import argparse
+from collections import defaultdict
 from pathlib import Path
 
 import torch
 from tqdm import tqdm
 
 from transoar.utils.io import load_json, write_json
-from transoar.utils.visualization import save_attn_visualization, save_pred_visualization
+# from transoar.utils.visualization import save_attn_visualization, save_pred_visualization
 from transoar.data.dataloader import get_loader
-from transoar.models.transoarnet import TransoarNet
 from transoar.evaluator import DetectionEvaluator
-from transoar.inference import inference
+from transoar.models.retinanet.retina_unet import RetinaUNet
 
 class Tester:
 
@@ -20,9 +20,9 @@ class Tester:
         config = load_json(path_to_run / 'config.json')
 
         self._save_preds = args.save_preds
-        self._save_attn_map = args.save_attn_map
+        self._full_labeled = args.full_labeled
         self._class_dict = config['labels']
-        self._device = 'cuda:' + str(args.num_gpu) if args.num_gpu > 0 else 'cpu'
+        self._device = 'cuda:' + str(args.num_gpu) if args.num_gpu >= 0 else 'cpu'
 
         # Get path to checkpoint
         avail_checkpoints = [path for path in path_to_run.iterdir() if 'model_' in str(path)]
@@ -36,8 +36,11 @@ class Tester:
         self._set_to_eval = 'val' if args.val else 'test'
         self._test_loader = get_loader(config, self._set_to_eval, batch_size=1)
 
-        self._evaluator = DetectionEvaluator(classes=list(config['labels'].values()))
-        self._model = TransoarNet(config).to(device=self._device)
+        self._evaluator = DetectionEvaluator(
+            classes=list(config['labels'].values()),
+            iou_range=(0.5, 0.95, 0.05) if args.coco_map else (0.1, 0.5, 0.05)
+        )
+        self._model = RetinaUNet(config).to(device=self._device)
 
         # Load checkpoint
         checkpoint = torch.load(path_to_ckpt, map_location=self._device)
@@ -53,69 +56,39 @@ class Tester:
             self._path_to_vis.mkdir(parents=False, exist_ok=True)
   
     def run(self):
-        if self._save_attn_map:
-            backbone_features_list, enc_attn_weights_list, dec_attn_weights_list = [], [], []
-            
-            # Register hooks to efficiently access relevant weights
-            hooks = [
-                self._model._backbone.layers[-1].register_forward_hook(
-                    lambda self, input, output: backbone_features_list.append(output)
-                ),
-                self._model._neck.encoder.layers[-1].self_attn.register_forward_hook(
-                    lambda self, input, output: enc_attn_weights_list.append(output[1])
-                ),
-                self._model._neck.decoder.layers[-1].multihead_attn.register_forward_hook(
-                    lambda self, input, output: dec_attn_weights_list.append(output[1])
-                ),
-            ]
-    
         with torch.no_grad():
-            for idx, (data, mask, bboxes, seg_mask) in enumerate(tqdm(self._test_loader)):
+            for idx, (data, _, bboxes, seg_mask) in enumerate(tqdm(self._test_loader)):
                 # Put data to gpu
-                data, mask = data.to(device=self._device), mask.to(device=self._device)
+                data = data.to(device=self._device)
             
-                targets = {
-                    'boxes': bboxes[0][0].to(dtype=torch.float, device=self._device),
-                    'labels': bboxes[0][1].to(device=self._device)
-                }
+                targets = defaultdict(list)
+                for item in bboxes:
+                    targets['target_boxes'].append(item[0].to(dtype=torch.float, device=self._device))
+                    targets['target_classes'].append(item[1].to(device=self._device))
+                targets['target_seg'] = seg_mask.squeeze(1).to(device=self._device)
 
                 # Only use complete data for performance evaluation
-                if targets['labels'].shape[0] < len(self._class_dict):
-                    continue
+                if self._full_labeled:
+                    if targets['target_classes'][0].shape[0] < len(self._class_dict):
+                        continue
 
                 # Make prediction
-                out = self._model(data, mask)
+                _, predictions = self._model.train_step(data, targets, evaluation=True)
 
-                # Format out to fit evaluator and estimate best predictions per class
-                pred_boxes, pred_classes, pred_scores = inference(out)
-                gt_boxes = [targets['boxes'].detach().cpu().numpy()]
-                gt_classes = [targets['labels'].detach().cpu().numpy()]
-
-                # Add pred to evaluator
+                # Evaluate validation predictions based on metric
                 self._evaluator.add(
-                    pred_boxes=pred_boxes,
-                    pred_classes=pred_classes,
-                    pred_scores=pred_scores,
-                    gt_boxes=gt_boxes,
-                    gt_classes=gt_classes
+                    pred_boxes=[boxes.detach().cpu().numpy() for boxes in predictions['pred_boxes']],
+                    pred_classes=[classes.detach().cpu().numpy() for classes in predictions['pred_labels']],
+                    pred_scores=[scores.detach().cpu().numpy() for scores in predictions['pred_scores']],
+                    gt_boxes=[gt_boxes.detach().cpu().numpy() for gt_boxes in targets['target_boxes']],
+                    gt_classes=[gt_classes.detach().cpu().numpy() for gt_classes in targets['target_classes']],
                 )
 
-                if self._save_preds:
-                    save_pred_visualization(
-                        pred_boxes[0], pred_classes[0], gt_boxes[0], gt_classes[0], seg_mask[0], 
-                        self._path_to_vis, self._class_dict, idx
-                    )
-
-                if self._save_attn_map:
-                    # Get current attn weights
-                    backbone_features = backbone_features_list.pop(-1).squeeze()
-                    enc_attn_weights = enc_attn_weights_list.pop(-1).squeeze()
-                    dec_attn_weights = dec_attn_weights_list.pop(-1).squeeze()
-
-                    save_attn_visualization(
-                        out, backbone_features, enc_attn_weights, dec_attn_weights, list(data.shape[-3:]),
-                        seg_mask[0]
-                    )
+                # if self._save_preds:
+                #     save_pred_visualization(
+                #         pred_boxes[0], pred_classes[0], gt_boxes[0], gt_classes[0], seg_mask[0], 
+                #         self._path_to_vis, self._class_dict, idx
+                #     )
 
             # Get and store final results
             metric_scores = self._evaluator.eval()
@@ -131,7 +104,8 @@ if __name__ == "__main__":
     parser.add_argument('--val', action='store_true', help='Evaluate performance on test set.')
     parser.add_argument('--last', action='store_true', help='Use model_last instead of model_best.')
     parser.add_argument('--save_preds', action='store_true', help='Save predictions.')
-    parser.add_argument('--save_attn_map', action='store_true', help='Saves attention maps.')
+    parser.add_argument('--full_labeled', action='store_true', help='Use only fully labeled data.')
+    parser.add_argument('--coco_map', action='store_true', help='Use coco map.')
     args = parser.parse_args()
 
     tester = Tester(args)
