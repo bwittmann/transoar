@@ -136,6 +136,7 @@ class Encoder(nn.Module):
         # Get initial channels
         in_channels = config['in_channels']
         out_channels = config['start_channels']
+        pre_merge = config['pre_merge']
 
         # Get number of encoder stages
         num_stages = len(config['conv_kernels'])
@@ -164,7 +165,8 @@ class Encoder(nn.Module):
                     drop=config['drop_rate'],
                     attn_drop=config['attn_drop_rate'],
                     drop_path=drop_path_rate[sum(swin_depth[:stage_id - 2]):sum(swin_depth[:stage_id - 1])],
-                    downsample=downsample_layer
+                    downsample=downsample_layer,
+                    pre_merge=pre_merge
                 )
             else:
                 stage = EncoderCnnBlock(

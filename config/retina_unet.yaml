@@ -1,20 +1,23 @@
 # Config file for AttnFPN backbone and RetinaNet head
 
 # General training
-experiment_name: test #retina_unet_attnfpn_original_optim
-device: cuda:3
+experiment_name: retina_unet_attnfpn_original_optim_no_grad_swin5_reversed
+device: cuda:7
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
 seed: 10
 
-epochs: 2500 # prev: 50
+epochs: 10000 # prev: 50
 lr: 2e-4
 lr_backbone: 2e-5
 weight_decay: 1e-4
-clip_max_norm: 0.1
+clip_max_norm: -1 # Deactivated
 
 # Scheduler
-lr_drop: 2300
+lr_drop: 10000000
+
+# Trainer
+seg_proxy: False
 
 # Data
 dataset: transoar_test_160160256_CT #transoar_testing_focused_attn_320_320_512_CT
@@ -47,7 +50,8 @@ backbone:
   drop_rate: 0.
   attn_drop_rate: 0.
   drop_path_rate: 0.2
-  conv_merging: False # Not tested yet
+  conv_merging: True
+  pre_merge: False
 
   # Decoder
   use_decoder_attn: False # Activated def attn

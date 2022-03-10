@@ -59,6 +59,12 @@ class Trainer:
             # Make prediction 
             with autocast():
                 losses, _ = self._model.train_step(data, targets, evaluation=False)
+
+                # Dont consider seg losses
+                if not self._config['seg_proxy']:
+                    for key in ['seg_ce', 'seg_dice']:
+                        losses.pop(key)
+    
                 loss_abs = sum(losses.values())
 
             self._optimizer.zero_grad()
@@ -75,8 +81,10 @@ class Trainer:
             loss_agg += loss_abs.item()
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
-            loss_seg_ce_agg += losses['seg_ce'].item()
-            loss_seg_dice_agg += losses['seg_dice'].item()
+
+            if self._config['seg_proxy']:
+                loss_seg_ce_agg += losses['seg_ce'].item()
+                loss_seg_dice_agg += losses['seg_dice'].item()
 
 
         loss = loss_agg / len(self._train_loader)
@@ -117,18 +125,23 @@ class Trainer:
             # Make prediction 
             with autocast():
                 losses, predictions = self._model.train_step(data, targets, evaluation=True)
+
+                # Dont consider seg losses
+                if not self._config['seg_proxy']:
+                    for key in ['seg_ce', 'seg_dice']:
+                        losses.pop(key)
+
                 loss_abs = sum(losses.values())
 
             loss_agg += loss_abs.item()
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
-            loss_seg_ce_agg += losses['seg_ce'].item()
-            loss_seg_dice_agg += losses['seg_dice'].item()
 
+            if self._config['seg_proxy']:
+                loss_seg_ce_agg += losses['seg_ce'].item()
+                loss_seg_dice_agg += losses['seg_dice'].item()
 
             # Evaluate validation predictions based on metric
-            # pred_boxes, pred_classes, pred_scores = inference(predictions)
-
             self._evaluator.add(
                 pred_boxes=[boxes.detach().cpu().numpy() for boxes in predictions['pred_boxes']],
                 pred_classes=[classes.detach().cpu().numpy() for classes in predictions['pred_labels']],

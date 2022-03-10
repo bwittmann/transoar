@@ -67,16 +67,18 @@ class EncoderSwinBlock(nn.Module):
         attn_drop,
         drop_path,
         downsample,
-        norm_layer=nn.LayerNorm
+        norm_layer=nn.LayerNorm,
+        pre_merge=True
     ):
         super().__init__()
         self.window_size = window_size
+        self.pre_merge = pre_merge
         self.shift_size = tuple(i // 2 for i in window_size)
 
         # build blocks
         self.blocks = nn.ModuleList([
             SwinBlock(
-                dim=dim,
+                dim=dim if not pre_merge else dim * 2,
                 num_heads=num_heads,
                 window_size=window_size,
                 shift_size=(0,0,0) if (i % 2 == 0) else self.shift_size,
@@ -103,6 +105,13 @@ class EncoderSwinBlock(nn.Module):
             x: Input feature, tensor size (B, C, D, H, W).
         """
         # calculate attention mask for SW-MSA
+
+        if self.pre_merge:
+            x = rearrange(x, 'b c d h w -> b d h w c')
+            if self.downsample is not None:
+                x = self.downsample(x)
+            x = rearrange(x, 'b d h w c -> b c d h w')
+
         B, C, D, H, W = x.shape
         window_size, shift_size = get_window_size((D,H,W), self.window_size, self.shift_size)
         x = rearrange(x, 'b c d h w -> b d h w c')
@@ -114,8 +123,9 @@ class EncoderSwinBlock(nn.Module):
             x = blk(x, attn_mask)
         x = x.view(B, D, H, W, -1)
 
-        if self.downsample is not None:
-            x = self.downsample(x)
+        if not self.pre_merge:
+            if self.downsample is not None:
+                x = self.downsample(x)
 
         x = rearrange(x, 'b d h w c -> b c d h w')
         return x

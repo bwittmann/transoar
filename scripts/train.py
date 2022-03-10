@@ -39,13 +39,6 @@ def train(config, args):
 
     model = RetinaUNet(config).to(device=device)
 
-    # model.half()    # https://medium.com/@dwightfoster03/fp16-in-pytorch-a042e9967f7e
-    # for layer in model.children():
-    #     if not isinstance(layer, (nn.Conv3d, nn.ConvTranspose3d, nn.Parameter)):  # GroupNorm leads to errors
-    #         layer.float()
-
-    # criterion = build_criterion(config).to(device=device)
-
     # # Analysis of model parameter distribution
     # num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     # num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['backbone', 'input_proj', 'skip']))
@@ -74,40 +67,6 @@ def train(config, args):
         param_dicts, lr=float(config['lr']), weight_decay=float(config['weight_decay'])
     )
     scheduler = torch.optim.lr_scheduler.StepLR(optim, config['lr_drop'])
-
-    # for module in model.modules():
-    #     if isinstance(module, (nn.InstanceNorm3d, nn.GroupNorm)):
-    #         for param in module.parameters():
-    #             assert not hasattr(param, 'no_wd')
-    #             setattr(param, 'no_wd', True)
-
-    # wd_groups = [
-    #     {
-    #         'params': filter(lambda p: hasattr(p, "no_wd"), model.parameters()),
-    #         'weight_decay': 0
-    #     },
-    #     {
-    #         'params': filter(lambda p: not hasattr(p, "no_wd"), model.parameters()),
-    #         'weight_decay': 3e-05
-
-    #     } 
-    # ]
-
-    # optim = torch.optim.SGD(
-    #     wd_groups,
-    #     0.01,
-    #     weight_decay=3e-05,
-    #     momentum=0.9,
-    #     nesterov=True
-    # )
-
-    # scheduler = LinearWarmupPolyLR(
-    #     optimizer=optim,
-    #     warm_iterations=4000,
-    #     warm_lr=1e-06,
-    #     poly_gamma=0.9,
-    #     num_iterations=150000 #90000
-    # )
 
     # Load checkpoint if applicable
     if args.resume is not None:
