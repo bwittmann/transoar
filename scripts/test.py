@@ -23,6 +23,7 @@ class Tester:
 
         self._save_preds = args.save_preds
         self._save_attn_map = args.save_attn_map
+        self._full_labeled = args.full_labeled
         self._class_dict = config['labels']
 
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.num_gpu)
@@ -40,7 +41,10 @@ class Tester:
         self._set_to_eval = 'val' if args.val else 'test'
         self._test_loader = get_loader(config, self._set_to_eval, batch_size=1)
 
-        self._evaluator = DetectionEvaluator(classes=list(config['labels'].values()))
+        self._evaluator = DetectionEvaluator(
+            classes=list(config['labels'].values()),
+            iou_range=(0.5, 0.95, 0.05) if args.coco_map else (0.1, 0.5, 0.05)
+        )
         self._model = TransoarNet(config).to(device=self._device)
 
         # Load checkpoint
@@ -71,7 +75,6 @@ class Tester:
             ]
     
         with torch.no_grad():
-            query_info = defaultdict(list)
             for idx, (data, mask, bboxes, seg_mask) in enumerate(tqdm(self._test_loader)):
                 # Put data to gpu
                 data, mask = data.to(device=self._device), mask.to(device=self._device)
@@ -89,7 +92,7 @@ class Tester:
                 out = self._model(data)
 
                 # Format out to fit evaluator and estimate best predictions per class
-                pred_boxes, pred_classes, pred_scores, query_info = inference(out, query_info)
+                pred_boxes, pred_classes, pred_scores = inference(out)
                 gt_boxes = [targets['boxes'].detach().cpu().numpy()]
                 gt_classes = [targets['labels'].detach().cpu().numpy()]
 
@@ -134,6 +137,8 @@ if __name__ == "__main__":
     parser.add_argument('--last', action='store_true', help='Use model_last instead of model_best.')
     parser.add_argument('--save_preds', action='store_true', help='Save predictions.')
     parser.add_argument('--save_attn_map', action='store_true', help='Saves attention maps.')
+    parser.add_argument('--full_labeled', action='store_true', help='Use only fully labeled data.')
+    parser.add_argument('--coco_map', action='store_true', help='Use coco map.')
     args = parser.parse_args()
 
     tester = Tester(args)

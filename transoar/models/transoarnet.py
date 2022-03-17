@@ -29,6 +29,10 @@ class TransoarNet(nn.Module):
         self._cls_head = nn.Linear(hidden_dim, num_classes + 1)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
+        in_channels = config['backbone']['start_channels']
+        out_channels = 2 if config['backbone']['fg_bg'] else config['neck']['num_organs'] + 1 # inc bg
+        self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
+
         # Get projections and embeddings
         self._query_embed = nn.Embedding(num_queries, hidden_dim)
         self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
@@ -39,9 +43,10 @@ class TransoarNet(nn.Module):
 
     def forward(self, x):
         out_backbone = self._backbone(x)
-        out_backbone = out_backbone[self.input_level]
+        seg_src = out_backbone['P0']
+        det_src = out_backbone[self.input_level]
 
-        src = self._input_proj(out_backbone)
+        src = self._input_proj(det_src)
         mask = torch.zeros_like(src[:, 0], dtype=torch.bool)    # No mask needed
 
         pos = self._pos_enc(src)
@@ -55,10 +60,12 @@ class TransoarNet(nn.Module):
 
         pred_logits = self._cls_head(out_neck)
         pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
+        pred_seg = self._seg_head(seg_src)
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
-            'pred_boxes': pred_boxes[-1]
+            'pred_boxes': pred_boxes[-1],
+            'pred_seg': pred_seg
         }
 
         if self._aux_loss:

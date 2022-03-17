@@ -206,12 +206,11 @@ class Trainer:
             self._train_one_epoch(epoch)
 
             # Log learning rates
-            # self._write_to_logger(
-            #     epoch, 'lr',
-            #     backbone=self._optimizer.param_groups[0]['lr'],
-            #     neck=self._optimizer.param_groups[1]['lr'],
-            #     heads=self._optimizer.param_groups[2]['lr']
-            # )
+            self._write_to_logger(
+                epoch, 'lr',
+                backbone=self._optimizer.param_groups[0]['lr'],
+                neck=self._optimizer.param_groups[1]['lr']
+            )
 
             if epoch % self._config['val_interval'] == 0:
                 self._validate(epoch)

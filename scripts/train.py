@@ -68,6 +68,7 @@ def train(config, args):
     # Load checkpoint if applicable
     if args.resume is not None:
         checkpoint = torch.load(Path(args.resume))
+        checkpoint['scheduler_state_dict']['step_size'] = config['lr_drop']
 
         # Unpack and load content
         model.load_state_dict(checkpoint['model_state_dict'])

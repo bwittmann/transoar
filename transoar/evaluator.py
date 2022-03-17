@@ -16,7 +16,8 @@ class DetectionEvaluator:
         self,
         classes,
         iou_fn=iou_3d_np,
-        max_detections=1
+        max_detections=1,
+        iou_range=(0.1, 0.5, 0.05)
     ):
         """
         Class for evaluate detection metrics
@@ -35,7 +36,7 @@ class DetectionEvaluator:
             Metric(
                 classes=classes,
                 iou_list=np.arange(0.1, 1.0, 0.1),  # for individual APs
-                iou_range=(0.1, 0.5, 0.05), # for mAP - different from coco (0.5, 0.95, 0.05)
+                iou_range=iou_range, # for mAP - different from coco (0.5, 0.95, 0.05)
                 per_class=True,
                 max_detection=(1, ) # different from nndet (100, )
             )
