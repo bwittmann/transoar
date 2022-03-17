@@ -1,7 +1,7 @@
 # Config file for AttnFPN backbone and RetinaNet head
 
 # General training
-experiment_name: retina_unet_attnfpn_original_optim_no_grad_swin5_reversed
+experiment_name: retina_unet_attnfpn_original_optim_no_grad_384
 device: cuda:7
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
@@ -14,10 +14,7 @@ weight_decay: 1e-4
 clip_max_norm: -1 # Deactivated
 
 # Scheduler
-lr_drop: 10000000
-
-# Trainer
-seg_proxy: False
+lr_drop: 3400 #2680
 
 # Data
 dataset: transoar_test_160160256_CT #transoar_testing_focused_attn_320_320_512_CT
@@ -51,13 +48,13 @@ backbone:
   attn_drop_rate: 0.
   drop_path_rate: 0.2
   conv_merging: True
-  pre_merge: False
+  pre_merge: True
 
   # Decoder
   use_decoder_attn: False # Activated def attn
   
   # Standard params
-  fpn_channels: 192 #384 # Final output channels
+  fpn_channels: 384 # Final output channels
   out_fmap: P2  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
@@ -71,14 +68,17 @@ backbone:
   n_points: 4 #4
   use_cuda: False
 
+  # Use segmentation proxy loss
+  seg_proxy: True
+
 neck:
   # Input
   input_levels: [P2, P3, P4, P5]
-  cls_reg_channels: 192
+  cls_reg_channels: 384
   seg_channels: 24
 
   # Heads
-  head_channels: 192
+  head_channels: 384
   classifier_classes: 20
   loss_weight: 1.0  # for bce and giou
   prior_prob: 0.01 # for weight init of cls head

@@ -75,6 +75,8 @@ def train(config, args):
         # Unpack and load content
         model.load_state_dict(checkpoint['model_state_dict'])
         optim.load_state_dict(checkpoint['optimizer_state_dict'])
+
+        checkpoint['scheduler_state_dict']['step_size'] = config['lr_drop']
         scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         epoch = checkpoint['epoch']
         metric_start_val = checkpoint['metric_max_val']

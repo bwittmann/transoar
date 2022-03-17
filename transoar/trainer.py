@@ -59,12 +59,8 @@ class Trainer:
             # Make prediction 
             with autocast():
                 losses, _ = self._model.train_step(data, targets, evaluation=False)
-
-                # Dont consider seg losses
-                if not self._config['seg_proxy']:
-                    for key in ['seg_ce', 'seg_dice']:
-                        losses.pop(key)
-    
+                # for item in ['seg_ce', 'seg_dice']:
+                #     losses.pop(item)
                 loss_abs = sum(losses.values())
 
             self._optimizer.zero_grad()
@@ -82,7 +78,7 @@ class Trainer:
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
 
-            if self._config['seg_proxy']:
+            if self._config['backbone']['seg_proxy']:
                 loss_seg_ce_agg += losses['seg_ce'].item()
                 loss_seg_dice_agg += losses['seg_dice'].item()
 
@@ -125,19 +121,15 @@ class Trainer:
             # Make prediction 
             with autocast():
                 losses, predictions = self._model.train_step(data, targets, evaluation=True)
-
-                # Dont consider seg losses
-                if not self._config['seg_proxy']:
-                    for key in ['seg_ce', 'seg_dice']:
-                        losses.pop(key)
-
+                # for item in ['seg_ce', 'seg_dice']:
+                #     losses.pop(item)
                 loss_abs = sum(losses.values())
 
             loss_agg += loss_abs.item()
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
 
-            if self._config['seg_proxy']:
+            if self._config['backbone']['seg_proxy']:
                 loss_seg_ce_agg += losses['seg_ce'].item()
                 loss_seg_dice_agg += losses['seg_dice'].item()
 
@@ -202,7 +194,8 @@ class Trainer:
             # Log learning rates
             self._write_to_logger(
                 epoch, 'lr',
-                main=self._optimizer.param_groups[0]['lr'],
+                neck=self._optimizer.param_groups[0]['lr'],
+                backbone=self._optimizer.param_groups[1]['lr']
             )
 
             if epoch % self._config['val_interval'] == 0:

@@ -36,9 +36,16 @@ class Decoder(nn.Module):
         self._num_stages = len(config['conv_kernels'])
         self._refine_fmaps = config['use_decoder_attn']
         self._refine_feature_levels = config['feature_levels']
+        self._seg_proxy = config['seg_proxy']
 
         # Determine channels
         out_channels = torch.tensor([config['start_channels'] * 2**stage for stage in range(self._num_stages)])
+
+        # Dont use later stages is not needed
+        if not config['seg_proxy']:
+            out_channels = out_channels[2:]
+            self._num_stages -= 2
+
         encoder_out_channels = out_channels.tolist()
         decoder_out_channels = out_channels.clip(max=config['fpn_channels']).tolist()
 
@@ -51,7 +58,7 @@ class Decoder(nn.Module):
         self._out = nn.ModuleList()
         # Ensure that relevant stages have channels according to fpn_channels
         earliest_required_stage = min([int(config['out_fmap'][-1]), int(config['feature_levels'][0][-1])])
-        num_required_stages = self._num_stages - earliest_required_stage    
+        num_required_stages = self._num_stages - earliest_required_stage if self._seg_proxy else self._num_stages
         final_out_channels = torch.tensor(decoder_out_channels)
         final_out_channels[-num_required_stages:] = config['fpn_channels']
 
@@ -89,6 +96,14 @@ class Decoder(nn.Module):
             )
 
     def forward(self, x):
+        # Adjust output based requirement for high res output fmaps
+        if not self._seg_proxy:
+            for key in ['C0', 'C1']:
+                x.pop(key)
+            start_map = 2
+        else:
+            start_map = 0
+
         # Forward lateral
         fpn_maps = [self._lateral[level](fm) for level, fm in enumerate(x.values())]
 
@@ -106,7 +121,7 @@ class Decoder(nn.Module):
             out_up.append(x)
 
         # Forward out
-        outputs = {'P' + str(level): self._out[level](fm) for level, fm in enumerate(reversed(out_up))}
+        outputs = {'P' + str(level + start_map): self._out[level](fm) for level, fm in enumerate(reversed(out_up))}
 
         # Forward refine
         if self._refine_fmaps:
