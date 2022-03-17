@@ -12,7 +12,6 @@ class TransoarNet(nn.Module):
         super().__init__()
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
-        num_channels = config['backbone']['fpn_channels']
         num_classes = config['num_classes']
         self.input_level = config['neck']['input_level']
 
@@ -34,32 +33,87 @@ class TransoarNet(nn.Module):
         self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
 
         # Get projections and embeddings
-        self._query_embed = nn.Embedding(num_queries, hidden_dim)
-        self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
+        self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
+
+        # Get individual input projection for each feature level
+        num_feature_levels = 6 - int(config['neck']['input_level'][-1])
+        input_proj_list = []
+        for _ in range(num_feature_levels):
+            in_channels = config['backbone']['fpn_channels']    # TODO: even necessary?
+            input_proj_list.append(nn.Sequential(
+                nn.Conv3d(in_channels, hidden_dim, kernel_size=1),
+                nn.GroupNorm(32, hidden_dim),
+            ))
+
+        self._input_proj = nn.ModuleList(input_proj_list)
+        
+        self._reset_parameter()
 
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
 
+    def _reset_parameter(self):
+        nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
+        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
+        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
+
+        for proj in self._input_proj:
+            nn.init.xavier_uniform_(proj[0].weight, gain=1)
+            nn.init.constant_(proj[0].bias, 0)
+
+
     def forward(self, x):
         out_backbone = self._backbone(x)
         seg_src = out_backbone['P0']
-        det_src = out_backbone[self.input_level]
 
-        src = self._input_proj(det_src)
-        mask = torch.zeros_like(src[:, 0], dtype=torch.bool)    # No mask needed
+        # Retrieve fmaps
+        det_srcs = []
+        for key, value in out_backbone.items():
+            if int(key[-1]) < int(self.input_level[-1]):
+                continue
+            else:
+                det_srcs.append(value)
 
-        pos = self._pos_enc(src)
+        det_masks = []
+        det_pos = []
+        for idx, fmap in enumerate(det_srcs):
+            det_srcs[idx] = self._input_proj[idx](fmap)
+            mask = torch.zeros_like(fmap[:, 0], dtype=torch.bool)    # No mask needed
+            det_masks.append(mask)
+            det_pos.append(self._pos_enc(fmap))
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
-            src,
-            mask,
+            det_srcs,
+            det_masks,
             self._query_embed.weight,
-            pos
+            det_pos
         )
 
-        pred_logits = self._cls_head(out_neck)
-        pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
+        # Relative offset box and logit prediction
+        hs, init_reference_out, inter_references_out = out_neck
+
+        outputs_classes = []
+        outputs_coords = []
+        for lvl in range(hs.shape[0]):
+            if lvl == 0:
+                reference = init_reference_out
+            else:
+                reference = inter_references_out[lvl - 1]
+            reference = inverse_sigmoid(reference)
+            outputs_class = self._cls_head(hs[lvl])
+            tmp = self._bbox_reg_head(hs[lvl])
+
+            assert reference.shape[-1] == 3
+            tmp[..., :3] += reference
+
+            outputs_coord = tmp.sigmoid()
+            outputs_classes.append(outputs_class)
+            outputs_coords.append(outputs_coord)
+        pred_logits = torch.stack(outputs_classes)
+        pred_boxes = torch.stack(outputs_coords)
+
+        # Segmentation prediction
         pred_seg = self._seg_head(seg_src)
 
         out = {
@@ -95,3 +149,9 @@ class MLP(nn.Module):
         for i, layer in enumerate(self.layers):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
+
+def inverse_sigmoid(x, eps=1e-5):
+    x = x.clamp(min=0, max=1)
+    x1 = x.clamp(min=eps)
+    x2 = (1 - x).clamp(min=eps)
+    return torch.log(x1/x2)

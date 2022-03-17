@@ -3,7 +3,7 @@
 from transoar.models.matcher import HungarianMatcher
 from transoar.models.criterion import TransoarCriterion
 from transoar.models.backbones.attn_fpn.attn_fpn import AttnFPN
-from transoar.models.necks.detr_transformer import DetrTransformer
+from transoar.models.necks.def_detr_transformer import DeformableTransformer
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
 
 
@@ -14,17 +14,20 @@ def build_backbone(config):
     return model
 
 def build_neck(config):
-    model = DetrTransformer(
+    model = DeformableTransformer(
         d_model=config['hidden_dim'],
-        dropout=config['dropout'],
         nhead=config['nheads'],
-        dim_feedforward=config['dim_feedforward'],
         num_encoder_layers=config['enc_layers'],
         num_decoder_layers=config['dec_layers'],
-        normalize_before=config['pre_norm'],
-        use_encoder=config['use_encoder'],
-        return_intermediate_dec=True
-    )
+        dim_feedforward=config['dim_feedforward'],
+        dropout=config['dropout'],
+        activation="relu",
+        return_intermediate_dec=True,
+        dec_n_points=config['dec_n_points'],
+        enc_n_points=config['enc_n_points'],
+        use_cuda=config['use_cuda'],
+        use_encoder=config['use_encoder']
+    ) 
 
     return model
 

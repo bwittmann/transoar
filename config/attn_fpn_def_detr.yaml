@@ -1,20 +1,21 @@
-# Config file for AttnFPN-DETR
+# Config file for AttnFPN-def-DETR
 
 # General training
-experiment_name: attn_fpn_detr_P2_seg
-device: cuda:6
+experiment_name: attn_fpn_def_detr_P2_seg
+device: cuda:5
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
-epochs: 3000 #600 #1100
-lr: 1e-4
-lr_backbone: 1e-5
+epochs: 600
+lr: 2e-4
+lr_backbone: 2e-5
+lr_linear_proj_mult: 0.1
 weight_decay: 1e-4
 clip_max_norm: -1   # Not used
 
 # Scheduler
-lr_drop: 3000 #700
+lr_drop: 400
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
@@ -27,7 +28,7 @@ shuffle: True
 num_workers: 4
 
 # Hungarian matching
-set_cost_class: 1
+set_cost_class: 2
 set_cost_bbox: 5
 set_cost_giou: 2
 
@@ -73,7 +74,7 @@ backbone:
 
   # Def attn params
   pos_encoding: sine
-  feature_levels: [P3, P4, P5]
+  feature_levels: [P2, P3, P4, P5]
   hidden_dim: 384 #832 # 192 # prev: 256
   dim_feedforward: 1024
   dropout: 0.1 #0.1
@@ -86,23 +87,24 @@ backbone:
   use_seg_proxy_loss: True
   fg_bg: True
 
-neck:
-  name: detr
-  input_level: P2
-  use_encoder: False
-  
-  pos_encoding: sine
-  hidden_dim: 192 # prev: 256
-  dropout: 0.0 # prev: 0.1
-  nheads: 6
-  dim_feedforward: 1024 #1024 #2048
-  enc_layers: 3 # prev: 6
-  dec_layers: 3 # prev: 6
-  pre_norm: False
-  num_queries: 100
-  aux_loss: True
 
-  num_organs: 20
+neck:
+  name: def_detr
+  use_encoder: False
+  input_level: P2
+
+  pos_encoding: sine
+  hidden_dim: 192 #832 # 192 # prev: 256
+  dropout: 0.1
+  nheads: 6 #26  #prev: 8
+  dim_feedforward: 1024
+  enc_layers: 3
+  dec_layers: 3
+  enc_n_points: 4
+  dec_n_points: 4
+  num_queries: 300
+  aux_loss: True
+  use_cuda: False #True
 
 # Augmentation
 augmentation:
