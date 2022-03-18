@@ -39,15 +39,13 @@ def train(config, args):
 
     model = RetinaUNet(config).to(device=device)
 
-    # # Analysis of model parameter distribution
-    # num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    # num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['backbone', 'input_proj', 'skip']))
-    # num_neck_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['neck', 'query']))
-    # num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['head']))
+    # Analysis of model parameter distribution
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['attn_fpn']))
+    num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['head', 'segmenter']))
 
-    # print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%') # TODO: Incorp into logging
-    # print(f'num_neck_params\t\t{num_neck_params:>10}\t{num_neck_params/num_params:.4f}%')
-    # print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
+    print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%') # TODO: Incorp into logging
+    print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
 
     param_dicts = [
         {
