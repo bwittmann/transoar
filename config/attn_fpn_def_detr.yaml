@@ -1,7 +1,7 @@
 # Config file for AttnFPN-def-DETR
 
 # General training
-experiment_name: attn_fpn_def_detr_P2_seg
+experiment_name: attn_fpn_def_detr_P5_seg
 device: cuda:5
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
@@ -70,7 +70,7 @@ backbone:
   
   # Standard params
   fpn_channels: 192 #384 # Final output channels
-  out_fmap: P2  # P0, P1, P2, P3, P4, P5
+  out_fmap: P5  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -91,7 +91,8 @@ backbone:
 neck:
   name: def_detr
   use_encoder: False
-  input_level: P2
+  input_level: P5
+  num_feature_levels: 1
 
   pos_encoding: sine
   hidden_dim: 192 #832 # 192 # prev: 256

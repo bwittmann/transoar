@@ -26,7 +26,8 @@ def build_neck(config):
         dec_n_points=config['dec_n_points'],
         enc_n_points=config['enc_n_points'],
         use_cuda=config['use_cuda'],
-        use_encoder=config['use_encoder']
+        use_encoder=config['use_encoder'],
+        num_feature_levels=config['num_feature_levels']
     ) 
 
     return model
