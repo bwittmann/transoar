@@ -86,7 +86,7 @@ class Tester:
 
                 # Only use complete data for performance evaluation
                 if targets['labels'].shape[0] < len(self._class_dict):
-                    pass    #continue
+                    continue
 
                 # Make prediction
                 out = self._model(data)
