@@ -55,7 +55,7 @@ class Decoder(nn.Module):
         earliest_required_stage = min([int(config['out_fmap'][-1]), int(config['feature_levels'][0][-1])])
         num_required_stages = self._num_stages - earliest_required_stage    
         final_out_channels = deepcopy(decoder_out_channels)
-        final_out_channels[-num_required_stages] = config['fpn_channels']
+        final_out_channels[-num_required_stages:] = [config['fpn_channels'] for _ in final_out_channels[-num_required_stages:]]
 
         for out_channels, in_channels in zip(final_out_channels, decoder_out_channels):
             self._out.append(nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1))  # TODO: kernel_size 1
