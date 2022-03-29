@@ -60,9 +60,9 @@ class PositionEmbeddingLearned3D(nn.Module):
         self.orig_channels = channels
         channels = int(np.ceil(channels/6)*2)
 
-        self.row_embed = nn.Embedding(50, channels)
-        self.col_embed = nn.Embedding(50, channels)
-        self.depth_embed = nn.Embedding(50, channels)
+        self.row_embed = nn.Embedding(70, channels)
+        self.col_embed = nn.Embedding(70, channels)
+        self.depth_embed = nn.Embedding(70, channels)
         self.reset_parameters()
 
     def reset_parameters(self):
