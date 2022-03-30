@@ -43,8 +43,14 @@ class Tester:
 
         self._evaluator = DetectionEvaluator(
             classes=list(config['labels'].values()),
-            iou_range=(0.5, 0.95, 0.05) if args.coco_map else (0.1, 0.5, 0.05)
+            classes_small=config['labels_small'],
+            classes_mid=config['labels_mid'],
+            classes_large=config['labels_large'],
+            iou_range_nndet=(0.1, 0.5, 0.05),
+            iou_range_coco=(0.5, 0.95, 0.05),
+            sparse_results=True
         )
+
         self._model = TransoarNet(config).to(device=self._device)
 
         # Load checkpoint

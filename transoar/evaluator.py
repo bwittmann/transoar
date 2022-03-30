@@ -15,9 +15,14 @@ class DetectionEvaluator:
     def __init__(
         self,
         classes,
+        classes_small,
+        classes_mid,
+        classes_large,
+        iou_range_coco,
+        iou_range_nndet,
         iou_fn=iou_3d_np,
         max_detections=1,
-        iou_range=(0.1, 0.5, 0.05)
+        sparse_results=False
     ):
         """
         Class for evaluate detection metrics
@@ -35,9 +40,14 @@ class DetectionEvaluator:
         self.metrics = [
             Metric(
                 classes=classes,
-                iou_list=np.arange(0.1, 1.0, 0.1),  # for individual APs
-                iou_range=iou_range, # for mAP - different from coco (0.5, 0.95, 0.05)
-                per_class=True,
+                classes_small=classes_small,
+                classes_mid=classes_mid,
+                classes_large=classes_large,
+                iou_list=(0.1, 0.5, 0.75), #np.arange(0.1, 1.0, 0.1),  # for individual APs
+                iou_range_coco=iou_range_coco, # for mAP
+                iou_range_nndet=iou_range_nndet,
+                per_class=False if sparse_results else True,
+                determine_ar=False if sparse_results else True,
                 max_detection=(1, ) # different from nndet (100, )
             )
         ]
