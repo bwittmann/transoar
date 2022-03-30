@@ -29,11 +29,17 @@ class Trainer:
         self._scaler = GradScaler()
 
         self._evaluator = DetectionEvaluator(
-            classes=list(config['labels'].values())
+            classes=list(config['labels'].values()),
+            classes_small=config['labels_small'],
+            classes_mid=config['labels_mid'],
+            classes_large=config['labels_large'],
+            iou_range_nndet=(0.1, 0.5, 0.05),
+            iou_range_coco=(0.5, 0.95, 0.05),
+            sparse_results=True
         )
 
         # Init main metric for checkpoint
-        self._main_metric_key = 'mAP_IoU_0.10_0.50_0.05_MaxDet_1'
+        self._main_metric_key = 'mAP_coco'
         self._main_metric_max_val = metric_start_val
 
     def _train_one_epoch(self, num_epoch):
@@ -186,16 +192,14 @@ class Trainer:
 
         self._write_to_logger(
             num_epoch, 'val_metric',
-            mAP=metric_scores['mAP_IoU_0.10_0.50_0.05_MaxDet_1'],
-            AP10=metric_scores['AP_IoU_0.10_MaxDet_1'],
-            AP20=metric_scores['AP_IoU_0.20_MaxDet_1'],
-            AP30=metric_scores['AP_IoU_0.30_MaxDet_1'],
-            AP40=metric_scores['AP_IoU_0.40_MaxDet_1'],
-            AP50=metric_scores['AP_IoU_0.50_MaxDet_1'],
-            AP60=metric_scores['AP_IoU_0.60_MaxDet_1'],
-            AP70=metric_scores['AP_IoU_0.70_MaxDet_1'],
-            AP80=metric_scores['AP_IoU_0.80_MaxDet_1'],
-            AP90=metric_scores['AP_IoU_0.90_MaxDet_1'],
+            mAPcoco=metric_scores['mAP_coco'],
+            mAPcocoS=metric_scores['mAP_coco_s'],
+            mAPcocoM=metric_scores['mAP_coco_m'],
+            mAPcocoL=metric_scores['mAP_coco_l'],
+            mAPnndet=metric_scores['mAP_nndet'],
+            AP10=metric_scores['AP_IoU_0.10'],
+            AP50=metric_scores['AP_IoU_0.50'],
+            AP75=metric_scores['AP_IoU_0.75'],
         )
 
     def run(self):
