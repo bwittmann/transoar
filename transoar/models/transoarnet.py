@@ -35,32 +35,16 @@ class TransoarNet(nn.Module):
         # Get projections and embeddings
         self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
 
-        # Get individual input projection for each feature level
-        num_feature_levels = 6 - int(config['neck']['input_level'][-1])
-        input_proj_list = []
-        for _ in range(num_feature_levels):
-            in_channels = config['backbone']['fpn_channels']    # TODO: even necessary?
-            input_proj_list.append(nn.Sequential(
-                nn.Conv3d(in_channels, hidden_dim, kernel_size=1),
-                nn.GroupNorm(32, hidden_dim),
-            ))
-
-        self._input_proj = nn.ModuleList(input_proj_list)
-        
-        self._reset_parameter()
-
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
+
+        self._reset_parameter()
 
 
     def _reset_parameter(self):
         nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
         nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
         nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
-
-        for proj in self._input_proj:
-            nn.init.xavier_uniform_(proj[0].weight, gain=1)
-            nn.init.constant_(proj[0].bias, 0)
 
 
     def forward(self, x):
@@ -78,7 +62,7 @@ class TransoarNet(nn.Module):
         det_masks = []
         det_pos = []
         for idx, fmap in enumerate(det_srcs):
-            det_srcs[idx] = self._input_proj[idx](fmap)
+            det_srcs[idx] = fmap
             mask = torch.zeros_like(fmap[:, 0], dtype=torch.bool)    # No mask needed
             det_masks.append(mask)
             det_pos.append(self._pos_enc(fmap))
