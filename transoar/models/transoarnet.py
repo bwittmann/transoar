@@ -12,7 +12,6 @@ class TransoarNet(nn.Module):
         super().__init__()
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
-        num_classes = config['num_classes']
         self.input_level = config['neck']['input_level']
 
         # Use auxiliary decoding losses if required
@@ -25,7 +24,7 @@ class TransoarNet(nn.Module):
         self._neck = build_neck(config['neck'])
 
         # Get heads
-        self._cls_head = nn.Linear(hidden_dim, num_classes + 1)
+        self._cls_head = nn.Linear(hidden_dim, 1)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         in_channels = config['backbone']['start_channels']
