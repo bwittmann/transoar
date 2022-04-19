@@ -37,13 +37,13 @@ class TransoarCriterion(nn.Module):
             [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
         ).type(torch.FloatTensor)
 
-    def loss_class(self, outputs, matches, soft_labels):
+    def loss_class(self, outputs, soft_labels):
         assert 'pred_logits' in outputs
         cls_preds = outputs['pred_logits'].flatten()
-        cls_labels = matches.flatten().float()
+        cls_labels = soft_labels.flatten()
 
         # Remove non existent classes
-        valid_ids = (soft_labels.flatten() != -1).nonzero()
+        valid_ids = (cls_labels != -1).nonzero()
 
         loss_ce = F.binary_cross_entropy_with_logits(cls_preds[valid_ids].squeeze(), cls_labels[valid_ids].squeeze().cuda())
         return loss_ce
@@ -95,7 +95,7 @@ class TransoarCriterion(nn.Module):
 
         # Compute losses
         loss_bbox, loss_giou = self.loss_bboxes(outputs, targets, matches, num_boxes)
-        loss_cls = self.loss_class(outputs, matches, soft_labels)
+        loss_cls = self.loss_class(outputs, soft_labels)
 
         if self._seg_proxy:
             loss_seg_ce, loss_seg_dice = self.loss_segmentation(outputs, seg_targets)
@@ -114,7 +114,7 @@ class TransoarCriterion(nn.Module):
                 matches, soft_labels = self.matcher(aux_outputs, targets)
 
                 loss_bbox, loss_giou = self.loss_bboxes(outputs, targets, matches, num_boxes)
-                loss_cls = self.loss_class(outputs, matches, soft_labels)
+                loss_cls = self.loss_class(outputs, soft_labels)
 
                 loss_dict[f'bbox_{i}'] = loss_bbox
                 loss_dict[f'giou_{i}'] = loss_giou
