@@ -1,20 +1,20 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: attn_fpn_detr_P2_seg
-device: cuda:6
+experiment_name: attn_fpn_foc_dec_spec_queries_top1_shear05
+device: cuda:7
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
-epochs: 3000 #600 #1100
+epochs: 400
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4
 clip_max_norm: -1   # Not used
 
 # Scheduler
-lr_drop: 3000 #700
+lr_drop: 300 #700
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
@@ -69,7 +69,7 @@ backbone:
   
   # Standard params
   fpn_channels: 192 #384 # Final output channels
-  out_fmap: P2  # P0, P1, P2, P3, P4, P5
+  out_fmap: P5  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -88,7 +88,7 @@ backbone:
 
 neck:
   name: detr
-  input_level: P2
+  input_level: P5
   use_encoder: False
   
   pos_encoding: sine
@@ -99,7 +99,7 @@ neck:
   enc_layers: 3 # prev: 6
   dec_layers: 3 # prev: 6
   pre_norm: False
-  num_queries: 100
+  num_queries: 540
   aux_loss: True
 
   num_organs: 20
@@ -116,7 +116,7 @@ augmentation:
   p_adjust_contrast: 0 #0.2
   p_rotate: 0.5
   p_zoom: 0.5
-  p_shear: 0
+  p_shear: 0.0
   p_translate: 0.5
   p_flip: 0
 
