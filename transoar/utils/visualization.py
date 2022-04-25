@@ -1,6 +1,7 @@
 """Helper functions for visualization purposes."""
 
 from collections import defaultdict
+from pathlib import Path
 import math
 
 import cv2
@@ -214,73 +215,120 @@ def rescale_bbox(bbox, original_shape):
         return bbox
 
 def save_attn_visualization(
-    model_out, backbone_features, dec_attn_weights, original_shape, seg_mask
+    model_out, backbone_features, dec_attn_weights, original_shape, seg_mask, case_id, path='/home/bastian/download'
 ):
+    path = Path(path) / ('case' + str(case_id))
+    path.mkdir(parents=True, exist_ok=True)
+
     # Put everything to cpu
-    model_out = {k: v.cpu() for k, v in model_out.items() if k != 'aux_outputs'}
+    model_out = {k: v.cpu().squeeze() for k, v in model_out.items() if k != 'aux_outputs'}
     seg_mask, backbone_features, dec_attn_weights = seg_mask.cpu().squeeze(), backbone_features.cpu(), dec_attn_weights.cpu()
+    seg_mask_raw = torch.permute(seg_mask, (1, 0, 2)).short()
 
     # Get shape of input feature map
     d, h, w = backbone_features.shape[-3:]
 
-    # Reshape to get class specific queries
-    dec_attn_weights = dec_attn_weights.reshape(20, 27, -1)
+    # Get predicted classes
+    classes = model_out['pred_logits'].argmax(dim=-1)
 
-    # Decoder cross attn weights, averaged over all heads
-    for class_ in range(dec_attn_weights.shape[0]):
-        for query_id in range(dec_attn_weights.shape[1]):
+    for idx, attn_weights in enumerate(dec_attn_weights):
+        class_ = classes[idx].item()
 
-            # Reshape attn weights to original fmap shape
-            query_dec_attn_weights = dec_attn_weights[class_, query_id].view(d, h, w)
-            assert torch.isclose(query_dec_attn_weights.sum(), torch.tensor([1.]))
+        # Skip bg class
+        if class_ == 0:
+            continue
 
-            # Upsample attn weights to original input shape
-            query_dec_attn_weights = F.interpolate(query_dec_attn_weights[None, None], original_shape).squeeze()
+        attn_weights = attn_weights.view(d, h, w)
+        attn_weights = F.interpolate(attn_weights[None, None], original_shape).squeeze()
+        max_weight, min_weight = attn_weights.max(), attn_weights.min()
+        attn_weights = ((attn_weights- min_weight) / (max_weight - min_weight)) * 255
+        attn_weights = torch.permute(attn_weights, (1, 0, 2))
 
-            # Generate complete organ pc and different colored query target organ pc
-            pc_rest = torch.nonzero(torch.logical_and(seg_mask != 0, seg_mask != class_ + 1))
-            pc_rest_color = (torch.tensor(PALETTE[3]) / 255)[None].repeat(pc_rest.shape[0], 1)
+        seg_mask = seg_mask_raw.clone()
+        seg_mask[seg_mask == class_] = -1
+        seg_mask[seg_mask > 0] = 50
+        seg_mask[seg_mask == -1] = 240
 
-            pc_query = torch.nonzero(seg_mask == class_ + 1)
-            pc_query_color = (torch.tensor(PALETTE[1]) / 255)[None].repeat(pc_query.shape[0], 1)
+        path_query = path / ('class' + str(class_))
+        path_query.mkdir(exist_ok=True)
 
-            pc_comb, pc_comb_color = torch.cat((pc_rest, pc_query), dim=0), torch.cat((pc_rest_color, pc_query_color), dim=0)
+        for idx_, (seg_frame, attn_weight_frame) in enumerate(zip(seg_mask, attn_weights)):
+            seg_frame_rgb =  seg_frame.unsqueeze(-1).repeat(1, 1, 3)
 
-            pc = o3d.geometry.PointCloud()
-            pc.points = o3d.utility.Vector3dVector(pc_comb)
-            pc.colors = o3d.utility.Vector3dVector(pc_comb_color)
-            pc_organs = pc 
+            # attn_weight_frame_rgb = attn_weight_frame.unsqueeze(-1).repeat(1, 1, 3)
 
-            # Generate attn weight pc
-            pc_attn_weights = []
+            b_channel, g_channel, r_channel = cv2.split(torch.zeros_like(attn_weight_frame).unsqueeze(-1).repeat(1, 1, 3).numpy())
+            r_channel.fill(255)
+            alpha_channel = attn_weight_frame.short().numpy()
+            img_BGRA = cv2.merge((b_channel.astype(np.int16), g_channel.astype(np.int16), r_channel.astype(np.int16), alpha_channel))
 
-            query_dec_attn_weights = query_dec_attn_weights.flatten()
+            if idx_ == 80:
+                k = 12
 
-            # Create mask in order to reduce complexity by sampling sparse attn weights
-            mask = torch.ones_like(query_dec_attn_weights).to(dtype=torch.bool)
-            mask[::2] = False
-            query_dec_attn_weights[mask] = -1
-            query_dec_attn_weights = query_dec_attn_weights.view(original_shape) 
+            cv2.imwrite(str(path_query / f'frame{idx_}_seg.png'), seg_frame_rgb.numpy())
+            cv2.imwrite(str(path_query / f'frame{idx_}_attn.png'), img_BGRA)
 
-            weights = query_dec_attn_weights.unique()[2:]   # no 0 and -1 attn weights
-            for weight in tqdm(weights, desc='Process attn weights pc.'):
-                pc_attn_weight = torch.nonzero(query_dec_attn_weights == weight)
-                color = torch.tensor([1, 1, 1]) - 60 * weight
-                color[0] = 1
 
-                pc_attn_color = color[None].repeat(pc_attn_weight.shape[0], 1)
 
-                pc = o3d.geometry.PointCloud()
-                pc.points = o3d.utility.Vector3dVector(pc_attn_weight)
-                pc.colors = o3d.utility.Vector3dVector(pc_attn_color)
 
-                pc_attn_weights.append(pc)
 
-            for idx, pc in enumerate(pc_attn_weights):
-                o3d.io.write_point_cloud(f'/home/bastian/download/attn{idx}.ply', pc)
 
-            o3d.io.write_point_cloud('/home/bastian/download/test.ply', pc_organs)
-            # o3d.visualization.draw_geometries([pc_organs, *pc_attn_weights])
+        # attn_weights = attn_weights.view(d, h, w)
+        # assert torch.isclose(attn_weights.sum(), torch.tensor([1.]))
+
+        # # Upsample attn weights to original input shape
+        # attn_weights = F.interpolate(attn_weights[None, None], original_shape).squeeze()
+
+        # # Generate complete organ pc and different colored query target organ pc
+        # pc_rest = torch.nonzero(torch.logical_and(seg_mask != 0, seg_mask != class_ + 1))
+        # pc_rest_color = (torch.tensor(PALETTE[3]) / 255)[None].repeat(pc_rest.shape[0], 1)
+
+        # pc_query = torch.nonzero(seg_mask == class_ + 1)
+        # pc_query_color = (torch.tensor(PALETTE[1]) / 255)[None].repeat(pc_query.shape[0], 1)
+
+        # pc_comb, pc_comb_color = torch.cat((pc_rest, pc_query), dim=0), torch.cat((pc_rest_color, pc_query_color), dim=0)
+
+        # pc = o3d.geometry.PointCloud()
+        # pc.points = o3d.utility.Vector3dVector(pc_comb)
+        # pc.colors = o3d.utility.Vector3dVector(pc_comb_color)
+        # pc_organs = pc 
+
+        # # Generate attn weight pc
+        # pc_attn_weights = []
+
+        # query_dec_attn_weights = attn_weights.flatten()
+
+        # # Create mask in order to reduce complexity by sampling sparse attn weights
+        # mask = torch.ones_like(query_dec_attn_weights).to(dtype=torch.bool)
+        # mask[::2] = False
+        # query_dec_attn_weights[mask] = -1
+        # query_dec_attn_weights = query_dec_attn_weights.view(original_shape) 
+
+        # weights = query_dec_attn_weights.unique()[2:]   # no 0 and -1 attn weights
+        # for weight in tqdm(weights, desc='Process attn weights pc.'):
+        #     pc_attn_weight = torch.nonzero(query_dec_attn_weights == weight)
+        #     color = torch.tensor([1, 1, 1]) - 60 * weight
+        #     color[0] = 1
+
+        #     pc_attn_color = color[None].repeat(pc_attn_weight.shape[0], 1)
+
+        #     pc = o3d.geometry.PointCloud()
+        #     pc.points = o3d.utility.Vector3dVector(pc_attn_weight)
+        #     pc.colors = o3d.utility.Vector3dVector(pc_attn_color)
+
+        #     pc_attn_weights.append(pc)
+
+        # path_id = path / str(idx)
+        # path_id.mkdir(exist_ok=True) 
+
+        # for idx_, pc in enumerate(pc_attn_weights):
+        #     o3d.io.write_point_cloud(str(path_id / f'attn{idx_}.ply'), pc)
+
+        # o3d.io.write_point_cloud(str(path_id / 'test.ply'), pc_organs)
+        # # o3d.visualization.draw_geometries([pc_organs, *pc_attn_weights])
+
+
+
 
 def write_bbox(bbox, mode, output_file, palette, diameter=0.3):
     """Generate a .ply file representing a bbox.
