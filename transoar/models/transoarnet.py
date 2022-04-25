@@ -21,7 +21,7 @@ class TransoarNet(nn.Module):
         self._backbone = build_backbone(config['backbone'])
 
         # Get neck
-        self._neck = build_neck(config['neck'])
+        self._neck = build_neck(config['neck'], config['bbox_properties'])
 
         # Get heads
         self._cls_head = nn.Linear(hidden_dim, 1)
@@ -32,7 +32,7 @@ class TransoarNet(nn.Module):
         self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
 
         # Get projections and embeddings
-        self._query_embed = nn.Embedding(num_queries, hidden_dim)
+        self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)  # tgt + query_pos 
 
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
@@ -43,13 +43,10 @@ class TransoarNet(nn.Module):
         seg_src = out_backbone['P0']
         det_src = out_backbone[self.input_level]
 
-        mask = torch.zeros_like(det_src[:, 0], dtype=torch.bool)    # No mask needed
-
         pos = self._pos_enc(det_src)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
             det_src,
-            mask,
             self._query_embed.weight,
             pos
         )
