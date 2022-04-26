@@ -1,8 +1,8 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: attn_fpn_foc_dec_foc_attn_p3_no_restriction
-device: cuda:2
+experiment_name: test #attn_fpn_foc_dec_foc_attn_p4_no_restriction
+device: cuda:5
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
@@ -11,7 +11,7 @@ epochs: 4000
 lr: 1e-4
 lr_backbone: 1e-5
 weight_decay: 1e-4
-clip_max_norm: -1   # Not used
+clip_max_norm: 0.1
 
 # Scheduler
 lr_drop: 3000 #700
@@ -69,7 +69,7 @@ backbone:
   
   # Standard params
   fpn_channels: 192 #384 # Final output channels
-  out_fmap: P3  # P0, P1, P2, P3, P4, P5
+  out_fmaps: [P4]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -83,13 +83,13 @@ backbone:
   use_cuda: False
 
   # Segmentation proxy loss
-  use_seg_proxy_loss: True
+  use_seg_proxy_loss: False
   fg_bg: True
 
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_level: P3
+  input_level: P4
   
   hidden_dim: 192 #512 832 # prev: 256
   dropout: 0.1  # prev: 0.1
