@@ -9,10 +9,15 @@ class Metric:
     def __init__(
         self,
         classes,
+        classes_small,
+        classes_mid,
+        classes_large,
         iou_list=(0.1, 0.5, 0.75),
-        iou_range=(0.1, 0.5, 0.05),
+        iou_range_nndet=(0.1, 0.5, 0.05),
+        iou_range_coco=(0.5, 0.95, 0.05),
         max_detection=(1, 5, 100),
-        per_class=True
+        per_class=True,
+        determine_ar=True
     ):
         """
         Class to compute COCO metrics
@@ -28,21 +33,43 @@ class Metric:
             max_detection (Sequence[int]): maximum number of detections per image
         """
         self.classes = classes
-        self.per_class = per_class
+        self.classes_subsets= {
+            's': classes_small,
+            'm': classes_mid,
+            'l': classes_large
+        }
 
-        iou_list = np.array(iou_list)
-        _iou_range = np.linspace(
-            iou_range[0], iou_range[1], int(np.round((iou_range[1] - iou_range[0]) / iou_range[2])) + 1, endpoint=True
-        )
-        self.iou_thresholds = np.union1d(iou_list, _iou_range)
-        self.iou_range = iou_range
+        self.per_class = per_class
+        self.determine_ar = determine_ar
+
+        iou_list = np.array(iou_list).round(2)
+
+        # determine mAP IoU ranges
+        _iou_range_nndet = np.linspace(
+            iou_range_nndet[0],
+            iou_range_nndet[1],
+            int(np.round((iou_range_nndet[1] - iou_range_nndet[0]) / iou_range_nndet[2])) + 1,
+            endpoint=True
+        ).round(2)
+        _iou_range_coco = np.linspace(
+            iou_range_coco[0],
+            iou_range_coco[1],
+            int(np.round((iou_range_coco[1] - iou_range_coco[0]) / iou_range_coco[2])) + 1,
+            endpoint=True
+        ).round(2)
+
+        self.iou_thresholds = np.union1d(np.union1d(iou_list, _iou_range_coco), _iou_range_nndet)
+
+        self.iou_range_coco = iou_range_coco
+        self.iou_range_nndet = iou_range_nndet
 
         # get indices of iou values of ious range and ious list for later evaluation
         self.iou_list_idx = np.nonzero(iou_list[:, np.newaxis] == self.iou_thresholds[np.newaxis])[1]
-        self.iou_range_idx = np.nonzero(_iou_range[:, np.newaxis] == self.iou_thresholds[np.newaxis])[1]
+        self.iou_range_coco_idx = np.nonzero(_iou_range_coco[:, np.newaxis] == self.iou_thresholds[np.newaxis])[1]
+        self.iou_range_nndet_idx = np.nonzero(_iou_range_nndet[:, np.newaxis] == self.iou_thresholds[np.newaxis])[1]
 
-        assert (self.iou_thresholds[self.iou_list_idx] == iou_list).all()
-        assert (self.iou_thresholds[self.iou_range_idx] == _iou_range).all()
+        assert (self.iou_thresholds[self.iou_range_coco_idx] == _iou_range_coco).all()
+        assert (self.iou_thresholds[self.iou_range_nndet_idx] == _iou_range_nndet).all()
 
         self.recall_thresholds = np.linspace(.0, 1.00, int(np.round((1.00 - .0) / .01)) + 1, endpoint=True)
         self.max_detections = max_detection
@@ -85,7 +112,9 @@ class Metric:
 
         results = {}
         results.update(self.compute_ap(dataset_statistics))
-        results.update(self.compute_ar(dataset_statistics))
+
+        if self.determine_ar:
+            results.update(self.compute_ar(dataset_statistics))
 
         return results, None
 
@@ -105,30 +134,54 @@ class Metric:
                 `dtIgnore`: detections which should be ignored [T, D], indicate which detections should be ignored
         """
         results = {}
-        if self.iou_range:  # mAP
-            key = (f"mAP_IoU_{self.iou_range[0]:.2f}_{self.iou_range[1]:.2f}_{self.iou_range[2]:.2f}_"
-                   f"MaxDet_{self.max_detections[-1]}")
-            results[key] = self.select_ap(dataset_statistics, iou_idx=self.iou_range_idx, max_det_idx=-1)
+        if self.iou_range_coco:  # mAP coco
+            key = ('mAP_coco')
+            results[key] = self.select_ap(dataset_statistics, iou_idx=self.iou_range_coco_idx, max_det_idx=-1)
 
-            if self.per_class:
-                for cls_idx, cls_str in enumerate(self.classes):  # per class results
-                    key = (f"{cls_str}_"
-                           f"mAP_IoU_{self.iou_range[0]:.2f}_{self.iou_range[1]:.2f}_{self.iou_range[2]:.2f}_"
-                           f"MaxDet_{self.max_detections[-1]}")
-                    results[key] = self.select_ap(dataset_statistics, iou_idx=self.iou_range_idx,
-                                                  cls_idx=cls_idx, max_det_idx=-1)
+            if self.classes_subsets:    #mAPs, mAPm, mAPl
+                for key_, dict_ in self.classes_subsets.items():
+                    key = (f"mAP_coco_{key_}")
+                    cls_idx = [int(cls_id) -1 for cls_id in list(dict_.keys())]
+                    results[key] = self.select_ap(
+                        dataset_statistics, iou_idx=self.iou_range_coco_idx, cls_idx=cls_idx, max_det_idx=-1
+                    )
+
+            if self.per_class:  # per class results
+                for cls_idx, cls_str in enumerate(self.classes):
+                    key = (f"mAP_coco_{cls_str}_")
+                    results[key] = self.select_ap(
+                        dataset_statistics, iou_idx=self.iou_range_coco_idx, cls_idx=cls_idx, max_det_idx=-1
+                    )
+
+        if self.iou_range_nndet:  # mAP nndet
+            key = ('mAP_nndet')
+            results[key] = self.select_ap(dataset_statistics, iou_idx=self.iou_range_nndet_idx, max_det_idx=-1)
+
+            if self.classes_subsets:    #mAPs, mAPm, mAPl
+                for key_, dict_ in self.classes_subsets.items():
+                    key = (f"mAP_nndet_{key_}")
+                    cls_idx = [int(cls_id) -1 for cls_id in list(dict_.keys())]
+                    results[key] = self.select_ap(
+                        dataset_statistics, iou_idx=self.iou_range_nndet_idx, cls_idx=cls_idx, max_det_idx=-1
+                    )
+
+            if self.per_class:  # per class results
+                for cls_idx, cls_str in enumerate(self.classes):
+                    key = (f"mAP_nndet_{cls_str}_")
+                    results[key] = self.select_ap(
+                        dataset_statistics, iou_idx=self.iou_range_nndet_idx, cls_idx=cls_idx, max_det_idx=-1
+                    )
 
         for idx in self.iou_list_idx:   # AP@IoU
-            key = f"AP_IoU_{self.iou_thresholds[idx]:.2f}_MaxDet_{self.max_detections[-1]}"
+            key = f"AP_IoU_{self.iou_thresholds[idx]:.2f}"
             results[key] = self.select_ap(dataset_statistics, iou_idx=[idx], max_det_idx=-1)
 
             if self.per_class:
                 for cls_idx, cls_str in enumerate(self.classes):  # per class results
-                    key = (f"{cls_str}_"
-                           f"AP_IoU_{self.iou_thresholds[idx]:.2f}_"
-                           f"MaxDet_{self.max_detections[-1]}")
-                    results[key] = self.select_ap(dataset_statistics,
-                                                  iou_idx=[idx], cls_idx=cls_idx, max_det_idx=-1)
+                    key = (f"AP_IoU_{self.iou_thresholds[idx]:.2f}_{cls_str}_")
+                    results[key] = self.select_ap(
+                        dataset_statistics, iou_idx=[idx], cls_idx=cls_idx, max_det_idx=-1
+                    )
         return results
 
     def compute_ar(self, dataset_statistics):
@@ -288,10 +341,10 @@ class Metric:
         num_classes = len(self.classes)
         num_max_detections = len(self.max_detections)
 
-        # -1 for the precision of absent categories
-        precision = -np.ones((num_iou_th, num_recall_th, num_classes, num_max_detections))
-        recall = -np.ones((num_iou_th, num_classes, num_max_detections))
-        scores = -np.ones((num_iou_th, num_recall_th, num_classes, num_max_detections))
+        # 0 for the precision of absent categories
+        precision = np.zeros((num_iou_th, num_recall_th, num_classes, num_max_detections))
+        recall = np.zeros((num_iou_th, num_classes, num_max_detections))
+        scores = np.zeros((num_iou_th, num_recall_th, num_classes, num_max_detections))
 
         for cls_idx, cls_i in enumerate(self.classes):  # for each class
             for maxDet_idx, maxDet in enumerate(self.max_detections):  # for each maximum number of detections

@@ -22,3 +22,29 @@ labels:
   18: left_psoas_major
   19: right_rectus_abdominis
   20: left_rectus_abdominis
+
+labels_small:
+  15: right_adrenal_gland
+  16: left_adrenal_gland
+  4: gall_bladder
+  11: thyroid_gland
+  7: trachea
+
+labels_mid:
+  12: first_lumbar_vertebra
+  5: urinary_bladder
+  3: pancreas
+  13: right_kidney
+  14: left_kidney
+  10: sternum
+  17: right_psoas_major
+  18: left_psoas_major
+  2: spleen
+
+labels_large:
+  19: right_rectus_abdominis
+  20: left_rectus_abdominis
+  6: aorta
+  1: liver
+  8: right_lung
+  9: left_lung

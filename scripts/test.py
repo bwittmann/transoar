@@ -8,7 +8,6 @@ import torch
 from tqdm import tqdm
 
 from transoar.utils.io import load_json, write_json
-# from transoar.utils.visualization import save_attn_visualization, save_pred_visualization
 from transoar.data.dataloader import get_loader
 from transoar.evaluator import DetectionEvaluator
 from transoar.models.retinanet.retina_unet import RetinaUNet
@@ -38,9 +37,16 @@ class Tester:
 
         self._evaluator = DetectionEvaluator(
             classes=list(config['labels'].values()),
-            iou_range=(0.5, 0.95, 0.05) if args.coco_map else (0.1, 0.5, 0.05)
+            classes_small=config['labels_small'],
+            classes_mid=config['labels_mid'],
+            classes_large=config['labels_large'],
+            iou_range_nndet=(0.1, 0.5, 0.05),
+            iou_range_coco=(0.5, 0.95, 0.05),
+            sparse_results=True
         )
         self._model = RetinaUNet(config).to(device=self._device)
+
+        print(sum(p.numel() for p in self._model.parameters() if p.requires_grad))
 
         # Load checkpoint
         checkpoint = torch.load(path_to_ckpt, map_location=self._device)

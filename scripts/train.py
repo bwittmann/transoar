@@ -13,7 +13,6 @@ import monai
 from transoar.trainer import Trainer
 from transoar.data.dataloader import get_loader
 from transoar.utils.io import get_config, write_json, get_meta_data
-from transoar.models.retinanet.scheduler import LinearWarmupPolyLR
 from transoar.models.retinanet.retina_unet import RetinaUNet
 
 
@@ -26,8 +25,8 @@ def match(n, keywords):
         return out
 
 def train(config, args):
-    os.environ["CUDA_VISIBLE_DEVICES"] = config['device'][-1]
-    device = 'cuda' # TODO: fix this hack for def detr cuda module
+    #os.environ["CUDA_VISIBLE_DEVICES"] = config['device'][-1]
+    device = 'cuda:0' # TODO: fix this hack for def detr cuda module
 
     # Build necessary components
     train_loader = get_loader(config, 'train')
@@ -35,7 +34,7 @@ def train(config, args):
     if config['overfit']:
         val_loader = get_loader(config, 'train')
     else:
-        val_loader = get_loader(config, 'val')
+        val_loader = get_loader(config, 'val', batch_size=1)
 
     model = RetinaUNet(config).to(device=device)
 

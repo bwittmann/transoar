@@ -109,7 +109,7 @@ class EncoderSwinBlock(nn.Module):
         if self.pre_merge:
             x = rearrange(x, 'b c d h w -> b d h w c')
             if self.downsample is not None:
-                x = self.downsample(x)
+                x = self.downsample(x, 'down')
             x = rearrange(x, 'b d h w c -> b c d h w')
 
         B, C, D, H, W = x.shape
@@ -123,9 +123,8 @@ class EncoderSwinBlock(nn.Module):
             x = blk(x, attn_mask)
         x = x.view(B, D, H, W, -1)
 
-        if not self.pre_merge:
-            if self.downsample is not None:
-                x = self.downsample(x)
+        if self.downsample is not None:
+            x = self.downsample(x, 'refine')
 
         x = rearrange(x, 'b d h w c -> b c d h w')
         return x
@@ -352,18 +351,27 @@ class ConvPatchMerging(nn.Module):
         eps=1e-05
     ):
         super().__init__()
+        self._reduction = nn.ModuleDict()
 
-        self._reduction = nn.Sequential(
+        self._reduction['down'] = nn.Sequential(
             nn.Conv3d(
-                in_channels=dim, out_channels=dim * 2, kernel_size=2, stride=2, padding=0, bias=bias
+                in_channels=dim, out_channels=dim * 2, kernel_size=3, stride=2, padding=1, bias=bias    # TODO down kernelsize=2
             ),
             nn.InstanceNorm3d(num_features=dim * 2, affine=affine, eps=eps),
             nn.ReLU(inplace=True)
         )
 
-    def forward(self, x):
+        self._reduction['refine'] = nn.Sequential(
+            nn.Conv3d(
+                in_channels=dim * 2, out_channels=dim * 2, kernel_size=3, stride=1, padding=1, bias=bias
+            ),
+            nn.InstanceNorm3d(num_features=dim * 2, affine=affine, eps=eps),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x, operation='down'):
         x = rearrange(x, 'b d h w c -> b c d h w')
-        x = self._reduction(x)
+        x = self._reduction[operation](x)
         x = rearrange(x, 'b c d h w -> b d h w c')
         return x
 
