@@ -98,7 +98,7 @@ class FocusedDecoder(nn.Module):
 
             query_attn_volume[dummy_fmap_flattened] = False
 
-        return torch.zeros_like(attn_mask, dtype=torch.bool)
+        return attn_mask #torch.zeros_like(attn_mask, dtype=torch.bool)
 
     def _reset_parameters(self):
         for p in self.parameters():

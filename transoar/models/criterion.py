@@ -87,8 +87,8 @@ class TransoarCriterion(nn.Module):
         return loss_ce, loss_dice
 
 
-    def forward(self, outputs, targets, seg_targets):
-        matches, soft_labels = self.matcher(outputs, targets)
+    def forward(self, outputs, targets, seg_targets, anchors):
+        matches, soft_labels = self.matcher(outputs, targets, anchors)
 
         # Compute the average number of target boxes accross all nodes, for normalization purposes
         num_boxes = sum(len(t["labels"]) for t in targets)
@@ -111,7 +111,7 @@ class TransoarCriterion(nn.Module):
         # Compute losses for the output of each intermediate layer
         if 'aux_outputs' in outputs:
             for i, aux_outputs in enumerate(outputs['aux_outputs']):
-                matches, soft_labels = self.matcher(aux_outputs, targets)
+                matches, soft_labels = self.matcher(aux_outputs, targets, anchors)
 
                 loss_bbox, loss_giou = self.loss_bboxes(outputs, targets, matches, num_boxes)
                 loss_cls = self.loss_class(outputs, soft_labels)

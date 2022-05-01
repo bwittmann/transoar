@@ -1,17 +1,17 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: test #attn_fpn_foc_dec_foc_attn_p4_no_restriction
-device: cuda:5
+experiment_name: attn_fpn_foc_dec_cnn_rec_shear05
+device: cuda:2
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
 epochs: 4000
-lr: 1e-4
-lr_backbone: 1e-5
+lr: 2e-4
+lr_backbone: 2e-5
 weight_decay: 1e-4
-clip_max_norm: 0.1
+clip_max_norm: -1
 
 # Scheduler
 lr_drop: 3000 #700
@@ -24,12 +24,13 @@ bbox_padding: 1
 # Dataloader
 batch_size: 2
 shuffle: True
-num_workers: 4
+num_workers: 16
 
-# Hungarian matching
-set_cost_class: 1
-set_cost_bbox: 5
-set_cost_giou: 2
+# Matching
+anchor_matching: True
+set_cost_class: 0 #1
+set_cost_bbox: 0  #5
+set_cost_giou: 1  #2
 
 # Losses
 loss_coefs:
@@ -69,7 +70,7 @@ backbone:
   
   # Standard params
   fpn_channels: 192 #384 # Final output channels
-  out_fmaps: [P4]  # P0, P1, P2, P3, P4, P5
+  out_fmaps: [P3]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -89,18 +90,21 @@ backbone:
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_level: P4
+  input_level: P3
   
   hidden_dim: 192 #512 832 # prev: 256
   dropout: 0.1  # prev: 0.1
   nheads: 8 #26 #6  #prev: 8
   dim_feedforward: 1024 # prev: 1024
-  dec_layers: 2 #6
+  dec_layers: 3 #6
+
+  anchor_offset_pred: True
+  anchor_gen_offset: 0.1
+  max_anchor_pred_offset: 0.2
 
   num_queries: 540
   num_feature_levels: 1
   queries_per_organ: 27
-  anchor_offsets: 0.1
   num_organs: 20
   aux_loss: True
 
@@ -116,7 +120,7 @@ augmentation:
   p_adjust_contrast: 0 #0.2
   p_rotate: 0.5
   p_zoom: 0.5
-  p_shear: 0.0
+  p_shear: 0.5
   p_translate: 0.5
   p_flip: 0
 

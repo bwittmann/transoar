@@ -7,19 +7,23 @@ from transoar.utils.bboxes import box_cxcyczwhd_to_xyzxyz, generalized_bbox_iou_
 
 
 class HungarianMatcher(nn.Module):
-    def __init__(self, cost_class: float = 1, cost_bbox: float = 1, cost_giou: float = 1):
+    def __init__(self, cost_class=1, cost_bbox=1, cost_giou=1, anchor_matching=True):
         super().__init__()
         self.cost_class = cost_class
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
+        self.anchor_matching = anchor_matching
         assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, "all costs can't be 0"
 
     @torch.no_grad()
-    def forward(self, outputs, targets, num_top_queries=1):
+    def forward(self, outputs, targets, anchors, num_top_queries=1):
         bs = outputs["pred_logits"].shape[0]
 
         # Split queries in individual classes
-        classes_queries_boxes = outputs["pred_boxes"].reshape(bs, 20, 27, -1).cpu().float()
+        if self.anchor_matching:
+            classes_queries_boxes = anchors[None].repeat((bs, 1, 1)).reshape(bs, 20, 27, -1).cpu().float() 
+        else:
+            classes_queries_boxes = outputs["pred_boxes"].reshape(bs, 20, 27, -1).cpu().float()
         classes_queries_probs = outputs["pred_logits"].reshape(bs, 20, 27, -1).cpu().float()
 
         # Get targets

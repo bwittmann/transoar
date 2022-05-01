@@ -1,5 +1,6 @@
 """Main model of the transoar project."""
 
+from collections import defaultdict
 
 import torch
 import torch.nn as nn
@@ -12,13 +13,18 @@ class TransoarNet(nn.Module):
         super().__init__()
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
-        self.input_level = config['neck']['input_level']
+        self._input_level = config['neck']['input_level']
+        self._anchor_offset = config['neck']['anchor_offset_pred']
+        self._max_offset = config['neck']['max_anchor_pred_offset']
 
         # Use auxiliary decoding losses if required
         self._aux_loss = config['neck']['aux_loss']
 
         # Get backbone
         self._backbone = build_backbone(config['backbone'])
+
+        # Get anchors
+        self._anchors = self._generate_anchors(config['neck'], config['bbox_properties']).cuda()
 
         # Get neck
         self._neck = build_neck(config['neck'], config['bbox_properties'])
@@ -39,11 +45,46 @@ class TransoarNet(nn.Module):
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
+        if self._anchor_offset:
+            self._reset_parameter()
+
+    def _reset_parameter(self):
+        nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
+        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
+
+        nn.init.constant_(self._cls_head.weight.data, 0)
+        nn.init.constant_(self._cls_head.bias.data, 0)
+
+    def _generate_anchors(self, model_config, bbox_props):
+        median_bboxes = defaultdict(list)
+        # Get median bbox for each class 
+        for class_, class_bbox_props in bbox_props.items():
+            median_bboxes[int(class_)] = class_bbox_props['median'] #cxcyczwhd
+
+        # Init anchors and corresponding classes
+        anchors = torch.zeros((model_config['num_queries'], 6))
+        query_classes = torch.repeat_interleave(
+            torch.arange(1, model_config['num_organs'] + 1), model_config['queries_per_organ'] * model_config['num_feature_levels']
+        )
+
+        # Generate offsets for each anchor
+        anchor_offset = model_config['anchor_gen_offset']
+        possible_offsets = torch.tensor([0, anchor_offset, -anchor_offset])
+        offsets = torch.cartesian_prod(possible_offsets, possible_offsets, possible_offsets)
+        offsets = offsets.repeat(model_config['num_organs'] * model_config['num_feature_levels'], 1)
+
+        # Generate anchors by applying offsets to median box
+        for idx, (query_class, offset) in enumerate(zip(query_classes, offsets)):
+            query_median_box = torch.tensor(median_bboxes[query_class.item()])
+            query_median_box[:3] += offset 
+            anchors[idx] = query_median_box
+
+        return anchors
 
     def forward(self, x):
         out_backbone = self._backbone(x)
         seg_src = out_backbone['P0'] if self._seg_proxy else 0
-        det_src = out_backbone[self.input_level]
+        det_src = out_backbone[self._input_level]
 
         pos = self._pos_enc(det_src)
 
@@ -54,12 +95,13 @@ class TransoarNet(nn.Module):
         )
 
         pred_logits = self._cls_head(out_neck)
-        pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
+        pred_boxes = self._bbox_reg_head(out_neck)
+        pred_boxes = pred_boxes.tanh() * self._max_offset if self._anchor_offset else pred_boxes.sigmoid()
         pred_seg = self._seg_head(seg_src) if self._seg_proxy else 0
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
-            'pred_boxes': pred_boxes[-1],
+            'pred_boxes': pred_boxes[-1] + self._anchors,
             'pred_seg': pred_seg
         }
 
@@ -73,7 +115,6 @@ class TransoarNet(nn.Module):
         # Hack to support dictionary with non-homogeneous values
         return [{'pred_logits': a, 'pred_boxes': b}
                 for a, b in zip(pred_logits[:-1], pred_boxes[:-1])]
-
 
 class MLP(nn.Module):
     """ Very simple multi-layer perceptron (also called FFN)"""

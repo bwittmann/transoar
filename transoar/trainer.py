@@ -67,7 +67,7 @@ class Trainer:
             # Make prediction
             with autocast(): 
                 out = self._model(data)
-                loss_dict = self._criterion(out, det_targets, seg_targets)
+                loss_dict = self._criterion(out, det_targets, seg_targets, self._model._anchors)
 
                 # Create absolute loss and mult with loss coefficient
                 loss_abs = 0
@@ -136,7 +136,7 @@ class Trainer:
             # Make prediction
             with autocast():
                 out = self._model(data)
-                loss_dict = self._criterion(out, det_targets, seg_targets)
+                loss_dict = self._criterion(out, det_targets, seg_targets, self._model._anchors)
 
                 # Create absolute loss and mult with loss coefficient
                 loss_abs = 0
