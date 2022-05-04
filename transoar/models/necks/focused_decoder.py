@@ -37,7 +37,8 @@ class FocusedDecoder(nn.Module):
         self.d_model = d_model
         self.nhead = nhead
 
-        attn_mask = self.generate_attn_mask()
+        attn_masks = self.generate_attn_mask()
+        attn_mask = attn_masks[0]   # TODO: pyramid scheme
 
         decoder_layer = FocusedDecoderLayer(
             d_model, dim_feedforward, dropout, activation, nhead, attn_mask, config['obj_self_attn']
@@ -47,30 +48,17 @@ class FocusedDecoder(nn.Module):
         self._reset_parameters()
 
     def generate_attn_mask(self, padding=0):
-        assert self.config['num_queries'] == self.config['queries_per_organ'] * self.config['num_feature_levels'] * self.config['num_organs']
-        input_shape = [self.shapes[self.config['input_level']]]
+        num_queries_per_organ = int(self.config['num_queries'] / self.config['num_organs'])
+        assert num_queries_per_organ in [1, 7, 27]
 
-        # Init full attn mask
-        num_patches_per_lvl = torch.tensor(input_shape).prod(axis=1)
-        attn_mask = torch.ones((self.config['num_queries'], num_patches_per_lvl.sum()), dtype=torch.bool)
+        input_shapes = [self.shapes[input_level] for input_level in self.config['input_levels']]
 
         # Get per class volume to attend to at different feature map lvls
         attn_volumes = defaultdict(list)
         for class_, props in self.bbox_props.items():
             attn_volume_normalized = torch.tensor(props['attn_area'])   # x1, y1, z1, x2, y2, z2
 
-            # Show information about class boxes
-            # from transoar.utils.bboxes import box_cxcyczwhd_to_xyzxyz
-            # median_box = box_cxcyczwhd_to_xyzxyz(torch.tensor(props['median']))
-            # max_box = box_cxcyczwhd_to_xyzxyz(torch.tensor(props['max']))
-            # print(
-            #     class_,
-            #     # (attn_volume_normalized[3:] -  attn_volume_normalized[:3]).tolist(),
-            #     (median_box[3:] -  median_box[:3]).tolist(),
-            #     (max_box[3:] -  max_box[:3]).tolist(),
-            # )
-
-            for fmap_shape in input_shape:
+            for fmap_shape in input_shapes:
                 attn_volume = torch.tensor(
                     [
                         torch.floor(attn_volume_normalized[0] * fmap_shape[0]) - padding,   # x1
@@ -83,24 +71,27 @@ class FocusedDecoder(nn.Module):
                 )
                 attn_volumes[int(class_)].append(attn_volume.to(dtype=torch.int))
 
-        # Set attn mask to mask out region which is not in desired attn volume
-        query_classes = torch.repeat_interleave(torch.arange(1, self.config['num_organs'] + 1), self.config['queries_per_organ'] * self.config['num_feature_levels'])
-        query_fmap_lvls = torch.repeat_interleave(torch.arange(self.config['num_feature_levels']), self.config['queries_per_organ']).repeat(self.config['num_organs']) 
-        for query_attn_volume, query_class, query_fmap_lvl in zip(attn_mask, query_classes, query_fmap_lvls):
-            # Retrieve class attn volume of current query
-            dummy_fmap = torch.zeros(input_shape[query_fmap_lvl.item()])
-            class_attn_volume = attn_volumes[query_class.item()][query_fmap_lvl.item()]
+        # Init full attn mask
+        num_patches_per_lvl = torch.tensor(input_shapes).prod(axis=1)
+        attn_masks = [torch.ones((self.config['num_queries'], num_patches.sum()), dtype=torch.bool) for num_patches in num_patches_per_lvl]
 
-            # Restrict attn to region of interest
-            dummy_fmap[class_attn_volume[0]:class_attn_volume[3], class_attn_volume[1]:class_attn_volume[4], class_attn_volume[2]:class_attn_volume[5]] = 1
-            dummy_fmap_flattened = dummy_fmap.flatten().nonzero()
+        # Get query classes
+        query_classes = torch.repeat_interleave(torch.arange(1, self.config['num_organs'] + 1), num_queries_per_organ)
 
-            if query_fmap_lvl.item() > 0:
-                dummy_fmap_flattened += num_patches_per_lvl[query_fmap_lvl.item() - 1]
+        # Mask out regions not in desired attn volume
+        for idx, attn_mask in enumerate(attn_masks):
 
-            query_attn_volume[dummy_fmap_flattened] = False
+            for query_attn_volume, query_class in zip(attn_mask, query_classes):
+                # Retrieve class attn volume of current query
+                dummy_fmap = torch.zeros(input_shapes[idx])
+                class_attn_volume = attn_volumes[query_class.item()][idx]
 
-        return attn_mask if self.config['restrict_attn'] else torch.zeros_like(attn_mask, dtype=torch.bool)
+                # Restrict attn to region of interest
+                dummy_fmap[class_attn_volume[0]:class_attn_volume[3], class_attn_volume[1]:class_attn_volume[4], class_attn_volume[2]:class_attn_volume[5]] = 1
+                dummy_fmap_flattened_idx = dummy_fmap.flatten().nonzero()
+                query_attn_volume[dummy_fmap_flattened_idx] = False
+
+        return attn_masks if self.config['restrict_attn'] else [torch.zeros_like(attn_mask, dtype=torch.bool) for attn_mask in attn_masks]
 
     def _reset_parameters(self):
         for p in self.parameters():

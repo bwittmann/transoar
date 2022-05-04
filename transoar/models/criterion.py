@@ -51,8 +51,10 @@ class TransoarCriterion(nn.Module):
 
     def loss_bboxes(self, outputs, targets, matches, num_boxes, matches_per_class=1):
         assert 'pred_boxes' in outputs
-        bs = outputs['pred_boxes'].shape[0]
-        box_preds = outputs['pred_boxes'].reshape(bs, 20, 27, -1)
+        bs, num_queries, _ = outputs['pred_boxes'].shape
+        num_queries_per_organ = int(num_queries / 20)
+
+        box_preds = outputs['pred_boxes'].reshape(bs, 20, num_queries_per_organ, -1)
         box_labels = [target['boxes'] for target in targets]    # can have different shapes
 
         # Get matched pred boxes

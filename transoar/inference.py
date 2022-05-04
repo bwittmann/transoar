@@ -3,11 +3,12 @@
 import numpy as np
 
 def inference(out):
-    bs, *_ = out['pred_logits'].shape
+    bs, num_queries, _ = out['pred_logits'].shape
+    num_queries_per_organ = int(num_queries / 20)
 
     # Get probabilities from output logits and select query with highest prob
-    pred_probs = out['pred_logits'].sigmoid().squeeze().reshape(bs, 20, 27).cpu()
-    pred_boxes = out['pred_boxes'].reshape(bs, 20, 27, -1).cpu()
+    pred_probs = out['pred_logits'].sigmoid().squeeze().reshape(bs, 20, num_queries_per_organ).cpu()
+    pred_boxes = out['pred_boxes'].reshape(bs, 20, num_queries_per_organ, -1).cpu()
     pred_query_ids = pred_probs.argmax(dim=-1)
 
     # Adjust format to fit metric

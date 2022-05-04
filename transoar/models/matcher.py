@@ -17,14 +17,15 @@ class HungarianMatcher(nn.Module):
 
     @torch.no_grad()
     def forward(self, outputs, targets, anchors, num_top_queries=1):
-        bs = outputs["pred_logits"].shape[0]
+        bs, num_queries, _ = outputs["pred_logits"].shape
+        num_queries_per_organ = int(num_queries / 20)
 
         # Split queries in individual classes
         if self.anchor_matching:
-            classes_queries_boxes = anchors[None].repeat((bs, 1, 1)).reshape(bs, 20, 27, -1).cpu().float() 
+            classes_queries_boxes = anchors[None].repeat((bs, 1, 1)).reshape(bs, 20, num_queries_per_organ, -1).cpu().float() 
         else:
-            classes_queries_boxes = outputs["pred_boxes"].reshape(bs, 20, 27, -1).cpu().float()
-        classes_queries_probs = outputs["pred_logits"].reshape(bs, 20, 27, -1).cpu().float()
+            classes_queries_boxes = outputs["pred_boxes"].reshape(bs, 20, num_queries_per_organ, -1).cpu().float()
+        classes_queries_probs = outputs["pred_logits"].reshape(bs, 20, num_queries_per_organ, -1).cpu().float()
 
         # Get targets
         tgt = [{label.item(): box.cpu() for box, label in zip(target['boxes'], target['labels'])} for target in targets]
@@ -52,7 +53,10 @@ class HungarianMatcher(nn.Module):
                 # Assign soft labels and match
                 soft_labels[batch,  class_ - 1] = ((cost_giou - cost_giou.max()) / (cost_giou.min() - cost_giou.max())).clip(min=0) # nomalize
 
-                for query_id in best_query_ids:
-                    matches[batch, class_ -1, query_id] = 1
+                try:
+                    for query_id in best_query_ids:
+                        matches[batch, class_ -1, query_id] = 1
+                except TypeError:
+                    matches[batch, class_ -1, 0] = 1
 
         return matches, soft_labels
