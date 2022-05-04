@@ -31,6 +31,7 @@ class TransoarNet(nn.Module):
 
         # Get heads
         self._cls_head = nn.Linear(hidden_dim, 1)
+        #self._cls_head = MLP(hidden_dim, hidden_dim, 1, 3)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         self._seg_proxy = config['backbone']['use_seg_proxy_loss']
@@ -54,6 +55,8 @@ class TransoarNet(nn.Module):
 
         nn.init.constant_(self._cls_head.weight.data, 0)
         nn.init.constant_(self._cls_head.bias.data, 0)
+        #nn.init.constant_(self._cls_head.layers[-1].weight.data, 0)
+        #nn.init.constant_(self._cls_head.layers[-1].bias.data, 0)
 
     def _generate_anchors(self, model_config, bbox_props):
         median_bboxes = defaultdict(list)
@@ -68,10 +71,23 @@ class TransoarNet(nn.Module):
         )
 
         # Generate offsets for each anchor
-        anchor_offset = model_config['anchor_gen_offset']
-        possible_offsets = torch.tensor([0, anchor_offset, -anchor_offset])
-        offsets = torch.cartesian_prod(possible_offsets, possible_offsets, possible_offsets)
-        offsets = offsets.repeat(model_config['num_organs'] * model_config['num_feature_levels'], 1)
+        if not model_config['anchor_gen_dynamic_offset']:
+            anchor_offset = model_config['anchor_gen_offset']
+            possible_offsets = torch.tensor([0, anchor_offset, -anchor_offset])
+            offsets = torch.cartesian_prod(possible_offsets, possible_offsets, possible_offsets)
+            offsets = offsets.repeat(model_config['num_organs'] * model_config['num_feature_levels'], 1)
+        else:
+            # Generate dynamic anchor offsets
+            all_offsets = []
+            for class_, class_bbox_props in bbox_props.items():
+                attn_area = torch.tensor(class_bbox_props['attn_area']) #x1y1z1x2y2z2
+                median_box = torch.tensor(class_bbox_props['median']) #cxcyczwhd
+                offset_scale = (((attn_area[3:] - attn_area[0:3]) - median_box[3:]) / 3)[None]
+                possible_offsets = torch.cat((offset_scale, -offset_scale, torch.zeros_like(offset_scale)), dim=0)
+                offsets = torch.cartesian_prod(*possible_offsets.unbind(dim=-1))
+                all_offsets.append(offsets)
+            
+            offsets = torch.cat(all_offsets)
 
         # Generate anchors by applying offsets to median box
         for idx, (query_class, offset) in enumerate(zip(query_classes, offsets)):
@@ -79,7 +95,7 @@ class TransoarNet(nn.Module):
             query_median_box[:3] += offset 
             anchors[idx] = query_median_box
 
-        return anchors
+        return torch.clamp(anchors, min=0, max=1)
 
     def forward(self, x):
         out_backbone = self._backbone(x)
@@ -96,12 +112,17 @@ class TransoarNet(nn.Module):
 
         pred_logits = self._cls_head(out_neck)
         pred_boxes = self._bbox_reg_head(out_neck)
-        pred_boxes = pred_boxes.tanh() * self._max_offset if self._anchor_offset else pred_boxes.sigmoid()
+        if self._anchor_offset:
+            pred_boxes = torch.clamp((pred_boxes.tanh() * self._max_offset) + self._anchors, min=0, max=1)
+            # pred_boxes = (pred_boxes.tanh() * self._max_offset) + self._anchors
+        else:
+            pred_boxes =  pred_boxes.sigmoid()
+
         pred_seg = self._seg_head(seg_src) if self._seg_proxy else 0
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
-            'pred_boxes': pred_boxes[-1] + self._anchors,
+            'pred_boxes':pred_boxes[-1],
             'pred_seg': pred_seg
         }
 

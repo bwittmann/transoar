@@ -1,8 +1,8 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: attn_fpn_foc_dec_cnn_rec_shear05
-device: cuda:2
+experiment_name: attn_fpn_foc_dec_cnn_rec_aux_fix_one_query
+device: cuda:5
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
@@ -92,16 +92,25 @@ neck:
   pos_encoding: sine
   input_level: P3
   
+  # Transformer decoder model
   hidden_dim: 192 #512 832 # prev: 256
   dropout: 0.1  # prev: 0.1
   nheads: 8 #26 #6  #prev: 8
   dim_feedforward: 1024 # prev: 1024
   dec_layers: 3 #6
+  
+  restrict_attn: True
+  obj_self_attn: False
 
-  anchor_offset_pred: True
+  # Anchor generation
+  anchor_gen_dynamic_offset: False #True
   anchor_gen_offset: 0.1
+
+  # Anchor offset prediction
+  anchor_offset_pred: False
   max_anchor_pred_offset: 0.2
 
+  # Queries
   num_queries: 540
   num_feature_levels: 1
   queries_per_organ: 27
@@ -120,7 +129,7 @@ augmentation:
   p_adjust_contrast: 0 #0.2
   p_rotate: 0.5
   p_zoom: 0.5
-  p_shear: 0.5
+  p_shear: 0.0
   p_translate: 0.5
   p_flip: 0
 
