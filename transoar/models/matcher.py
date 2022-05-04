@@ -50,13 +50,12 @@ class HungarianMatcher(nn.Module):
                 C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
                 best_query_ids = torch.topk(C, num_top_queries, largest=False)[-1]
 
-                # Assign soft labels and match
-                soft_labels[batch,  class_ - 1] = ((cost_giou - cost_giou.max()) / (cost_giou.min() - cost_giou.max())).clip(min=0) # nomalize
-
                 try:
                     for query_id in best_query_ids:
                         matches[batch, class_ -1, query_id] = 1
+                    soft_labels[batch,  class_ - 1] = ((cost_giou - cost_giou.max()) / (cost_giou.min() - cost_giou.max())).clip(min=0) # nomalize
                 except TypeError:
                     matches[batch, class_ -1, 0] = 1
+                    soft_labels[batch,  class_ - 1] = 1
 
         return matches, soft_labels
