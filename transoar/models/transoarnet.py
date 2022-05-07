@@ -13,7 +13,7 @@ class TransoarNet(nn.Module):
         super().__init__()
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
-        self._input_level = config['neck']['input_level']
+        self._input_levels = config['neck']['input_levels']
         self._anchor_offset = config['neck']['anchor_offset_pred']
         self._max_offset = config['neck']['max_anchor_pred_offset']
 
@@ -114,12 +114,12 @@ class TransoarNet(nn.Module):
     def forward(self, x):
         out_backbone = self._backbone(x)
         seg_src = out_backbone['P0'] if self._seg_proxy else 0
-        det_src = out_backbone[self._input_level]
+        det_srcs = [out_backbone[input_level] for input_level in self._input_levels]
 
-        pos = self._pos_enc(det_src)
+        pos = [self._pos_enc(det_src) for det_src in det_srcs]
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
-            det_src,
+            det_srcs,
             self._query_embed.weight,
             pos
         )

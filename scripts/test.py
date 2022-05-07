@@ -72,7 +72,7 @@ class Tester:
             
             # Register hooks to efficiently access relevant weights
             hooks = [
-                self._model._backbone.P2_conv2.register_forward_hook(
+                self._model._backbone._decoder._out[0].register_forward_hook(
                     lambda self, input, output: backbone_features_list.append(output)
                 ),
                 self._model._neck.decoder.layers[-1].cross_attn.register_forward_hook(
@@ -124,7 +124,8 @@ class Tester:
 
                     save_attn_visualization(
                         out, backbone_features, dec_attn_weights, list(data.shape[-3:]),
-                        seg_mask[0]
+                        seg_mask[0],
+                        idx
                     )
 
             # Get and store final results

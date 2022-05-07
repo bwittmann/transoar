@@ -1,8 +1,8 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: test #attn_fpn_foc_dec_cnn_rec_aux_fix_one_query
-device: cuda:0
+experiment_name: attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
+device: cuda:3
 val_interval: 1
 debug_mode: True #False  # Doesn't save checkpoints
 seed: 10
@@ -69,8 +69,8 @@ backbone:
   use_decoder_attn: False # Activated def attn
   
   # Standard params
-  fpn_channels: 192 #384 # Final output channels
-  out_fmaps: [P3]  # P0, P1, P2, P3, P4, P5
+  fpn_channels: 384 #384 # Final output channels
+  out_fmaps: [P5, P4, P3]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -90,11 +90,10 @@ backbone:
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_level: P3
-  input_levels: [P3]
+  input_levels: [P5, P4, P3] # [P5, P4, P3]  
   
   # Transformer decoder model
-  hidden_dim: 192 #512 832 # prev: 256
+  hidden_dim: 384 #512 832 # prev: 256
   dropout: 0.1  # prev: 0.1
   nheads: 8 #26 #6  #prev: 8
   dim_feedforward: 1024 # prev: 1024
