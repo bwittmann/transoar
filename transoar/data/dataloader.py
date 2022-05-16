@@ -13,7 +13,7 @@ def get_loader(config, split, batch_size=None):
 
     # Init collator
     collator = TransoarCollator(config)
-    shuffle = False if split == 'test' else config['shuffle']
+    shuffle = False if split in ['test', 'val'] else config['shuffle']
 
     dataset = TransoarDataset(config, split)
     dataloader = DataLoader(
