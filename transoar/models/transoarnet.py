@@ -13,7 +13,7 @@ class TransoarNet(nn.Module):
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
         num_classes = config['num_classes']
-        self.input_level = config['neck']['input_level']
+        self._input_level = config['neck']['input_level']
 
         # Use auxiliary decoding losses if required
         self._aux_loss = config['neck']['aux_loss']
@@ -38,11 +38,17 @@ class TransoarNet(nn.Module):
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
+        self._seg_proxy = config['backbone']['use_seg_proxy_loss']
+        if self._seg_proxy:
+            in_channels = config['backbone']['start_channels']
+            out_channels = 2 if config['backbone']['fg_bg'] else config['neck']['num_organs'] + 1 # inc bg
+            self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
+
 
     def forward(self, x):
         out_backbone = self._backbone(x)
-        seg_src = out_backbone['P0']
-        det_src = out_backbone[self.input_level]
+        seg_src = out_backbone['P0'] if self._seg_proxy else 0
+        det_src = out_backbone[self._input_level]
 
         mask = torch.zeros_like(det_src[:, 0], dtype=torch.bool)    # No mask needed
 
@@ -57,7 +63,7 @@ class TransoarNet(nn.Module):
 
         pred_logits = self._cls_head(out_neck)
         pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
-        pred_seg = self._seg_head(seg_src)
+        pred_seg = self._seg_head(seg_src) if self._seg_proxy else 0
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
