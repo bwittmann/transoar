@@ -48,6 +48,7 @@ def train(config, args):
     print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%') # TODO: Incorp into logging
     print(f'num_neck_params\t\t{num_neck_params:>10}\t{num_neck_params/num_params:.4f}%')
     print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
+    print(num_params)
 
     param_dicts = [
         {

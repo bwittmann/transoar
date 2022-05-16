@@ -13,7 +13,7 @@ class TransoarNet(nn.Module):
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
         num_classes = config['num_classes']
-        self.input_level = config['neck']['input_level']
+        self._input_level = config['neck']['input_level']
 
         # Use auxiliary decoding losses if required
         self._aux_loss = config['neck']['aux_loss']
@@ -28,10 +28,6 @@ class TransoarNet(nn.Module):
         self._cls_head = nn.Linear(hidden_dim, num_classes + 1)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
-        in_channels = config['backbone']['start_channels']
-        out_channels = 2 if config['backbone']['fg_bg'] else config['neck']['num_organs'] + 1 # inc bg
-        self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
-
         # Get projections and embeddings
         self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
 
@@ -39,6 +35,12 @@ class TransoarNet(nn.Module):
         self._pos_enc = build_pos_enc(config['neck'])
 
         self._reset_parameter()
+
+        self._seg_proxy = config['backbone']['use_seg_proxy_loss']
+        if self._seg_proxy:
+            in_channels = config['backbone']['start_channels']
+            out_channels = 2 if config['backbone']['fg_bg'] else config['neck']['num_organs'] + 1 # inc bg
+            self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
 
 
     def _reset_parameter(self):
@@ -49,12 +51,12 @@ class TransoarNet(nn.Module):
 
     def forward(self, x):
         out_backbone = self._backbone(x)
-        seg_src = out_backbone['P0']
+        seg_src = out_backbone['P0'] if self._seg_proxy else 0
 
         # Retrieve fmaps
         det_srcs = []
         for key, value in out_backbone.items():
-            if int(key[-1]) < int(self.input_level[-1]):
+            if int(key[-1]) < int(self._input_level[-1]):
                 continue
             else:
                 det_srcs.append(value)
@@ -98,7 +100,7 @@ class TransoarNet(nn.Module):
         pred_boxes = torch.stack(outputs_coords)
 
         # Segmentation prediction
-        pred_seg = self._seg_head(seg_src)
+        pred_seg = self._seg_head(seg_src) if self._seg_proxy else 0
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer

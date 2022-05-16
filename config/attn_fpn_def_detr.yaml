@@ -1,13 +1,13 @@
 # Config file for AttnFPN-def-DETR
 
 # General training
-experiment_name: attn_fpn_def_detr_P5_seg
-device: cuda:5
+experiment_name: test #attn_fpn_def_detr_P5_seg
+device: cuda:3
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
-epochs: 600
+epochs: 4000
 lr: 2e-4
 lr_backbone: 2e-5
 lr_linear_proj_mult: 0.1
@@ -15,7 +15,7 @@ weight_decay: 1e-4
 clip_max_norm: -1   # Not used
 
 # Scheduler
-lr_drop: 400
+lr_drop: 2500
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
@@ -23,9 +23,9 @@ overfit: False # Use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
-batch_size: 2
+batch_size: 1
 shuffle: True
-num_workers: 4
+num_workers: 16
 
 # Hungarian matching
 set_cost_class: 2
@@ -69,8 +69,8 @@ backbone:
   use_decoder_attn: False # Activated def attn
   
   # Standard params
-  fpn_channels: 192 #384 # Final output channels
-  out_fmap: P5  # P0, P1, P2, P3, P4, P5
+  fpn_channels: 384 #384 # Final output channels
+  out_fmaps: [P5, P4, P3, P2]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -84,18 +84,18 @@ backbone:
   use_cuda: False
 
   # Segmentation proxy loss
-  use_seg_proxy_loss: True
+  use_seg_proxy_loss: False
   fg_bg: True
 
 
 neck:
   name: def_detr
-  use_encoder: False
-  input_level: P5
-  num_feature_levels: 1
+  use_encoder: True
+  input_level: P2
+  num_feature_levels: 4
 
   pos_encoding: sine
-  hidden_dim: 192 #832 # 192 # prev: 256
+  hidden_dim: 384 #832 # 192 # prev: 256
   dropout: 0.1
   nheads: 6 #26  #prev: 8
   dim_feedforward: 1024
@@ -103,7 +103,7 @@ neck:
   dec_layers: 3
   enc_n_points: 4
   dec_n_points: 4
-  num_queries: 300
+  num_queries: 100
   aux_loss: True
   use_cuda: False #True
 
