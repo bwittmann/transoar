@@ -13,7 +13,7 @@ def build_backbone(config):
     )
     return model
 
-def build_neck(config, bbox_props):
+def build_neck(config, bbox_props, anchors):
     model = FocusedDecoder(
         d_model=config['hidden_dim'],
         nhead=config['nheads'],
@@ -23,7 +23,8 @@ def build_neck(config, bbox_props):
         activation="relu",
         return_intermediate_dec=True,
         bbox_props=bbox_props,
-        config=config
+        config=config,
+        anchors=anchors
     )
 
     return model

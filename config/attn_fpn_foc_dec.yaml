@@ -1,8 +1,8 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
-device: cuda:3
+experiment_name: narrowing_encoder_000_010_005 #attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
+device: cuda:6
 val_interval: 1
 debug_mode: True #False  # Doesn't save checkpoints
 seed: 10
@@ -14,7 +14,7 @@ weight_decay: 1e-4
 clip_max_norm: -1
 
 # Scheduler
-lr_drop: 3000 #700
+lr_drop: 2500 #700
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
@@ -28,9 +28,9 @@ num_workers: 16
 
 # Matching
 anchor_matching: True
-set_cost_class: 0 #1
+set_cost_class: 1 #1
 set_cost_bbox: 0  #5
-set_cost_giou: 1  #2
+set_cost_giou: 0  #2
 
 # Losses
 loss_coefs:
@@ -70,7 +70,7 @@ backbone:
   
   # Standard params
   fpn_channels: 384 #384 # Final output channels
-  out_fmaps: [P5, P4, P3]  # P0, P1, P2, P3, P4, P5
+  out_fmaps: [P2]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -90,7 +90,7 @@ backbone:
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_levels: [P5, P4, P3] # [P5, P4, P3]  
+  input_levels: P2 # [P5, P4, P3]  
   
   # Transformer decoder model
   hidden_dim: 384 #512 832 # prev: 256
@@ -98,6 +98,11 @@ neck:
   nheads: 8 #26 #6  #prev: 8
   dim_feedforward: 1024 # prev: 1024
   dec_layers: 3 #6
+  focus_factor: {
+    0: 0, # RoI
+    1: 0.10,  # bbox pred
+    2: 0.05   # bbox pred
+  }
   
   restrict_attn: True
   obj_self_attn: False
@@ -107,11 +112,11 @@ neck:
   anchor_gen_offset: 0.1
 
   # Anchor offset prediction
-  anchor_offset_pred: False
-  max_anchor_pred_offset: 0.2
+  anchor_offset_pred: True
+  max_anchor_pred_offset: 0.1
 
   # Queries
-  num_queries: 20 # 540, 140, 20
+  num_queries: 540 # 540, 140, 20
   num_organs: 20
   aux_loss: True
 
