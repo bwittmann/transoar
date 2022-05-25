@@ -106,6 +106,8 @@ class FocusedDecoderLayer(nn.Module):
         self.obj_self_attn = obj_self_attn
         self.bbox_props= bbox_props
         self.anchors = anchors
+        self.num_queries_per_organ = int(self.config['num_queries'] / self.config['num_organs'])
+        assert self.num_queries_per_organ in [1, 7, 27]
 
         self.shapes = {
             'P0': [160, 160, 256],
@@ -115,6 +117,9 @@ class FocusedDecoderLayer(nn.Module):
             'P4': [10, 10, 16],
             'P5': [5, 5, 8]
         }
+
+        self.input_shape = torch.tensor(self.shapes[self.config['input_levels']]).cuda()
+        self.padding = {k: v * self.input_shape for k, v in self.config['focus_factor'].items()}
 
         # cross attention
         # self.cross_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
@@ -135,47 +140,47 @@ class FocusedDecoderLayer(nn.Module):
         self.dropout4 = nn.Dropout(dropout)
         self.norm3 = nn.LayerNorm(d_model)
 
+        # cache for std roi attn mask
+        self.std_mask = None
 
     def generate_attn_masks(self, idx, tgt, reg_head):
         batch_size, *_ = tgt.shape
-        num_queries_per_organ = int(self.config['num_queries'] / self.config['num_organs'])
-        assert num_queries_per_organ in [1, 7, 27]
-
-        input_shape = torch.tensor(self.shapes[self.config['input_levels']])
-        padding = self.config['focus_factor'][idx] * input_shape
-        num_patches = input_shape.prod()
+        padding = self.padding[idx].repeat(2)
+        padding[3:] = - padding[3:]
 
         # get attn volumes in format x1, y1, z1, x2, y2, z2
         if idx == 0:
+            if self.std_mask is not None:
+                return self.std_mask if self.config['restrict_attn'] else torch.zeros_like(self.std_mask, dtype=torch.bool)
             attn_volumes = []
             for props in self.bbox_props.values():
                 attn_volume = torch.tensor(props['attn_area'])   # x1, y1, z1, x2, y2, z2
                 attn_volumes.append(attn_volume[None])
-            attn_volumes =  torch.repeat_interleave(torch.cat(attn_volumes), num_queries_per_organ, dim=0)[None].repeat(batch_size, 1, 1)
+            attn_volumes =  torch.repeat_interleave(torch.cat(attn_volumes), self.num_queries_per_organ, dim=0)[None].repeat(batch_size, 1, 1).cuda()
         else:
             bbox_proposals = reg_head(tgt)
-            bbox_proposals = torch.clamp((bbox_proposals.tanh() * self.config['max_anchor_pred_offset']) + self.anchors, min=0, max=1).detach().cpu()
+            bbox_proposals = torch.clamp((bbox_proposals.tanh() * self.config['max_anchor_pred_offset']) + self.anchors, min=0, max=1).detach()
             attn_volumes = box_cxcyczwhd_to_xyzxyz(bbox_proposals)
 
         # pad attn volumes
-        attn_volumes[:, :, :3] = torch.floor((attn_volumes[:, :, :3] * input_shape) - padding).clamp(min=torch.tensor([0, 0, 0]), max=input_shape)
-        attn_volumes[:, :, 3:] = torch.floor((attn_volumes[:, :, 3:] * input_shape) + padding).clamp(min=torch.tensor([0, 0, 0]), max=input_shape)
-
+        attn_volumes = ((attn_volumes * self.input_shape.repeat(2)) - padding).clamp(min=torch.cuda.IntTensor(6).fill_(0), max=self.input_shape.repeat(2))
+        attn_volumes[:, :, :3] = torch.floor(attn_volumes[:, :, :3])
+        attn_volumes[:, :, 3:] = torch.ceil(attn_volumes[:, :, 3:])
+        attn_volumes = attn_volumes.int()
+        
         # init full attn mask
-        attn_mask = torch.ones((batch_size, self.config['num_queries'], num_patches.sum()), dtype=torch.bool)
+        attn_mask = torch.cuda.BoolTensor(batch_size, self.config['num_queries'], *self.input_shape.tolist())
 
         # mask out regions not in desired attn volume
-        for batch_attn_mask, batch_attn_volume in zip(attn_mask, attn_volumes.int()):
-            for query_attn_mask, query_attn_volume in zip(batch_attn_mask, batch_attn_volume):
-                # Retrieve class attn volume of current query
-                dummy_fmap = torch.zeros(input_shape.tolist())
-
+        for b in range(batch_size):
+            for q in range(self.config['num_queries']):
                 # Restrict attn to region of interest
-                dummy_fmap[query_attn_volume[0]:query_attn_volume[3], query_attn_volume[1]:query_attn_volume[4], query_attn_volume[2]:query_attn_volume[5]] = 1
-                dummy_fmap_flattened_idx = dummy_fmap.flatten().nonzero()
-                query_attn_mask[dummy_fmap_flattened_idx] = False
+                attn_mask[b, q, attn_volumes[b, q, 0]:attn_volumes[b, q, 3], attn_volumes[b, q, 1]:attn_volumes[b, q, 4], attn_volumes[b, q, 2]:attn_volumes[b, q, 5]] = False
 
-        return attn_mask if self.config['restrict_attn'] else torch.zeros_like(attn_mask, dtype=torch.bool)
+        if idx == 0 and self.std_mask is None:
+            self.std_mask = attn_mask.flatten(2)
+
+        return attn_mask.flatten(2) if self.config['restrict_attn'] else torch.zeros_like(attn_mask.flatten(2), dtype=torch.bool)
 
     @staticmethod
     def with_pos_embed(tensor, pos):
@@ -200,7 +205,7 @@ class FocusedDecoderLayer(nn.Module):
         # cross attention
         q = self.with_pos_embed(tgt, query_pos)
         k = self.with_pos_embed(src, src_pos)
-        tgt2 = self.cross_attn(q, k, src, mask=attn_mask.to(device=tgt.device).float())
+        tgt2 = self.cross_attn(q, k, src, mask=attn_mask.float())
 
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)

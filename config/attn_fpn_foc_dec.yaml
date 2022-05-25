@@ -1,8 +1,8 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: narrowing_encoder_000_010_005 #attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
-device: cuda:6
+experiment_name: test #narrowing_encoder_000_010_005 #attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
+device: cuda:7
 val_interval: 1
 debug_mode: True #False  # Doesn't save checkpoints
 seed: 10
@@ -24,7 +24,7 @@ bbox_padding: 1
 # Dataloader
 batch_size: 2
 shuffle: True
-num_workers: 16
+num_workers: 4
 
 # Matching
 anchor_matching: True
