@@ -27,7 +27,7 @@ class TransoarNet(nn.Module):
         self._anchors = self._generate_anchors(config['neck'], config['bbox_properties']).cuda()
 
         # Get neck
-        self._neck = build_neck(config['neck'], config['bbox_properties'])
+        self._neck = build_neck(config['neck'], config['bbox_properties'], self._anchors)
 
         # Get heads
         self._cls_head = nn.Linear(hidden_dim, 1)
