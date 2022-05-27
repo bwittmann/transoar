@@ -1,13 +1,13 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: test #narrowing_encoder_000_010_005 #attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
-device: cuda:7
+experiment_name: test #narrowing_test #encoder_000_010_005 #attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
+device: cuda:6
 val_interval: 1
-debug_mode: True #False  # Doesn't save checkpoints
+debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
-epochs: 4000
+epochs: 3000
 lr: 2e-4
 lr_backbone: 2e-5
 weight_decay: 1e-4
@@ -22,9 +22,9 @@ overfit: False # Use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
-batch_size: 2
+batch_size: 1
 shuffle: True
-num_workers: 4
+num_workers: 16
 
 # Matching
 anchor_matching: True
@@ -70,7 +70,7 @@ backbone:
   
   # Standard params
   fpn_channels: 384 #384 # Final output channels
-  out_fmaps: [P2]  # P0, P1, P2, P3, P4, P5
+  out_fmaps: [P3]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -90,7 +90,7 @@ backbone:
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_levels: P2 # [P5, P4, P3]  
+  input_levels: P3 # [P5, P4, P3]  
   
   # Transformer decoder model
   hidden_dim: 384 #512 832 # prev: 256
@@ -108,7 +108,7 @@ neck:
   obj_self_attn: False
 
   # Anchor generation
-  anchor_gen_dynamic_offset: False
+  anchor_gen_dynamic_offset: True
   anchor_gen_offset: 0.1
 
   # Anchor offset prediction

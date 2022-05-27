@@ -1,6 +1,6 @@
 """Main model of the transoar project."""
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import torch
 import torch.nn as nn
@@ -15,7 +15,6 @@ class TransoarNet(nn.Module):
         num_queries = config['neck']['num_queries']
         self._input_levels = config['neck']['input_levels']
         self._anchor_offset = config['neck']['anchor_offset_pred']
-        self._max_offset = config['neck']['max_anchor_pred_offset']
 
         # Use auxiliary decoding losses if required
         self._aux_loss = config['neck']['aux_loss']
@@ -24,10 +23,12 @@ class TransoarNet(nn.Module):
         self._backbone = build_backbone(config['backbone'])
 
         # Get anchors
-        self._anchors = self._generate_anchors(config['neck'], config['bbox_properties']).cuda()
+        anchors, restrictions = self._generate_anchors(config['neck'], config['bbox_properties'])
+        self._anchors = anchors.cuda()
+        self._restrictions = restrictions.cuda() if config['neck']['anchor_gen_dynamic_offset'] else config['neck']['max_anchor_pred_offset']
 
         # Get neck
-        self._neck = build_neck(config['neck'], config['bbox_properties'], self._anchors)
+        self._neck = build_neck(config['neck'], config['bbox_properties'], self._anchors, self._restrictions)
 
         # Get heads
         self._cls_head = nn.Linear(hidden_dim, 1)
@@ -55,57 +56,61 @@ class TransoarNet(nn.Module):
         nn.init.constant_(self._neck.decoder.reg_head.layers[-1].bias.data, 0)
 
     def _generate_anchors(self, model_config, bbox_props):
-        # Get median bbox for each class 
-        median_bboxes = defaultdict(list)
+        num_queries = model_config['num_queries']
+        num_queries_per_organ = int(num_queries / model_config['num_organs'])
+
+        def gen_offsets(pos_offsets, dyn=True):
+            if dyn:
+                all_offsets = torch.cartesian_prod(*pos_offsets.unbind(dim=-1))
+            else:
+                all_offsets = torch.cartesian_prod(pos_offsets, pos_offsets, pos_offsets)
+            return all_offsets
+
+        anchor_dict = defaultdict(dict)
         for class_, class_bbox_props in bbox_props.items():
-            median_bboxes[int(class_)] = class_bbox_props['median'] #cxcyczwhd
+            # Extract relevant info regarding size and pos
+            median_size = torch.tensor(class_bbox_props['median'])[3:]  # whd
 
-        # Init anchors and corresponding classes
-        anchors = torch.zeros((model_config['num_queries'], 6))
-        query_classes = torch.repeat_interleave(
-            torch.arange(1, model_config['num_organs'] + 1), int(model_config['num_queries'] / model_config['num_organs'])
-        )
-
-        # Generate offsets for each anchor, possibly dynamic
-        if not model_config['anchor_gen_dynamic_offset']:
-            anchor_offset = model_config['anchor_gen_offset']
-            possible_offsets = torch.tensor([0, anchor_offset, -anchor_offset])
-
-            if anchors.shape[0] == 20:  # no offset
-                offsets = torch.zeros_like(anchors[0][0:3][None])
-            elif anchors.shape[0] == 140:   # 6 offsets
-                all_offsets = torch.cartesian_prod(possible_offsets, possible_offsets, possible_offsets)
-                offsets = all_offsets[torch.count_nonzero(all_offsets, dim=-1) <= 1]
-            else:   # 26 offsets
-                offsets = torch.cartesian_prod(possible_offsets, possible_offsets, possible_offsets)
-
-            offsets = offsets.repeat(model_config['num_organs'], 1)
-        else:
-            offsets_combined = []
-            for class_, class_bbox_props in bbox_props.items():
-                attn_area = torch.tensor(class_bbox_props['attn_area']) # x1y1z1x2y2z2
-                median_box = torch.tensor(class_bbox_props['median']) # cxcyczwhd
-                offset_scale = (((attn_area[3:] - attn_area[0:3]) - median_box[3:]) / 3)[None]
-                possible_offsets = torch.cat((offset_scale, -offset_scale, torch.zeros_like(offset_scale)), dim=0)
-
-                if anchors.shape[0] == 20:  # no offset
-                    offsets = torch.zeros_like(anchors[0][0:3][None])
-                elif anchors.shape[0] == 140:   # 6 offsets
-                    all_offsets = torch.cartesian_prod(*possible_offsets.unbind(dim=-1))
-                    offsets = all_offsets[torch.count_nonzero(all_offsets, dim=-1) <= 1]
-                else:   # 26 offsets
-                    offsets = torch.cartesian_prod(*possible_offsets.unbind(dim=-1))
-                offsets_combined.append(offsets)
+            attn_vol = torch.tensor(class_bbox_props['attn_area']) # x1y1z1x2y2z2
+            attn_vol_center = (attn_vol[:3] + attn_vol[3:]) / 2 #cxcycz
+            attn_vol_whd = attn_vol[3:] - attn_vol[:3]  # whd
             
-            offsets = torch.cat(offsets_combined)
+            if model_config['anchor_gen_dynamic_offset']:
+                pos_offsets = ((attn_vol_whd - median_size) / 2)[None]
+                pos_offsets = torch.cat((pos_offsets, -pos_offsets, torch.zeros_like(pos_offsets)), dim=0)
+            else:
+                anchor_offset = model_config['anchor_gen_offset']
+                pos_offsets = torch.tensor([0, anchor_offset, -anchor_offset]) 
 
+            if num_queries == 20:  # no offset
+                pos_offsets = torch.zeros(3)[None]
+            elif num_queries == 140:   # 6 offsets
+                all_offsets = gen_offsets(pos_offsets, model_config['anchor_gen_dynamic_offset'])
+                pos_offsets = all_offsets[torch.count_nonzero(all_offsets, dim=-1) <= 1]
+            else:   # 26 offsets
+                pos_offsets = gen_offsets(pos_offsets, model_config['anchor_gen_dynamic_offset'])
+
+            anchor_dict[class_]['pos_offsets'] = pos_offsets
+            anchor_dict[class_]['base_center'] = attn_vol_center
+            anchor_dict[class_]['base_size'] = median_size
+            
         # Generate anchors by applying offsets to median box
-        for idx, (query_class, offset) in enumerate(zip(query_classes, offsets)):
-            query_median_box = torch.tensor(median_bboxes[query_class.item()])
-            query_median_box[:3] += offset 
-            anchors[idx] = query_median_box
+        anchors = []
+        restriction_pos_offsets = []
+        for class_dict in anchor_dict.values():
+            class_anchors = torch.cat((class_dict['pos_offsets'], class_dict['base_size'][None].repeat(class_dict['pos_offsets'].shape[0], 1)), dim=-1)
+            class_anchors[:, :3] += class_dict['base_center']
+            anchors.append(class_anchors)
+            restriction_pos_offsets.append(class_dict['pos_offsets'].max(dim=0)[0][None])
 
-        return torch.clamp(anchors, min=0, max=1)
+        # Determine offset restrictions
+        min_size_offsets = torch.tensor([v['median'] for v in bbox_props.values()])[:, 3:] - torch.tensor([v['min'] for v in bbox_props.values()])[:, 3:]
+        max_size_offsets = torch.tensor([v['max'] for v in bbox_props.values()])[:, 3:] - torch.tensor([v['median'] for v in bbox_props.values()])[:, 3:]
+        restriction_size_offsets = torch.max(min_size_offsets, max_size_offsets)   # whd
+        restriction_pos_offsets = torch.cat(restriction_pos_offsets)
+        restriction = torch.repeat_interleave(torch.cat((restriction_pos_offsets, restriction_size_offsets), dim=-1), num_queries_per_organ, dim=0)
+
+        return torch.cat(anchors).clamp(min=0, max=1), restriction
 
     def forward(self, x):
         out_backbone = self._backbone(x)
@@ -122,8 +127,7 @@ class TransoarNet(nn.Module):
         pred_logits = self._cls_head(out_neck)
         pred_boxes = self._neck.decoder.reg_head(out_neck)
         if self._anchor_offset:
-            pred_boxes = torch.clamp((pred_boxes.tanh() * self._max_offset) + self._anchors, min=0, max=1)
-            # pred_boxes = (pred_boxes.tanh() * self._max_offset) + self._anchors
+            pred_boxes = torch.clamp((pred_boxes.tanh() * self._restrictions) + self._anchors, min=0, max=1)
         else:
             pred_boxes =  pred_boxes.sigmoid()
 

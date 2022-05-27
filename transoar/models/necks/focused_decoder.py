@@ -23,7 +23,8 @@ class FocusedDecoder(nn.Module):
         return_intermediate_dec=False,
         bbox_props=None,
         config=None,
-        anchors=None
+        anchors=None,
+        restrictions=None
     ):
         super().__init__()
         self.bbox_props = bbox_props
@@ -34,7 +35,7 @@ class FocusedDecoder(nn.Module):
         reg_head = MLP(d_model, d_model, 6, 3)
 
         decoder_layer = FocusedDecoderLayer(
-            d_model, dim_feedforward, dropout, activation, nhead, config['obj_self_attn'], 
+            d_model, dim_feedforward, dropout, activation, nhead, restrictions, 
             config, bbox_props, anchors
         )
         self.decoder = FocusedDecoderModel(decoder_layer, reg_head, num_decoder_layers, return_intermediate_dec)
@@ -96,16 +97,16 @@ class FocusedDecoderLayer(nn.Module):
         dropout=0.1, 
         activation="relu",
         n_heads=8,
-        obj_self_attn=False,
+        restrictions=None,
         config=None,
         bbox_props=None,
         anchors=None
     ):
         super().__init__()
         self.config = config
-        self.obj_self_attn = obj_self_attn
         self.bbox_props= bbox_props
         self.anchors = anchors
+        self.restrictions = restrictions
         self.num_queries_per_organ = int(self.config['num_queries'] / self.config['num_organs'])
         assert self.num_queries_per_organ in [1, 7, 27]
 
@@ -159,7 +160,7 @@ class FocusedDecoderLayer(nn.Module):
             attn_volumes =  torch.repeat_interleave(torch.cat(attn_volumes), self.num_queries_per_organ, dim=0)[None].repeat(batch_size, 1, 1).cuda()
         else:
             bbox_proposals = reg_head(tgt)
-            bbox_proposals = torch.clamp((bbox_proposals.tanh() * self.config['max_anchor_pred_offset']) + self.anchors, min=0, max=1).detach()
+            bbox_proposals = torch.clamp((bbox_proposals.tanh() * self.restrictions) + self.anchors, min=0, max=1).detach()
             attn_volumes = box_cxcyczwhd_to_xyzxyz(bbox_proposals)
 
         # pad attn volumes
