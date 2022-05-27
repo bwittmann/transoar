@@ -38,6 +38,14 @@ def train(config, args):
         val_loader = get_loader(config, 'val')
 
     model = TransoarNet(config).to(device=device)
+
+    # Load weights of pretrained backbone
+    if config['backbone']['pre_train']:
+        resnet_id = config['backbone']['name'][-2:]
+        checkpoint = torch.load(Path(f'/home/home/supro_bastian/pretrain/resnet_{resnet_id}_23dataset.pth'))
+        state_dict = {'.'.join(k.split('.')[1:]): v for k, v in checkpoint['state_dict'].items()}
+        model._backbone.load_state_dict(state_dict)
+
     criterion = build_criterion(config).to(device=device)
 
     # Analysis of model parameter distribution

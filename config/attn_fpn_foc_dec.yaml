@@ -2,7 +2,7 @@
 
 # General training
 experiment_name: test #narrowing_encoder_000_010_005 #attn_fpn_foc_dec_cnn_rec_aux_fix_one_query_384_pyrP5-P3
-device: cuda:7
+device: cuda:0
 val_interval: 1
 debug_mode: True #False  # Doesn't save checkpoints
 seed: 10
@@ -42,7 +42,8 @@ loss_coefs:
 
 # Model specific params
 backbone:
-  name: attn_fpn
+  name: resnet50 #10, 18, 34, 50
+  pre_train: True
   
   # Encoder
   use_encoder_attn: False # Activates swin encoder
@@ -70,7 +71,7 @@ backbone:
   
   # Standard params
   fpn_channels: 384 #384 # Final output channels
-  out_fmaps: [P2]  # P0, P1, P2, P3, P4, P5
+  out_fmaps: [P3]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -90,7 +91,7 @@ backbone:
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_levels: P2 # [P5, P4, P3]  
+  input_levels: P3 # [P5, P4, P3]  
   
   # Transformer decoder model
   hidden_dim: 384 #512 832 # prev: 256

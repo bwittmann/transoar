@@ -41,6 +41,9 @@ class TransoarNet(nn.Module):
         # Get projections and embeddings
         self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)  # tgt + query_pos 
 
+        # Get input proj
+        self._proj = nn.Conv3d(2048, 384, 1)
+
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
@@ -110,7 +113,7 @@ class TransoarNet(nn.Module):
     def forward(self, x):
         out_backbone = self._backbone(x)
         seg_src = out_backbone['P0'] if self._seg_proxy else 0
-        det_src = out_backbone[self._input_levels]
+        det_src = self._proj(out_backbone) # out_backbone[self._input_levels]
         pos = self._pos_enc(det_src)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
