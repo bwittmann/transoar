@@ -1,6 +1,6 @@
 """Main model of the transoar project."""
 
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 
 import torch
 import torch.nn as nn
@@ -22,16 +22,18 @@ class TransoarNet(nn.Module):
         # Get backbone
         self._backbone = build_backbone(config['backbone'])
 
-        # Get anchors
+        # Get anchors and offset restriction
         anchors, restrictions = self._generate_anchors(config['neck'], config['bbox_properties'])
         self._anchors = anchors.cuda()
         self._restrictions = restrictions.cuda() if config['neck']['anchor_gen_dynamic_offset'] else config['neck']['max_anchor_pred_offset']
+        self._restrictions[:, :3] /= 2
 
         # Get neck
-        self._neck = build_neck(config['neck'], config['bbox_properties'], self._anchors, self._restrictions)
+        self._neck = build_neck(config['neck'], config['bbox_properties'])
 
         # Get heads
         self._cls_head = nn.Linear(hidden_dim, 1)
+        self._reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
         self._seg_proxy = config['backbone']['use_seg_proxy_loss']
         if self._seg_proxy:
@@ -52,8 +54,8 @@ class TransoarNet(nn.Module):
         nn.init.constant_(self._cls_head.weight.data, 0)
         nn.init.constant_(self._cls_head.bias.data, 0)
 
-        nn.init.constant_(self._neck.decoder.reg_head.layers[-1].weight.data, 0)
-        nn.init.constant_(self._neck.decoder.reg_head.layers[-1].bias.data, 0)
+        nn.init.constant_(self._reg_head.layers[-1].weight.data, 0)
+        nn.init.constant_(self._reg_head.layers[-1].bias.data, 0)
 
     def _generate_anchors(self, model_config, bbox_props):
         num_queries = model_config['num_queries']
@@ -125,7 +127,7 @@ class TransoarNet(nn.Module):
         )
 
         pred_logits = self._cls_head(out_neck)
-        pred_boxes = self._neck.decoder.reg_head(out_neck)
+        pred_boxes = self._reg_head(out_neck)
         if self._anchor_offset:
             pred_boxes = torch.clamp((pred_boxes.tanh() * self._restrictions) + self._anchors, min=0, max=1)
         else:
@@ -149,3 +151,20 @@ class TransoarNet(nn.Module):
         # Hack to support dictionary with non-homogeneous values
         return [{'pred_logits': a, 'pred_boxes': b}
                 for a, b in zip(pred_logits[:-1], pred_boxes[:-1])]
+
+class MLP(nn.Module):
+    """ Very simple multi-layer perceptron (also called FFN)"""
+
+    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
+        super().__init__()
+        self.num_layers = num_layers
+        h = [hidden_dim] * (num_layers - 1)
+        self.layers = nn.ModuleList(
+            nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim])
+        )
+
+    def forward(self, x):
+        for i, layer in enumerate(self.layers):
+            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
+        return x
+

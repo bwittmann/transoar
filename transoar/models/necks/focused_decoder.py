@@ -8,8 +8,6 @@ import torch.nn.functional as F
 from torch import nn
 from timm.models.layers import trunc_normal_
 
-from transoar.utils.bboxes import box_cxcyczwhd_to_xyzxyz
-
 
 class FocusedDecoder(nn.Module):
     def __init__(
@@ -22,9 +20,7 @@ class FocusedDecoder(nn.Module):
         activation="relu",
         return_intermediate_dec=False,
         bbox_props=None,
-        config=None,
-        anchors=None,
-        restrictions=None
+        config=None
     ):
         super().__init__()
         self.bbox_props = bbox_props
@@ -32,13 +28,11 @@ class FocusedDecoder(nn.Module):
 
         self.d_model = d_model
         self.nhead = nhead
-        reg_head = MLP(d_model, d_model, 6, 3)
 
         decoder_layer = FocusedDecoderLayer(
-            d_model, dim_feedforward, dropout, activation, nhead, restrictions, 
-            config, bbox_props, anchors
+            d_model, dim_feedforward, dropout, activation, nhead, config, bbox_props
         )
-        self.decoder = FocusedDecoderModel(decoder_layer, reg_head, num_decoder_layers, return_intermediate_dec)
+        self.decoder = FocusedDecoderModel(decoder_layer, num_decoder_layers, return_intermediate_dec)
 
         self._reset_parameters()
 
@@ -46,8 +40,6 @@ class FocusedDecoder(nn.Module):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
-
-        self.decoder.layers
 
     def forward(self, src, query_embed, pos):
         assert query_embed is not None
@@ -57,7 +49,7 @@ class FocusedDecoder(nn.Module):
         pos = pos.flatten(2).transpose(1, 2)
             
         bs, _, c = src.shape
-        query_embed, tgt = torch.split(query_embed, c, dim=1)       # Tgt in contrast to detr not zeros, but learnable
+        query_embed, tgt = torch.split(query_embed, c, dim=1)
         query_embed = query_embed.unsqueeze(0).expand(bs, -1, -1)
         tgt = tgt.unsqueeze(0).expand(bs, -1, -1)
 
@@ -67,19 +59,17 @@ class FocusedDecoder(nn.Module):
         return hs
 
 class FocusedDecoderModel(nn.Module):
-    def __init__(self, decoder_layer, reg_head, num_layers, return_intermediate=False):
+    def __init__(self, decoder_layer, num_layers, return_intermediate=False):
         super().__init__()
         self.layers = _get_clones(decoder_layer, num_layers)
-        self.reg_head = reg_head
         self.num_layers = num_layers
         self.return_intermediate = return_intermediate
 
     def forward(self, tgt, src, src_pos, query_pos=None):
         output = tgt
         intermediate = []
-        for idx, layer in enumerate(self.layers):
-
-            output = layer(output, query_pos, src_pos, src, idx, self.reg_head)
+        for layer in self.layers:
+            output = layer(output, query_pos, src_pos, src)
 
             if self.return_intermediate:
                 intermediate.append(output)
@@ -97,20 +87,16 @@ class FocusedDecoderLayer(nn.Module):
         dropout=0.1, 
         activation="relu",
         n_heads=8,
-        restrictions=None,
         config=None,
-        bbox_props=None,
-        anchors=None
+        bbox_props=None
     ):
         super().__init__()
         self.config = config
         self.bbox_props= bbox_props
-        self.anchors = anchors
-        self.restrictions = restrictions
         self.num_queries_per_organ = int(self.config['num_queries'] / self.config['num_organs'])
         assert self.num_queries_per_organ in [1, 7, 27]
 
-        self.shapes = {
+        shapes = {
             'P0': [160, 160, 256],
             'P1': [80, 80, 128],
             'P2': [40, 40, 64],
@@ -118,13 +104,11 @@ class FocusedDecoderLayer(nn.Module):
             'P4': [10, 10, 16],
             'P5': [5, 5, 8]
         }
-
-        self.input_shape = torch.tensor(self.shapes[self.config['input_levels']]).cuda()
-        self.padding = {k: v * self.input_shape for k, v in self.config['focus_factor'].items()}
+        self.input_shape = torch.tensor(shapes[self.config['input_levels']])
 
         # cross attention
-        # self.cross_attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
-        self.cross_attn = FocusedAttn(d_model, n_heads, proj_drop=0.1)
+        self.attn_mask = self.generate_attn_masks().cuda()
+        self.cross_attn = FocusedAttn(d_model, n_heads, self.attn_mask, proj_drop=0.1)
         self.dropout1 = nn.Dropout(dropout)
         self.norm1 = nn.LayerNorm(d_model)
 
@@ -141,47 +125,28 @@ class FocusedDecoderLayer(nn.Module):
         self.dropout4 = nn.Dropout(dropout)
         self.norm3 = nn.LayerNorm(d_model)
 
-        # cache for std roi attn mask
-        self.std_mask = None
-
-    def generate_attn_masks(self, idx, tgt, reg_head):
-        batch_size, *_ = tgt.shape
-        padding = self.padding[idx].repeat(2)
-        padding[3:] = - padding[3:]
-
+    def generate_attn_masks(self, padding=0):
         # get attn volumes in format x1, y1, z1, x2, y2, z2
-        if idx == 0:
-            if self.std_mask is not None:
-                return self.std_mask if self.config['restrict_attn'] else torch.zeros_like(self.std_mask, dtype=torch.bool)
-            attn_volumes = []
-            for props in self.bbox_props.values():
-                attn_volume = torch.tensor(props['attn_area'])   # x1, y1, z1, x2, y2, z2
-                attn_volumes.append(attn_volume[None])
-            attn_volumes =  torch.repeat_interleave(torch.cat(attn_volumes), self.num_queries_per_organ, dim=0)[None].repeat(batch_size, 1, 1).cuda()
-        else:
-            bbox_proposals = reg_head(tgt)
-            bbox_proposals = torch.clamp((bbox_proposals.tanh() * self.restrictions) + self.anchors, min=0, max=1).detach()
-            attn_volumes = box_cxcyczwhd_to_xyzxyz(bbox_proposals)
+        attn_volumes = []
+        for props in self.bbox_props.values():
+            attn_volume = torch.tensor(props['attn_area'])   # x1, y1, z1, x2, y2, z2
+            attn_volumes.append(attn_volume[None])
+        attn_volumes =  torch.repeat_interleave(torch.cat(attn_volumes), self.num_queries_per_organ, dim=0)
 
         # pad attn volumes
-        attn_volumes = ((attn_volumes * self.input_shape.repeat(2)) - padding).clamp(min=torch.cuda.IntTensor(6).fill_(0), max=self.input_shape.repeat(2))
-        attn_volumes[:, :, :3] = torch.floor(attn_volumes[:, :, :3])
-        attn_volumes[:, :, 3:] = torch.ceil(attn_volumes[:, :, 3:])
+        attn_volumes = ((attn_volumes * self.input_shape.repeat(2)) - padding).clamp(min=torch.zeros(6, dtype=torch.int), max=self.input_shape.repeat(2))
+        attn_volumes[:, :3] = torch.floor(attn_volumes[:, :3])
+        attn_volumes[:, 3:] = torch.ceil(attn_volumes[:, 3:])
         attn_volumes = attn_volumes.int()
         
         # init full attn mask
-        attn_mask = torch.cuda.BoolTensor(batch_size, self.config['num_queries'], *self.input_shape.tolist())
+        attn_mask = torch.ones(self.config['num_queries'], *self.input_shape.tolist()).bool()
 
         # mask out regions not in desired attn volume
-        for b in range(batch_size):
-            for q in range(self.config['num_queries']):
-                # Restrict attn to region of interest
-                attn_mask[b, q, attn_volumes[b, q, 0]:attn_volumes[b, q, 3], attn_volumes[b, q, 1]:attn_volumes[b, q, 4], attn_volumes[b, q, 2]:attn_volumes[b, q, 5]] = False
+        for q in range(self.config['num_queries']):
+            attn_mask[q, attn_volumes[q, 0]:attn_volumes[q, 3], attn_volumes[q, 1]:attn_volumes[q, 4], attn_volumes[q, 2]:attn_volumes[q, 5]] = False
 
-        if idx == 0 and self.std_mask is None:
-            self.std_mask = attn_mask.flatten(2)
-
-        return attn_mask.flatten(2) if self.config['restrict_attn'] else torch.zeros_like(attn_mask.flatten(2), dtype=torch.bool)
+        return attn_mask.flatten(1) if self.config['restrict_attn'] else torch.zeros_like(attn_mask.flatten(1), dtype=torch.bool)
 
     @staticmethod
     def with_pos_embed(tensor, pos):
@@ -193,20 +158,17 @@ class FocusedDecoderLayer(nn.Module):
         tgt = self.norm3(tgt)
         return tgt
 
-    def forward(self, tgt, query_pos, src_pos, src, idx, reg_head):
+    def forward(self, tgt, query_pos, src_pos, src):
         # self attention
         q = k = self.with_pos_embed(tgt, query_pos)
         tgt2 = self.self_attn(q.transpose(0, 1), k.transpose(0, 1), tgt.transpose(0, 1))[0].transpose(0, 1)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
 
-        # generate narrowing attn masks
-        attn_mask = self.generate_attn_masks(idx, tgt, reg_head).squeeze()
-
         # cross attention
         q = self.with_pos_embed(tgt, query_pos)
         k = self.with_pos_embed(src, src_pos)
-        tgt2 = self.cross_attn(q, k, src, mask=attn_mask.float())
+        tgt2 = self.cross_attn(q, k, src, mask=self.attn_mask.float())
 
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
@@ -222,10 +184,12 @@ class FocusedAttn(nn.Module):
         self,
         dim,
         num_heads,
+        attn_mask,
         qkv_bias=None,
         qk_scale=None,
         attn_drop=0,
-        proj_drop=0
+        proj_drop=0,
+        use_pos_bias=False,
     ):
         super().__init__()
         self.dim = dim
@@ -243,6 +207,12 @@ class FocusedAttn(nn.Module):
 
         self.softmax = nn.Softmax(dim=-1)
 
+        # learnable position bias
+        if use_pos_bias:
+            self.pos_bias = trunc_normal_(nn.Parameter(torch.zeros_like(attn_mask, dtype=torch.float)), std=.02)
+        else:
+            self.pos_bias = None
+
     def forward(self, q, k, v, mask=None):
         B, N_kv, C = k.shape
         _, N_q, _ = q.shape
@@ -253,12 +223,14 @@ class FocusedAttn(nn.Module):
         q = self.k_proj(q).reshape(B, N_q, self.num_heads, C // self.num_heads)
         q = q * self.scale
 
+        attn = torch.matmul(q.permute(0, 2, 1, 3), k.permute(0, 2, 3, 1))
+
+        if self.pos_bias is not None:
+            attn += self.pos_bias
+
         if mask is not None:
-            attn = torch.matmul(q.permute(0, 2, 1, 3), k.permute(0, 2, 3, 1)).transpose(0, 1)
             mask[mask > 0] = - torch.inf
-            attn = (attn + mask).transpose(0, 1)
-        else:
-            attn = torch.matmul(q.permute(0, 2, 1, 3), k.permute(0, 2, 3, 1))
+            attn += mask
 
         attn = self.softmax(attn)
         attn = self.attn_drop(attn)
@@ -282,19 +254,3 @@ def _get_activation_fn(activation):
     if activation == "glu":
         return F.glu
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
-
-class MLP(nn.Module):
-    """ Very simple multi-layer perceptron (also called FFN)"""
-
-    def __init__(self, input_dim, hidden_dim, output_dim, num_layers):
-        super().__init__()
-        self.num_layers = num_layers
-        h = [hidden_dim] * (num_layers - 1)
-        self.layers = nn.ModuleList(
-            nn.Linear(n, k) for n, k in zip([input_dim] + h, h + [output_dim])
-        )
-
-    def forward(self, x):
-        for i, layer in enumerate(self.layers):
-            x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
-        return x
