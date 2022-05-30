@@ -170,7 +170,7 @@ class FocusedDecoderLayer(nn.Module):
         attn_volumes = attn_volumes.int()
         
         # init full attn mask
-        attn_mask = torch.cuda.BoolTensor(batch_size, self.config['num_queries'], *self.input_shape.tolist())
+        attn_mask = torch.cuda.BoolTensor(batch_size, self.config['num_queries'], *self.input_shape.tolist()).fill_(1)
 
         # mask out regions not in desired attn volume
         for b in range(batch_size):
