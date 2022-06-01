@@ -42,6 +42,23 @@ def box_cxcyczwhd_to_xyzxyz(bboxes):
     else:
         return np.stack(b, axis=-1)
 
+def box_xyxyzz_to_cxcyczwhd(bboxes, shape):
+    x1 = bboxes[:, 0] / shape[0]
+    y1 = bboxes[:, 1] / shape[1]
+    x2 = bboxes[:, 2] / shape[0]
+    y2 = bboxes[:, 3] / shape[1]
+    z1 = bboxes[:, 4] / shape[2]
+    z2 = bboxes[:, 5] / shape[2]
+
+    cx = (x1 + x2) / 2
+    cy = (y1 + y2) / 2
+    cz = (z1 + z2) / 2
+    w = x2 - x1
+    h = y2 - y1
+    d = z2 - z1
+
+    return np.stack([cx, cy, cz, w, h, d]).T
+
 def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normalize=True):
     batch_bboxes = []
     batch_classes = []

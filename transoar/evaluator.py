@@ -47,7 +47,7 @@ class DetectionEvaluator:
                 iou_range_coco=iou_range_coco, # for mAP
                 iou_range_nndet=iou_range_nndet,
                 per_class=False if sparse_results else True,
-                determine_ar=False if sparse_results else True,
+                determine_ar=False,
                 max_detection=(1, ) # different from nndet (100, )
             )
         ]

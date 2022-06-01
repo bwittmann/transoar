@@ -8,6 +8,8 @@ import torch
 from tqdm import tqdm
 
 from transoar.utils.io import load_json, write_json
+from transoar.utils.bboxes import box_xyxyzz_to_cxcyczwhd
+from transoar.utils.visualization import save_pred_visualization
 from transoar.data.dataloader import get_loader
 from transoar.evaluator import DetectionEvaluator
 from transoar.models.retinanet.retina_unet import RetinaUNet
@@ -21,7 +23,7 @@ class Tester:
         self._save_preds = args.save_preds
         self._full_labeled = args.full_labeled
         self._class_dict = config['labels']
-        self._device = 'cuda:' + str(args.num_gpu) if args.num_gpu >= 0 else 'cpu'
+        self._device = 'cuda' if args.num_gpu >= 0 else 'cpu'
 
         # Get path to checkpoint
         avail_checkpoints = [path for path in path_to_run.iterdir() if 'model_' in str(path)]
@@ -42,11 +44,9 @@ class Tester:
             classes_large=config['labels_large'],
             iou_range_nndet=(0.1, 0.5, 0.05),
             iou_range_coco=(0.5, 0.95, 0.05),
-            sparse_results=True
+            sparse_results=False
         )
         self._model = RetinaUNet(config).to(device=self._device)
-
-        print(sum(p.numel() for p in self._model.parameters() if p.requires_grad))
 
         # Load checkpoint
         checkpoint = torch.load(path_to_ckpt, map_location=self._device)
@@ -81,20 +81,27 @@ class Tester:
                 # Make prediction
                 _, predictions = self._model.train_step(data, targets, evaluation=True)
 
+                pred_boxes = [boxes.detach().cpu().numpy() for boxes in predictions['pred_boxes']]
+                pred_classes = [classes.detach().cpu().numpy() for classes in predictions['pred_labels']]
+                pred_scores = [scores.detach().cpu().numpy() for scores in predictions['pred_scores']]
+                gt_boxes = [gt_boxes.detach().cpu().numpy() for gt_boxes in targets['target_boxes']]
+                gt_classes = [gt_classes.detach().cpu().numpy() for gt_classes in targets['target_classes']]
+
                 # Evaluate validation predictions based on metric
                 self._evaluator.add(
-                    pred_boxes=[boxes.detach().cpu().numpy() for boxes in predictions['pred_boxes']],
-                    pred_classes=[classes.detach().cpu().numpy() for classes in predictions['pred_labels']],
-                    pred_scores=[scores.detach().cpu().numpy() for scores in predictions['pred_scores']],
-                    gt_boxes=[gt_boxes.detach().cpu().numpy() for gt_boxes in targets['target_boxes']],
-                    gt_classes=[gt_classes.detach().cpu().numpy() for gt_classes in targets['target_classes']],
+                    pred_boxes=pred_boxes,
+                    pred_classes=pred_classes,
+                    pred_scores=pred_scores,
+                    gt_boxes=gt_boxes,
+                    gt_classes=gt_classes,
                 )
 
-                # if self._save_preds:
-                #     save_pred_visualization(
-                #         pred_boxes[0], pred_classes[0], gt_boxes[0], gt_classes[0], seg_mask[0], 
-                #         self._path_to_vis, self._class_dict, idx
-                #     )
+                if self._save_preds:
+                    save_pred_visualization(
+                        box_xyxyzz_to_cxcyczwhd(pred_boxes[0], data.shape[2:]), pred_classes[0] + 1, 
+                        box_xyxyzz_to_cxcyczwhd(gt_boxes[0], data.shape[2:]), gt_classes[0] + 1, seg_mask[0], 
+                        self._path_to_vis, self._class_dict, idx
+                    )
 
             # Get and store final results
             metric_scores = self._evaluator.eval()

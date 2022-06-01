@@ -196,7 +196,7 @@ def save_pred_visualization(
         bbox = rescale_bbox(bbox, seg_mask.shape)
         bbox = np.concatenate((bbox, np.array([0])), axis=0)
         path_bbox = str(path_to_instance) + f'/{classes[str(class_)]}_bbox_gt.ply'
-        write_bbox(bbox, 1000, path_bbox, PALETTE, seg_mask.shape[-1] / 750)
+        write_bbox(bbox, 1000, path_bbox, PALETTE, seg_mask.shape[-1] / 750 * 4)
 
     # Generate pred bboxes
     for bbox, class_ in zip(pred_boxes, pred_classes):
@@ -204,7 +204,7 @@ def save_pred_visualization(
 
         bbox = np.concatenate((bbox, np.array([0])), axis=0)
         path_bbox = str(path_to_instance) + f'/{classes[str(class_)]}_bbox_pred.ply'
-        write_bbox(bbox, 1001, path_bbox, PALETTE, seg_mask.shape[-1] / 750)
+        write_bbox(bbox, 1, path_bbox, PALETTE, seg_mask.shape[-1] / 750 * 4)
 
 def rescale_bbox(bbox, original_shape):
         # Change val of bboxes from sigmoid range back to meaningful values
