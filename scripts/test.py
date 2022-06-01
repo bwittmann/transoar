@@ -5,6 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import torch
+import numpy as np
 from tqdm import tqdm
 
 from transoar.utils.io import load_json, write_json
@@ -81,26 +82,34 @@ class Tester:
                 # Make prediction
                 _, predictions = self._model.train_step(data, targets, evaluation=True)
 
-                pred_boxes = [boxes.detach().cpu().numpy() for boxes in predictions['pred_boxes']]
-                pred_classes = [classes.detach().cpu().numpy() for classes in predictions['pred_labels']]
-                pred_scores = [scores.detach().cpu().numpy() for scores in predictions['pred_scores']]
-                gt_boxes = [gt_boxes.detach().cpu().numpy() for gt_boxes in targets['target_boxes']]
-                gt_classes = [gt_classes.detach().cpu().numpy() for gt_classes in targets['target_classes']]
+                pred_boxes = predictions['pred_boxes'][0].detach().cpu().numpy()
+                pred_classes = predictions['pred_labels'][0].detach().cpu().numpy()
+                pred_scores = predictions['pred_scores'][0].detach().cpu().numpy()
+                gt_boxes = targets['target_boxes'][0].detach().cpu().numpy()
+                gt_classes = targets['target_classes'][0].detach().cpu().numpy()
 
                 # Evaluate validation predictions based on metric
                 self._evaluator.add(
-                    pred_boxes=pred_boxes,
-                    pred_classes=pred_classes,
-                    pred_scores=pred_scores,
-                    gt_boxes=gt_boxes,
-                    gt_classes=gt_classes,
+                    pred_boxes=[pred_boxes],
+                    pred_classes=[pred_classes],
+                    pred_scores=[pred_scores],
+                    gt_boxes=[gt_boxes],
+                    gt_classes=[gt_classes],
                 )
+
+                # Just take most confident prediction per class
+                best_ids = []
+                for class_ in np.unique(pred_classes):
+                    class_ids = (pred_classes == class_).nonzero()[0]
+                    max_scoring_idx = pred_scores[class_ids].argmax()
+                    best_ids.append(class_ids[max_scoring_idx])
+                best_ids = torch.tensor(best_ids)
 
                 if self._save_preds:
                     save_pred_visualization(
-                        box_xyxyzz_to_cxcyczwhd(pred_boxes[0], data.shape[2:]), pred_classes[0] + 1, 
-                        box_xyxyzz_to_cxcyczwhd(gt_boxes[0], data.shape[2:]), gt_classes[0] + 1, seg_mask[0], 
-                        self._path_to_vis, self._class_dict, idx
+                        box_xyxyzz_to_cxcyczwhd(pred_boxes[best_ids], data.shape[2:]), pred_classes[best_ids] + 1, 
+                        box_xyxyzz_to_cxcyczwhd(gt_boxes, data.shape[2:]), gt_classes + 1, 
+                        seg_mask[0], self._path_to_vis, self._class_dict, idx
                     )
 
             # Get and store final results
