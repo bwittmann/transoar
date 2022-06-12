@@ -58,6 +58,7 @@ class TransoarNet(nn.Module):
         nn.init.constant_(self._reg_head.layers[-1].bias.data, 0)
 
     def _generate_anchors(self, model_config, bbox_props):
+        #num_queries = model_config['num_queries'] / 2
         num_queries = model_config['num_queries']
         num_queries_per_organ = int(num_queries / model_config['num_organs'])
 
@@ -78,7 +79,7 @@ class TransoarNet(nn.Module):
             attn_vol_whd = attn_vol[3:] - attn_vol[:3]  # whd
             
             if model_config['anchor_gen_dynamic_offset']:
-                pos_offsets = ((attn_vol_whd - median_size) / 2)[None]
+                pos_offsets = ((attn_vol_whd - median_size) / 3)[None]
                 pos_offsets = torch.cat((pos_offsets, -pos_offsets, torch.zeros_like(pos_offsets)), dim=0)
             else:
                 anchor_offset = model_config['anchor_gen_offset']
@@ -113,6 +114,7 @@ class TransoarNet(nn.Module):
         restriction = torch.repeat_interleave(torch.cat((restriction_pos_offsets, restriction_size_offsets), dim=-1), num_queries_per_organ, dim=0)
 
         return torch.cat(anchors).clamp(min=0, max=1), restriction
+        #return torch.repeat_interleave(torch.cat(anchors), 2, dim=0), torch.repeat_interleave(restriction, 2, dim=0)
 
     def forward(self, x):
         out_backbone = self._backbone(x)
