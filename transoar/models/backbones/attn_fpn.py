@@ -1,5 +1,7 @@
 """Module containing code of the transoar projects backbone."""
 
+from copy import deepcopy
+
 import torch
 import torch.nn as nn
 
@@ -36,46 +38,51 @@ class Decoder(nn.Module):
         self._num_stages = len(config['conv_kernels'])
         self._refine_fmaps = config['use_decoder_attn']
         self._refine_feature_levels = config['feature_levels']
-        self._seg_proxy = config['seg_proxy']
+        self._seg_proxy = config['use_seg_proxy_loss']
 
-        # Determine channels
-        out_channels = torch.tensor([config['start_channels'] * 2**stage for stage in range(self._num_stages)])
+        # Determine channels of encoder fmaps
+        encoder_out_channels = torch.tensor([config['start_channels'] * 2**stage for stage in range(self._num_stages)])
 
-        # Dont use later stages is not needed
-        if not config['seg_proxy']:
-            out_channels = out_channels[2:]
-            self._num_stages -= 2
+        # Estimate required stages
+        all_stages = config['out_fmaps'] + config['feature_levels'] if config['use_decoder_attn'] else config['out_fmaps']
+        required_stages = set([int(fmap[-1]) for fmap in all_stages])
+        if self._seg_proxy:
+            required_stages.add(0)
+        self._required_stages = required_stages
 
-        encoder_out_channels = out_channels.tolist()
-        decoder_out_channels = out_channels.clip(max=config['fpn_channels']).tolist()
+        earliest_required_stage = min(required_stages)
 
-        # Lateral 
+        # LATERAL
+        # Reduce lateral connections if not needed
+        lateral_in_channels = encoder_out_channels if self._seg_proxy else encoder_out_channels[earliest_required_stage:]
+        lateral_out_channels = lateral_in_channels.clip(max=config['fpn_channels'])
+
         self._lateral = nn.ModuleList()
-        for in_channels, out_channels in zip(encoder_out_channels, decoder_out_channels):
+        for in_channels, out_channels in zip(lateral_in_channels, lateral_out_channels):
             self._lateral.append(nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=1))
+        self._lateral_levels = len(self._lateral)
 
-        # Out
-        self._out = nn.ModuleList()
+        # OUT
         # Ensure that relevant stages have channels according to fpn_channels
-        earliest_required_stage = min([int(config['out_fmap'][-1]), int(config['feature_levels'][0][-1])])
-        num_required_stages = self._num_stages - earliest_required_stage if self._seg_proxy else self._num_stages
-        final_out_channels = torch.tensor(decoder_out_channels)
-        final_out_channels[-num_required_stages:] = config['fpn_channels']
+        out_in_channels = [lateral_out_channels[-self._num_stages + required_stage].item() for required_stage in required_stages]
+        out_out_channels = torch.full((len(out_in_channels),), int(config['fpn_channels'])).tolist()
+        out_out_channels[0] = encoder_out_channels[0] if self._seg_proxy else int(config['fpn_channels'])
 
-        for out_channels, in_channels in zip(final_out_channels, decoder_out_channels):
-            self._out.append(nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1))  # TODO: kernel_size 1
+        self._out = nn.ModuleList()
+        for in_channels, out_channels in zip(out_in_channels, out_out_channels):
+            self._out.append(nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1))
 
-        #  Up
+        #  UP
         self._up = nn.ModuleList()
-        for level in range(1, len(decoder_out_channels)):
+        for level in range(len(lateral_out_channels)-1):
             self._up.append(
                 nn.ConvTranspose3d(
-                    in_channels=decoder_out_channels[level], out_channels=decoder_out_channels[level-1],
-                    kernel_size=config['strides'][level], stride=config['strides'][level]
+                    in_channels=list(reversed(lateral_out_channels))[level], out_channels=list(reversed(lateral_out_channels))[level+1],
+                    kernel_size=list(reversed(config['strides']))[level], stride=list(reversed(config['strides']))[level]
                 )
             )
         
-        # Refine
+        # REFINE
         if self._refine_fmaps:
             # Build positional encoding
             if config['pos_encoding'] == 'sine':
@@ -96,32 +103,28 @@ class Decoder(nn.Module):
             )
 
     def forward(self, x):
-        # Adjust output based requirement for high res output fmaps
-        if not self._seg_proxy:
-            for key in ['C0', 'C1']:
-                x.pop(key)
-            start_map = 2
-        else:
-            start_map = 0
-
         # Forward lateral
-        fpn_maps = [self._lateral[level](fm) for level, fm in enumerate(x.values())]
+        lateral_out = [lateral(fmap) for lateral, fmap in zip(self._lateral, list(x.values())[-self._lateral_levels:])]
 
         # Forward up
-        out_up = []
-        for idx, x in enumerate(reversed(fpn_maps), 1):
-            level = self._num_stages - idx - 1
-
-            if idx != 1:
+        up_out = []
+        for idx, x in enumerate(reversed(lateral_out)):
+            if idx != 0:
                 x = x + up
+            
+            if idx < self._lateral_levels - 1:
+                up = self._up[idx](x)
 
-            if idx != self._num_stages:
-                up = self._up[level](x)
-
-            out_up.append(x)
+            up_out.append(x)
 
         # Forward out
-        outputs = {'P' + str(level + start_map): self._out[level](fm) for level, fm in enumerate(reversed(out_up))}
+        if self._seg_proxy:
+            out_fmaps = [(list(reversed(up_out))[stage], stage) for stage in self._required_stages]
+        else:
+            out_fmaps = zip(reversed(up_out), self._required_stages)
+
+        outputs = {'P' + str(stage): self._out[idx](fmap) for idx, (fmap, stage) in enumerate(out_fmaps)}
+        #outputs = {'P' + str(stage): fmap for idx, (fmap, stage) in enumerate(out_fmaps)}
 
         # Forward refine
         if self._refine_fmaps:
@@ -151,7 +154,6 @@ class Encoder(nn.Module):
         # Get initial channels
         in_channels = config['in_channels']
         out_channels = config['start_channels']
-        pre_merge = config['pre_merge']
 
         # Get number of encoder stages
         num_stages = len(config['conv_kernels'])
@@ -180,8 +182,7 @@ class Encoder(nn.Module):
                     drop=config['drop_rate'],
                     attn_drop=config['attn_drop_rate'],
                     drop_path=drop_path_rate[sum(swin_depth[:stage_id - 2]):sum(swin_depth[:stage_id - 1])],
-                    downsample=downsample_layer,
-                    pre_merge=pre_merge
+                    downsample=downsample_layer
                 )
             else:
                 stage = EncoderCnnBlock(

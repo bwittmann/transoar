@@ -1,8 +1,8 @@
 # Config file for AttnFPN backbone and RetinaNet head
 
 # General training
-experiment_name: retina_unet_attnfpn_swin_std_merge_7 
-device: cuda:0
+experiment_name: retina_unet_384_192 
+device: cuda:7
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
 seed: 10
@@ -14,7 +14,7 @@ weight_decay: 1e-4
 clip_max_norm: -1 # Deactivated
 
 # Scheduler
-lr_drop: 2300 #3950 #2680
+lr_drop: 2500
 
 # Data
 dataset: transoar_test_160160256_CT #transoar_testing_focused_attn_320_320_512_CT
@@ -29,7 +29,7 @@ num_workers: 8
 # Model
 backbone:
   # Encoder
-  use_encoder_attn: True # Activates swin encoder
+  use_encoder_attn: False # Activates swin encoder
 
   # Standard params
   conv_kernels: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]  # C0, C1, C2, C3, C4, C5
@@ -54,8 +54,8 @@ backbone:
   use_decoder_attn: False # Activated def attn
   
   # Standard params
-  fpn_channels: 192 # Final output channels
-  out_fmap: P2  # P0, P1, P2, P3, P4, P5
+  fpn_channels: 384 # Final output channels
+  out_fmaps: [P2, P3, P4, P5]   # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -69,16 +69,16 @@ backbone:
   use_cuda: False
 
   # Use segmentation proxy loss
-  seg_proxy: True
+  use_seg_proxy_loss: False
 
 neck:
   # Input
   input_levels: [P2, P3, P4, P5]
-  cls_reg_channels: 192 #384
+  cls_reg_channels: 384
   seg_channels: 24
 
   # Heads
-  head_channels: 192 #384
+  head_channels: 192
   classifier_classes: 20
   loss_weight: 1.0  # for bce and giou
   prior_prob: 0.01 # for weight init of cls head
@@ -129,7 +129,7 @@ augmentation:
   p_zoom: 0.5
   p_shear: 0
   p_translate: 0.5 # 0
-  p_flip: 0.5
+  p_flip: 0
 
   gaussian_noise_mean: 0.0
   gaussian_noise_std: 0.1

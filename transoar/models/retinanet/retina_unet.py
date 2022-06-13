@@ -50,7 +50,7 @@ class RetinaUNet(nn.Module):
         self.input_levels = config_neck['input_levels']
 
         self.head = detection_head
-        self.segmenter = segmentation_head if config['backbone']['seg_proxy'] else None
+        self.segmenter = segmentation_head if config['backbone']['use_seg_proxy_loss'] else None
 
         self.anchor_generator = anchor_gen
         self.proposal_matcher = matcher

@@ -26,7 +26,7 @@ def match(n, keywords):
 
 def train(config, args):
     #os.environ["CUDA_VISIBLE_DEVICES"] = config['device'][-1]
-    device = 'cuda:0' # TODO: fix this hack for def detr cuda module
+    device = 'cuda' # TODO: fix this hack for def detr cuda module
 
     # Build necessary components
     train_loader = get_loader(config, 'train')
@@ -43,6 +43,7 @@ def train(config, args):
     num_backbone_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['attn_fpn']))
     num_head_params = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and match(n, ['head', 'segmenter']))
 
+    print(num_params)
     print(f'num_head_params\t\t{num_head_params:>10}\t{num_head_params/num_params:.4f}%') # TODO: Incorp into logging
     print(f'num_backbone_params\t{num_backbone_params:>10}\t{num_backbone_params/num_params:.4f}%')
 

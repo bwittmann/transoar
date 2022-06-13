@@ -84,7 +84,7 @@ class Trainer:
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
 
-            if self._config['backbone']['seg_proxy']:
+            if self._config['backbone']['use_seg_proxy_loss']:
                 loss_seg_ce_agg += losses['seg_ce'].item()
                 loss_seg_dice_agg += losses['seg_dice'].item()
 
@@ -135,7 +135,7 @@ class Trainer:
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
 
-            if self._config['backbone']['seg_proxy']:
+            if self._config['backbone']['use_seg_proxy_loss']:
                 loss_seg_ce_agg += losses['seg_ce'].item()
                 loss_seg_dice_agg += losses['seg_dice'].item()
 
