@@ -2,13 +2,13 @@
 
 import numpy as np
 
-def inference(out):
+def inference(out, num_organs):
     bs, num_queries, _ = out['pred_logits'].shape
-    num_queries_per_organ = int(num_queries / 20)
+    num_queries_per_organ = int(num_queries / num_organs)
 
     # Get probabilities from output logits and select query with highest prob
-    pred_probs = out['pred_logits'].sigmoid().squeeze().reshape(bs, 20, num_queries_per_organ).cpu()
-    pred_boxes = out['pred_boxes'].reshape(bs, 20, num_queries_per_organ, -1).cpu()
+    pred_probs = out['pred_logits'].sigmoid().squeeze().reshape(bs, num_organs, num_queries_per_organ).cpu()
+    pred_boxes = out['pred_boxes'].reshape(bs, num_organs, num_queries_per_organ, -1).cpu()
     pred_query_ids = pred_probs.argmax(dim=-1)
 
     # Adjust format to fit metric
@@ -19,7 +19,7 @@ def inference(out):
         batch_boxes = []
         batch_classes = []
         batch_scores = []
-        for class_ in range(20):
+        for class_ in range(num_organs):
             valid_id = pred_query_ids[batch, class_]
             batch_boxes.append(pred_boxes[batch, class_, valid_id][None].detach().cpu().numpy())
             batch_scores.append(pred_probs[batch, class_, valid_id].detach().cpu().numpy())

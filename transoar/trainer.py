@@ -55,6 +55,14 @@ class Trainer:
         for data, _, bboxes, seg_targets in tqdm(self._train_loader):
             # Put data to gpu
             data, seg_targets = data.to(device=self._device), seg_targets.to(device=self._device)
+
+            # from transoar.utils.io import write_nifti
+            # meta_data = {
+            #     'itk_spacing': [4, 1, 1]
+            # }
+            # write_nifti(data.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/train_{idx}_data.nii.gz')
+            # write_nifti(seg_targets.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/train_{idx}_seg.nii.gz')
+            # continue
         
             det_targets = []
             for item in bboxes:
@@ -124,6 +132,14 @@ class Trainer:
         for data, _, bboxes, seg_targets in tqdm(self._val_loader):
             # Put data to gpu
             data, seg_targets = data.to(device=self._device), seg_targets.to(device=self._device)
+
+            # from transoar.utils.io import write_nifti
+            # meta_data = {
+            #     'itk_spacing': [4, 1, 1]
+            # }
+            # write_nifti(data.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/val_{idx}_data.nii.gz')
+            # write_nifti(seg_targets.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/val_{idx}_seg.nii.gz')
+            # continue
         
             det_targets = []
             for item in bboxes:
@@ -144,7 +160,7 @@ class Trainer:
                     loss_abs += loss_val * self._config['loss_coefs'][loss_key.split('_')[0]]
 
             # Evaluate validation predictions based on metric
-            pred_boxes, pred_classes, pred_scores = inference(out)
+            pred_boxes, pred_classes, pred_scores = inference(out, self._config['neck']['num_organs'])
             self._evaluator.add(
                 pred_boxes=pred_boxes,
                 pred_classes=pred_classes,

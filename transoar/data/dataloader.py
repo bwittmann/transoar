@@ -18,7 +18,8 @@ def get_loader(config, split, batch_size=None):
     dataset = TransoarDataset(config, split)
     dataloader = DataLoader(
         dataset, batch_size=batch_size, shuffle=shuffle,
-        num_workers=config['num_workers'], collate_fn=collator
+        num_workers=config['num_workers'], collate_fn=collator,
+        drop_last=True
     )
     return dataloader
 

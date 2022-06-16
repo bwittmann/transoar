@@ -1,13 +1,13 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: std_dyn_div3_half_restr_P2_50percent
-device: cuda:6
+experiment_name: test
+device: cuda:7
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
-epochs: 4000
+epochs: 3000
 lr: 2e-4
 lr_backbone: 2e-5
 weight_decay: 1e-4
@@ -17,13 +17,13 @@ clip_max_norm: -1
 lr_drop: 2500 #700
 
 # Data
-dataset: transoar_testing_focused_attn_160_160_256_CT
+dataset: amos_256_256_128_strict_border_CT
 overfit: False # Use same set consisting of one image for train and val
 bbox_padding: 1
 
 # Dataloader
 batch_size: 2
-shuffle: True
+shuffle: False
 num_workers: 16
 
 # Matching
@@ -70,7 +70,7 @@ backbone:
   
   # Standard params
   fpn_channels: 384 #384 # Final output channels
-  out_fmaps: [P2]  # P0, P1, P2, P3, P4, P5
+  out_fmaps: [P3]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -90,7 +90,7 @@ backbone:
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_levels: P2 # [P5, P4, P3]  
+  input_levels: P3 # [P5, P4, P3]  
   
   # Transformer decoder model
   hidden_dim: 384 #512 832 # prev: 256
@@ -111,14 +111,14 @@ neck:
   max_anchor_pred_offset: 0.1
 
   # Queries
-  num_queries: 540 #540, 140, 20
-  num_organs: 20
+  num_queries: 405
+  num_organs: 15
   aux_loss: True
 
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [160, 160, 256] #null #[64, 64, 64]
+  patch_size: [256, 256, 128]
 
   p_gaussian_noise: 0 #0.1
   p_gaussian_smooth: 0 #0.1
@@ -140,9 +140,9 @@ augmentation:
 
   adjust_contrast_gamma: [0.7, 1.5]
 
-  rotation: [-15, 15]
-  min_zoom: 0.8
-  max_zoom: 1.2 
+  rotation: [-5, 5] #[-15, 15]
+  min_zoom: 0.9 #0.8
+  max_zoom: 1.1 #1.2 
   translate_precentage: 10
   shear_range: [0.1, 0.1, 0.1]
   flip_axis: [0, 1, 2]

@@ -22,6 +22,7 @@ class PreProcessor:
         paths_to_train,
         paths_to_val,
         paths_to_test,
+        path_to_dataset,
         path_to_splits,
         preprocessing_config,
         data_config
@@ -36,6 +37,7 @@ class PreProcessor:
             resize_shape=preprocessing_config['resize_shape']
         )
 
+        self._path_to_dataset = path_to_dataset
         self._path_to_splits = path_to_splits
         self._splits = {
             'train': paths_to_train,
@@ -51,7 +53,8 @@ class PreProcessor:
         for split_name, split_paths in self._splits.items():
             logging.info(f'Preparing {split_name} set.')
             for idx, case in enumerate(split_paths):
-                path_image, path_label = sorted(list(case.iterdir()), key=lambda x: len(str(x)))
+                path_image, path_label = self._path_to_dataset / case['image'], self._path_to_dataset / case['label']
+                case_name = case['image'].split('/')[-1][5:9]
 
                 case_dict = {
                         'image': path_image,
@@ -60,10 +63,36 @@ class PreProcessor:
 
                 preprocessed_case = self._preprocessing_transform(case_dict)
                 image, label = preprocessed_case['image'], preprocessed_case['label']
+                assert image.shape == label.shape
 
-                # Skip cases with a small amount of labels
-                if np.unique(label).size < self._preprocessing_config['min_num_organs'] + 1:
-                    logging.info(f"Skipped case {case.name} with less than {self._preprocessing_config['min_num_organs']} organs.")
+                self._shapes.append(image.shape)
+
+                # skip cases that dont contain important border organs for cropping
+                unique_labels = np.unique(label)
+                if unique_labels.shape[0] != 16:
+                    contains_border = all([m  in unique_labels.tolist() for m in [15., 14., 6., 1., 7.]])
+                    if contains_border == False:
+                        logging.info(f"Skipped case {case_name} due to missing border organs.")
+                        continue
+
+                # check boundary organs in fov
+                margin_boundary = 2
+                boundaries = [
+                    label[0, 0:margin_boundary, :, :],
+                    label[0, :, 0:margin_boundary, :],
+                    label[0, :, :, 0:margin_boundary],
+                    label[0, -margin_boundary:, :, :],
+                    label[0, :, -margin_boundary:, :],
+                    label[0, :, :, -margin_boundary:],
+                ]
+                crossed_boundary = False
+                for boundary in boundaries:
+                    for border_org in [15., 14., 6., 1., 7.]:
+                        if border_org in boundary:
+                            crossed_boundary = True
+
+                if crossed_boundary == True:
+                    logging.info(f"Skipped case {case_name} due to crossed boundary.")
                     continue
 
                 if split_name != 'test':
@@ -75,9 +104,10 @@ class PreProcessor:
                     voxels_foreground = self._get_foreground_voxels(image, label)
                     self._norm_voxels += voxels_foreground
 
-                logging.info(f'Successfull prepared case {case.name} of shape {image.shape}.')
+                logging.info(f'Successfull prepared case {case_name} of shape {image.shape}.')
 
-                path_to_case = self._path_to_splits / split_name / case.name
+                path_to_case = self._path_to_splits / split_name / case_name
+                
                 os.makedirs(path_to_case)
 
                 np.save(str(path_to_case / 'data.npy'), image.astype(np.float32))

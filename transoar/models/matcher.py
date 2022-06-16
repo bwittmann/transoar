@@ -7,25 +7,29 @@ from transoar.utils.bboxes import box_cxcyczwhd_to_xyzxyz, generalized_bbox_iou_
 
 
 class HungarianMatcher(nn.Module):
-    def __init__(self, cost_class=1, cost_bbox=1, cost_giou=1, anchor_matching=True):
+    def __init__(
+        self, cost_class=1, cost_bbox=1, cost_giou=1, anchor_matching=True, num_organs=None
+    ):
         super().__init__()
         self.cost_class = cost_class
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
         self.anchor_matching = anchor_matching
+        self.num_organs = num_organs
+
         assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, "all costs can't be 0"
 
     @torch.no_grad()
     def forward(self, outputs, targets, anchors, num_top_queries=1):
         bs, num_queries, _ = outputs["pred_logits"].shape
-        num_queries_per_organ = int(num_queries / 20)
+        num_queries_per_organ = int(num_queries / self.num_organs)
 
         # Split queries in individual classes
         if self.anchor_matching:
-            classes_queries_boxes = anchors[None].repeat((bs, 1, 1)).reshape(bs, 20, num_queries_per_organ, -1).cpu().float() 
+            classes_queries_boxes = anchors[None].repeat((bs, 1, 1)).reshape(bs, self.num_organs, num_queries_per_organ, -1).cpu().float() 
         else:
-            classes_queries_boxes = outputs["pred_boxes"].reshape(bs, 20, num_queries_per_organ, -1).cpu().float()
-        classes_queries_probs = outputs["pred_logits"].reshape(bs, 20, num_queries_per_organ, -1).cpu().float()
+            classes_queries_boxes = outputs["pred_boxes"].reshape(bs, self.num_organs, num_queries_per_organ, -1).cpu().float()
+        classes_queries_probs = outputs["pred_logits"].reshape(bs, self.num_organs, num_queries_per_organ, -1).cpu().float()
 
         # Get targets
         tgt = [{label.item(): box.cpu() for box, label in zip(target['boxes'], target['labels'])} for target in targets]

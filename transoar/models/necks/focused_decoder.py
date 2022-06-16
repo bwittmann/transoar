@@ -96,14 +96,30 @@ class FocusedDecoderLayer(nn.Module):
         self.num_queries_per_organ = int(self.config['num_queries'] / self.config['num_organs'])
         assert self.num_queries_per_organ in [1, 7, 27, 54]
 
-        shapes = {
-            'P0': [160, 160, 256],
-            'P1': [80, 80, 128],
-            'P2': [40, 40, 64],
-            'P3': [20, 20, 32],
-            'P4': [10, 10, 16],
-            'P5': [5, 5, 8]
-        }
+        if self.config['num_organs'] == 20:
+            shapes = {
+                'P0': [160, 160, 256],
+                'P1': [80, 80, 128],
+                'P2': [40, 40, 64],
+                'P3': [20, 20, 32],
+                'P4': [10, 10, 16],
+                'P5': [5, 5, 8]
+            }
+        else:
+            shapes = {
+                # 'P0': [256, 256, 96],
+                # 'P1': [128, 128, 48],
+                # 'P2': [64, 64, 24],
+                # 'P3': [32, 32, 12],
+                # 'P4': [16, 16, 6],
+                # 'P5': [8, 8, 3],
+                'P0': [256, 256, 128],
+                'P1': [128, 128, 64],
+                'P2': [64, 64, 32],
+                'P3': [32, 32, 16],
+                'P4': [16, 16, 8],
+                'P5': [8, 8, 4]
+            }
         self.input_shape = torch.tensor(shapes[self.config['input_levels']])
 
         # cross attention

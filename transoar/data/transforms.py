@@ -26,6 +26,11 @@ def crop_air(x):
     # To not crop fat which is -120 to -90
     return x > -500
 
+def crop_labels(x):
+    # crop based on organ boundaries
+    mask = (x == 6) | (x == 7) | (x == 15) | (x == 14)| (x == 1)
+    return mask
+
 def transform_preprocessing(
     margin, crop_key, orientation, resize_shape
 ):
@@ -33,9 +38,13 @@ def transform_preprocessing(
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
         Orientationd(keys=["image", "label"], axcodes=orientation),
+        # CropForegroundd(
+        #     keys=["image", "label"], source_key=crop_key, 
+        #     margin=margin, select_fn=crop_air
+        # ),
         CropForegroundd(
-            keys=["image", "label"], source_key=crop_key, 
-            margin=margin, select_fn=crop_air
+            keys=["image", "label"], source_key='label', 
+            margin=[10, 10, 10], select_fn=crop_labels
         ),
         Resized(
             keys=['image', 'label'], spatial_size=resize_shape,

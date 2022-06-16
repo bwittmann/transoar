@@ -1,0 +1,40 @@
+# Config file of amos dataset
+
+num_classes: 15
+labels:
+  1: spleen
+  2: right kidney
+  3: left kidney
+  4: gall bladder
+  5: esophagus
+  6: liver
+  7: stomach
+  8: aorta
+  9: postcava
+  10: pancreas
+  11: right adrenal gland
+  12: left adrenal gland
+  13: duodenum
+  14: urinary bladder
+  15: prostate_uterus
+
+labels_small:
+  4: gall bladder
+  5: esophagus
+  11: right adrenal gland
+  12: left adrenal gland
+  15: prostate_uterus
+
+labels_mid:
+  2: right kidney
+  3: left kidney
+  9: postcava
+  10: pancreas
+  13: duodenum
+  14: urinary bladder
+
+labels_large:
+  6: liver
+  7: stomach
+  8: aorta
+  1: spleen

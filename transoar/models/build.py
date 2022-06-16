@@ -33,9 +33,9 @@ def build_criterion(config):
         cost_class=config['set_cost_class'],
         cost_bbox=config['set_cost_bbox'],
         cost_giou=config['set_cost_giou'],
-        anchor_matching=config['anchor_matching']
+        anchor_matching=config['anchor_matching'],
+        num_organs=config['neck']['num_organs']
     )
-
     criterion = TransoarCriterion(
         num_classes=config['num_classes'],
         matcher=matcher,

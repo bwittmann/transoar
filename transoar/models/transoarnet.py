@@ -85,9 +85,9 @@ class TransoarNet(nn.Module):
                 anchor_offset = model_config['anchor_gen_offset']
                 pos_offsets = torch.tensor([0, anchor_offset, -anchor_offset]) 
 
-            if num_queries == 20:  # no offset
+            if num_queries_per_organ == 1:  # no offset
                 pos_offsets = torch.zeros(3)[None]
-            elif num_queries == 140:   # 6 offsets
+            elif num_queries_per_organ == 7:   # 6 offsets
                 all_offsets = gen_offsets(pos_offsets, model_config['anchor_gen_dynamic_offset'])
                 pos_offsets = all_offsets[torch.count_nonzero(all_offsets, dim=-1) <= 1]
             else:   # 26 offsets

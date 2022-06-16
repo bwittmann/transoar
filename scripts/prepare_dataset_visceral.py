@@ -6,7 +6,7 @@ from pathlib import Path
 import random
 
 from transoar.utils.io import get_config, set_root_logger
-from transoar.data.preprocessor import PreProcessor
+from transoar.data.preprocessor_visceral import PreProcessor
 
 
 if __name__ == "__main__":
