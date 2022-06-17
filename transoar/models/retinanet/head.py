@@ -19,18 +19,18 @@ class ClsHead(nn.Module):
             nn.ReLU(inplace=True)
         ]
 
-        block_2 = [
-            nn.Conv3d(config['head_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
-            nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
-            nn.ReLU(inplace=True)
-        ]
+        # block_2 = [
+        #     nn.Conv3d(config['head_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
+        #     nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
+        #     nn.ReLU(inplace=True)
+        # ]
 
         block_3 = [
             nn.Conv3d(config['head_channels'], out_channels, kernel_size=3, stride=1, padding=1),
         ]
 
         # Classification head
-        self._body = nn.Sequential(*block_1, *block_2)
+        self._body = nn.Sequential(*block_1) #, *block_2)
         self._out = nn.Sequential(*block_3)
         self._init_weights()
 
@@ -85,18 +85,18 @@ class RegHead(nn.Module):
             nn.ReLU(inplace=True)
         ]
 
-        block_2 = [
-            nn.Conv3d(config['head_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
-            nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
-            nn.ReLU(inplace=True)
-        ]
+        # block_2 = [
+        #     nn.Conv3d(config['head_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
+        #     nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
+        #     nn.ReLU(inplace=True)
+        # ]
 
         block_3 = [
             nn.Conv3d(config['head_channels'], out_channels, kernel_size=3, stride=1, padding=1),
         ]
 
         # Regression head
-        self._body = nn.Sequential(*block_1, *block_2)
+        self._body = nn.Sequential(*block_1) #, *block_2)
         self._out = nn.Sequential(*block_3)
         self._init_weights()
 
