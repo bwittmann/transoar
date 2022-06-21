@@ -65,8 +65,6 @@ class PreProcessor:
                 image, label = preprocessed_case['image'], preprocessed_case['label']
                 assert image.shape == label.shape
 
-                self._shapes.append(image.shape)
-
                 # skip cases that dont contain important border organs for cropping
                 unique_labels = np.unique(label)
                 if unique_labels.shape[0] != 16:
@@ -76,7 +74,7 @@ class PreProcessor:
                         continue
 
                 # check boundary organs in fov
-                margin_boundary = 2
+                margin_boundary = 1
                 boundaries = [
                     label[0, 0:margin_boundary, :, :],
                     label[0, :, 0:margin_boundary, :],

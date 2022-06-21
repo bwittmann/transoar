@@ -69,7 +69,7 @@ class FocusedDecoderModel(nn.Module):
         output = tgt
         intermediate = []
         for layer in self.layers:
-            output = layer(output, query_pos, src_pos, src)
+            output, _ = layer(output, query_pos, src_pos, src)
 
             if self.return_intermediate:
                 intermediate.append(output)
@@ -180,14 +180,14 @@ class FocusedDecoderLayer(nn.Module):
     def forward(self, tgt, query_pos, src_pos, src):
         # self attention
         q = k = self.with_pos_embed(tgt, query_pos)
-        tgt2 = self.self_attn(q.transpose(0, 1), k.transpose(0, 1), tgt.transpose(0, 1))[0].transpose(0, 1)
+        tgt2= self.self_attn(q.transpose(0, 1), k.transpose(0, 1), tgt.transpose(0, 1))[0].transpose(0, 1)
         tgt = tgt + self.dropout2(tgt2)
         tgt = self.norm2(tgt)
 
         # cross attention
         q = self.with_pos_embed(tgt, query_pos)
         k = self.with_pos_embed(src, src_pos)
-        tgt2 = self.cross_attn(q, k, src, mask=self.attn_mask.float())
+        tgt2, weights = self.cross_attn(q, k, src, mask=self.attn_mask.float())
 
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
@@ -195,7 +195,7 @@ class FocusedDecoderLayer(nn.Module):
         # ffn
         tgt = self.forward_ffn(tgt)
 
-        return tgt
+        return tgt, weights
 
 
 class FocusedAttn(nn.Module):
@@ -209,10 +209,12 @@ class FocusedAttn(nn.Module):
         attn_drop=0,
         proj_drop=0,
         use_pos_bias=False,
+        return_weights=True
     ):
         super().__init__()
         self.dim = dim
         self.num_heads = num_heads
+        self.ret_weights = return_weights
         head_dim = dim // num_heads
         self.scale = qk_scale or head_dim ** -0.5
 
@@ -252,13 +254,21 @@ class FocusedAttn(nn.Module):
             attn += mask
 
         attn = self.softmax(attn)
+
+        if self.ret_weights:
+            weights = attn
+
         attn = self.attn_drop(attn)
 
         x = (attn @ v.permute(0, 2, 1, 3)).transpose(1, 2).reshape(B, N_q, C)
 
         x = self.proj(x)
         x = self.proj_drop(x)
-        return x     
+        
+        if self.ret_weights:
+            return x, weights
+        else:
+            return x     
 
 def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])

@@ -44,7 +44,7 @@ def transform_preprocessing(
         # ),
         CropForegroundd(
             keys=["image", "label"], source_key='label', 
-            margin=[10, 10, 10], select_fn=crop_labels
+            margin=[2, 2, 2], select_fn=crop_labels
         ),
         Resized(
             keys=['image', 'label'], spatial_size=resize_shape,

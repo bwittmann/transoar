@@ -215,19 +215,26 @@ def rescale_bbox(bbox, original_shape):
         return bbox
 
 def save_attn_visualization(
-    model_out, backbone_features, dec_attn_weights, original_shape, seg_mask, case_id, mean_attn=False, path='/home/bastian/download'
+    model_out, backbone_features, dec_attn_weights, original_shape, seg_mask, case_id, mean_attn=True, 
+    path='/home/home/supro_bastian/download', final_shape=[160, 160, 256], num_orgs=15
 ):
     path = Path(path) / ('case' + str(case_id))
     path.mkdir(parents=True, exist_ok=True)
 
+    # Average across attn heads
+    dec_attn_weights = dec_attn_weights.mean(dim=0)
+
+    if list(seg_mask.shape[1:]) != final_shape:
+        seg_mask = F.interpolate(seg_mask[None].float(), final_shape).squeeze()
+
     # Get shape of input feature map and number of queries per object
     d, h, w = backbone_features.shape[-3:]
     num_queries = model_out['pred_logits'].shape[-2]
-    num_queries_per_object = int(num_queries / 20)
+    num_queries_per_object = int(num_queries / num_orgs)
 
     # Put everything to cpu
-    model_out = {k: v.cpu().squeeze().reshape(20, num_queries_per_object, -1) for k, v in model_out.items() if k not in ('aux_outputs', 'pred_seg')}
-    seg_mask, backbone_features, dec_attn_weights = seg_mask.cpu().squeeze(), backbone_features.cpu(), dec_attn_weights.cpu().reshape(20, num_queries_per_object, -1)
+    model_out = {k: v.cpu().squeeze().reshape(num_orgs, num_queries_per_object, -1) for k, v in model_out.items() if k not in ('aux_outputs', 'pred_seg')}
+    seg_mask, backbone_features, dec_attn_weights = seg_mask.cpu().squeeze(), backbone_features.cpu(), dec_attn_weights.cpu().reshape(num_orgs, num_queries_per_object, -1)
     seg_mask_raw = torch.permute(seg_mask, (1, 0, 2)).short()
 
     for class_, (class_preds, attn_weights) in enumerate(zip(model_out['pred_logits'], dec_attn_weights), 1):
@@ -236,7 +243,7 @@ def save_attn_visualization(
         attn_weights = attn_weights[class_preds.argmax()]
 
         attn_weights = attn_weights.view(d, h, w)
-        attn_weights = F.interpolate(attn_weights[None, None], original_shape).squeeze()
+        attn_weights = F.interpolate(attn_weights[None, None], final_shape).squeeze()
         max_weight, min_weight = attn_weights.max(), attn_weights.min()
         attn_weights = ((attn_weights- min_weight) / (max_weight - min_weight)) * 255
         attn_weights = torch.permute(attn_weights, (1, 0, 2))
@@ -251,6 +258,9 @@ def save_attn_visualization(
 
         for idx_, (seg_frame, attn_weight_frame) in enumerate(zip(seg_mask, attn_weights)):
             seg_frame_rgb =  seg_frame.unsqueeze(-1).repeat(1, 1, 3)
+
+            if idx_ % 5 != 0:
+                continue
 
             if mean_attn:
                 attn_weight_frame = attn_weights.mean(dim=0)

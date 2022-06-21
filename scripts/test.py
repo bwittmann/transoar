@@ -76,7 +76,7 @@ class Tester:
                     lambda self, input, output: backbone_features_list.append(output)
                 ),
                 self._model._neck.decoder.layers[-1].cross_attn.register_forward_hook(
-                    lambda self, input, output: dec_attn_weights_list.append(output[1])
+                    lambda self, input, output: dec_attn_weights_list.append(output[-1])
                 )
             ]
     
