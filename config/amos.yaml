@@ -19,15 +19,17 @@ labels:
   15: prostate_uterus
 
 labels_small:
-  4: gall bladder
   5: esophagus
   11: right adrenal gland
   12: left adrenal gland
-  15: prostate_uterus
+  15: prostate_uterus  
 
 labels_mid:
+  1: spleen
   2: right kidney
   3: left kidney
+  4: gall bladder
+  8: aorta
   9: postcava
   10: pancreas
   13: duodenum
@@ -36,5 +38,3 @@ labels_mid:
 labels_large:
   6: liver
   7: stomach
-  8: aorta
-  1: spleen

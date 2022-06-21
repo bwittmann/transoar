@@ -48,7 +48,7 @@ class Tester:
             classes_large=config['labels_large'],
             iou_range_nndet=(0.1, 0.5, 0.05),
             iou_range_coco=(0.5, 0.95, 0.05),
-            sparse_results=True
+            sparse_results=False
         )
 
         self._model = TransoarNet(config).to(device=self._device)
@@ -98,7 +98,7 @@ class Tester:
                 out = self._model(data)
 
                 # Format out to fit evaluator and estimate best predictions per class
-                pred_boxes, pred_classes, pred_scores = inference(out)
+                pred_boxes, pred_classes, pred_scores = inference(out, len(self._class_dict))
                 gt_boxes = [targets['boxes'].detach().cpu().numpy()]
                 gt_classes = [targets['labels'].detach().cpu().numpy()]
 
