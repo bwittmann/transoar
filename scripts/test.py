@@ -52,7 +52,7 @@ class Tester:
         )
 
         self._model = TransoarNet(config).to(device=self._device)
-        self._layer = int(config['backbone']['out_fmap'][-1])
+        self._layer = int(config['backbone']['out_fmaps'][0][-1])
 
         # Load checkpoint
         checkpoint = torch.load(path_to_ckpt, map_location=self._device)
