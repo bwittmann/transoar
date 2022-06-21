@@ -23,7 +23,7 @@ bbox_padding: 1
 
 # Dataloader
 batch_size: 2
-shuffle: False
+shuffle: True
 num_workers: 16
 
 # Matching

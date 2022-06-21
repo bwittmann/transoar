@@ -1,8 +1,8 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: test #std_dyn_div3_half_restr_P2_50percent
-device: cuda:6
+experiment_name: foc_dec_visceral_P3_strict_borders_red_aug
+device: cuda:5
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
@@ -17,7 +17,7 @@ clip_max_norm: -1
 lr_drop: 2500 #700
 
 # Data
-dataset: transoar_testing_focused_attn_160_160_256_CT
+dataset: visceral_160_160_256_strict_border_CT
 overfit: False # Use same set consisting of one image for train and val
 bbox_padding: 1
 
@@ -70,7 +70,7 @@ backbone:
   
   # Standard params
   fpn_channels: 384 #384 # Final output channels
-  out_fmaps: [P2]  # P0, P1, P2, P3, P4, P5
+  out_fmaps: [P3]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
@@ -90,7 +90,7 @@ backbone:
 neck:
   name: foc_attn
   pos_encoding: sine
-  input_levels: P2 # [P5, P4, P3]  
+  input_levels: P3 # [P5, P4, P3]  
   
   # Transformer decoder model
   hidden_dim: 384 #512 832 # prev: 256
@@ -111,7 +111,7 @@ neck:
   max_anchor_pred_offset: 0.1
 
   # Queries
-  num_queries: 540 #540, 140, 20
+  num_queries: 540
   num_organs: 20
   aux_loss: True
 
@@ -140,9 +140,9 @@ augmentation:
 
   adjust_contrast_gamma: [0.7, 1.5]
 
-  rotation: [-15, 15]
-  min_zoom: 0.8
-  max_zoom: 1.2 
+  rotation: [-5, 5] #[-15, 15]
+  min_zoom: 0.9 #0.8
+  max_zoom: 1.1 #1.2 
   translate_precentage: 10
   shear_range: [0.1, 0.1, 0.1]
   flip_axis: [0, 1, 2]
