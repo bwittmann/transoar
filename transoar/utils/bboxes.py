@@ -75,8 +75,8 @@ def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normal
             max_values = class_indices.max(dim=0)[0][1:].to(torch.float)
 
             # Ignore too small boxes
-            if ((max_values - min_values) < 5).any():
-                continue        
+            # if ((max_values - min_values) < 5).any():
+            #     continue        
 
             # Apply padding to bounding boxes
             min_values = (min_values - padding).clip(min=0) 
