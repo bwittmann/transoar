@@ -48,19 +48,22 @@ def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normal
     for map_ in segmentation_maps:
         assert map_.ndim == 4
 
-        bboxes = []
+        valid_bboxes = []
+        valid_classes = []
         classes = [int(class_) for class_ in map_.unique(sorted=True)][1:]
-        batch_classes.append(torch.tensor(classes))
-
         for class_ in classes:
             class_indices = (map_ == class_).nonzero(as_tuple=False)
 
             min_values = class_indices.min(dim=0)[0][1:].to(torch.float)   # x, y, z
             max_values = class_indices.max(dim=0)[0][1:].to(torch.float)
 
+            # Ignore too small boxes
+            if ((max_values - min_values) < 5).any():
+                continue        
+
             # Apply padding to bounding boxes
-            min_values -= padding
-            max_values += padding
+            min_values = (min_values - padding).clip(min=0) 
+            max_values = (max_values + padding).clip(max=torch.tensor(map_.shape[1:]))
 
             assert min_values[0] < max_values[0]
             assert min_values[1] < max_values[1]
@@ -71,17 +74,27 @@ def segmentation2bbox(segmentation_maps, padding, box_format='cxcyczwhd', normal
                 max_values /= torch.tensor(map_.shape[1:])
 
             if box_format == 'xyzxyz':
-                bboxes.append(torch.hstack((min_values, max_values)))   # x1, y1, z1, x2, y2, z2
+                valid_bboxes.append(torch.hstack((min_values, max_values)))   # x1, y1, z1, x2, y2, z2
+            elif box_format == 'xyxyzz':
+                valid_bboxes.append(torch.hstack((min_values[0:2], max_values[0:2], min_values[-1], max_values[-1])))
             elif box_format == 'cxcyczwhd':
                 width, height, depth = max_values - min_values
                 cx, cy, cz = (max_values + min_values) / 2
-                bboxes.append(torch.tensor([cx, cy, cz, width, height, depth]))
+                valid_bboxes.append(torch.tensor([cx, cy, cz, width, height, depth]))
             else:
                 raise ValueError('Please select a valid box format.')
 
-        batch_bboxes.append(torch.vstack(bboxes))
+            valid_classes.append(class_)
+
+        batch_classes.append(torch.tensor(valid_classes))
+        
+        try:
+            batch_bboxes.append(torch.vstack(valid_bboxes))
+        except:
+            batch_bboxes.append(torch.tensor(valid_bboxes))
 
     return batch_bboxes, batch_classes
+
 
 def iou_3d(bboxes1, bboxes2):
     """Determines the intersection over union (IoU) for two sets of
