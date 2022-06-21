@@ -57,8 +57,5 @@ class TransoarCollator:
             torch.stack(batch_labels), self._bbox_padding, normalize=False, box_format='xyxyzz'
         )
 
-        print(torch.stack(batch_labels).unique().shape[0] - 1, batch_classes[0].shape)
-
         batch_classes = [classes - 1 for classes in batch_classes]
-
         return torch.stack(batch_images), torch.stack(batch_masks), list(zip(batch_bboxes, batch_classes)), torch.stack(batch_labels)
