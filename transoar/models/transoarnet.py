@@ -28,10 +28,6 @@ class TransoarNet(nn.Module):
         self._cls_head = nn.Linear(hidden_dim, num_classes + 1)
         self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
 
-        in_channels = config['backbone']['start_channels']
-        out_channels = 2 if config['backbone']['fg_bg'] else config['neck']['num_organs'] + 1 # inc bg
-        self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
-
         # Get projections and embeddings
         self._query_embed = nn.Embedding(num_queries, hidden_dim)
 

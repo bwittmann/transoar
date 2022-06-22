@@ -34,7 +34,7 @@ class TransoarCriterion(nn.Module):
 
         # Hack to make deterministic, https://github.com/pytorch/pytorch/issues/46024
         self.cls_weights = torch.tensor(
-            [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+            [1, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
         ).type(torch.FloatTensor)
 
     def loss_class(self, outputs, targets, indices):
