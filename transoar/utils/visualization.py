@@ -35,7 +35,7 @@ PALETTE = {
     19: [255, 153, 51],
     20: [153, 204, 255],
     1000: [0, 255, 0],  # colors for bboxes (gt and pred)
-    1001: [255, 255, 0] 
+    1001: [190, 190, 0] 
 }
 
 
@@ -167,6 +167,11 @@ def save_pred_visualization(
     path_to_instance = path / instance_name
     path_to_instance.mkdir(exist_ok=True)
 
+    target_shape = [160, 160, 256]
+    seg_mask = F.interpolate(
+        torch.tensor(seg_mask[None, None]).float(), target_shape
+    ).squeeze().numpy()
+
     # Generate point cloud of each class and gt boxes
     for bbox, class_ in zip(gt_boxes, gt_classes):
         class_pc = (seg_mask == class_).nonzero()
@@ -198,7 +203,7 @@ def save_pred_visualization(
         bbox = rescale_bbox(bbox, seg_mask.shape)
         bbox = np.concatenate((bbox, np.array([0])), axis=0)
         path_bbox = str(path_to_instance) + f'/{classes[str(class_)]}_bbox_gt.ply'
-        write_bbox(bbox, 1000, path_bbox, PALETTE, seg_mask.shape[-1] / 750)
+        write_bbox(bbox, 1000, path_bbox, PALETTE, seg_mask.shape[-1] / 750 * 3)
 
     # Generate pred bboxes
     for bbox, class_ in zip(pred_boxes, pred_classes):
@@ -206,7 +211,7 @@ def save_pred_visualization(
 
         bbox = np.concatenate((bbox, np.array([0])), axis=0)
         path_bbox = str(path_to_instance) + f'/{classes[str(class_)]}_bbox_pred.ply'
-        write_bbox(bbox, 1001, path_bbox, PALETTE, seg_mask.shape[-1] / 750)
+        write_bbox(bbox, 1001, path_bbox, PALETTE, seg_mask.shape[-1] / 750 * 3)
 
 def rescale_bbox(bbox, original_shape):
         # Change val of bboxes from sigmoid range back to meaningful values
