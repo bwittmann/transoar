@@ -29,7 +29,3 @@ backup
 transoar/models/ops/build/
 transoar/models/ops/dist/
 
-# C
-*.so
-*.o
-
