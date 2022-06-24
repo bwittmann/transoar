@@ -2,11 +2,14 @@
 
 import os
 import logging
+from collections import defaultdict
 
+import torch
 import numpy as np
 
 from transoar.data.transforms import transform_preprocessing
 from transoar.utils.io import write_json
+from transoar.utils.bboxes import segmentation2bbox, box_cxcyczwhd_to_xyzxyz
 
 class PreProcessor:
     """Data preprocessor of the transoar project.
@@ -30,7 +33,7 @@ class PreProcessor:
             margin=preprocessing_config['margin'],
             crop_key=preprocessing_config['key'], 
             orientation=preprocessing_config['orientation'],
-            target_spacing=preprocessing_config['target_spacing']
+            resize_shape=preprocessing_config['resize_shape']
         )
 
         self._path_to_splits = path_to_splits
@@ -41,12 +44,13 @@ class PreProcessor:
         }
 
         self._shapes = []
+        self._bboxes = []
         self._norm_voxels = []
 
     def run(self):
         for split_name, split_paths in self._splits.items():
             logging.info(f'Preparing {split_name} set.')
-            for case in split_paths:
+            for idx, case in enumerate(split_paths):
                 path_image, path_label = sorted(list(case.iterdir()), key=lambda x: len(str(x)))
 
                 case_dict = {
@@ -65,17 +69,22 @@ class PreProcessor:
                 if split_name != 'test':
                     self._shapes.append(image.shape)
 
+                    bboxes, classes = segmentation2bbox(torch.tensor(label[None, ...]), padding=1)
+                    self._bboxes.append([bboxes, classes])
+
                     voxels_foreground = self._get_foreground_voxels(image, label)
                     self._norm_voxels += voxels_foreground
 
                 logging.info(f'Successfull prepared case {case.name} of shape {image.shape}.')
 
                 path_to_case = self._path_to_splits / split_name / case.name
+                
                 os.makedirs(path_to_case)
 
                 np.save(str(path_to_case / 'data.npy'), image.astype(np.float32))
                 np.save(str(path_to_case / 'label.npy'), label.astype(np.int32))
 
+        self._data_config['bbox_properties'] = self._get_bbox_props()
         self._data_config['shape_statistics'] = self._get_shape_statistics()
         self._data_config['foreground_voxel_statistics'] = self._get_voxel_statistics()
         self._data_config['preprocessing_config'] = self._preprocessing_config
@@ -83,6 +92,42 @@ class PreProcessor:
         # Save relevant information of dataset and preprocessing
         write_json(self._data_config, self._path_to_splits / 'data_info.json')
 
+    def _get_bbox_props(self):
+        bbox_dict = defaultdict(list)
+        bbox_properties = {}
+
+        for bboxes, classes in self._bboxes:
+            for bbox, class_ in zip(bboxes[0], classes[0]):
+                bbox_dict[class_.item()].append(bbox)
+
+        for class_ in bbox_dict.keys():
+            class_bboxes = torch.vstack(bbox_dict[class_]).numpy()
+
+            # Get general information about position of bboxes
+            bbox_properties[class_] = {
+                "median": np.median(class_bboxes, axis=0).tolist(), # cx, cy, cz, w, h, d
+                "mean": np.mean(class_bboxes, axis=0).tolist(),
+                "min": np.min(class_bboxes, axis=0).tolist(),
+                "max": np.max(class_bboxes, axis=0).tolist(),
+                "percentile_99_5": np.percentile(class_bboxes, 99.5, axis=0).tolist(),
+                "percentile_00_5": np.percentile(class_bboxes, 0.5, axis=0).tolist()
+            }
+
+            # Get the area to apply attn to
+            min_pos = np.min(box_cxcyczwhd_to_xyzxyz(class_bboxes), axis=0)
+            max_pos = np.max(box_cxcyczwhd_to_xyzxyz(class_bboxes), axis=0)
+
+            attn_area = [   # x1, y1, z1, x2, y2, z2
+                min_pos[0].item(),
+                min_pos[1].item(),
+                min_pos[2].item(),
+                max_pos[3].item(),
+                max_pos[4].item(),
+                max_pos[5].item()
+            ]
+            bbox_properties[class_]['attn_area'] = attn_area
+
+        return bbox_properties
 
     def _get_foreground_voxels(self, data, seg, subsample=10):
         mask = seg > 0

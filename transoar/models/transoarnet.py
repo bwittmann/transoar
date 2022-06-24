@@ -1,8 +1,7 @@
 """Main model of the transoar project."""
 
-import math
+from collections import defaultdict
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,131 +13,134 @@ class TransoarNet(nn.Module):
         super().__init__()
         hidden_dim = config['neck']['hidden_dim']
         num_queries = config['neck']['num_queries']
-        num_channels = config['backbone']['num_channels']
-        num_classes = config['num_classes']
+        self._input_levels = config['neck']['input_levels']
+        self._anchor_offset = config['neck']['anchor_offset_pred']
 
         # Use auxiliary decoding losses if required
         self._aux_loss = config['neck']['aux_loss']
 
-        # Skip connection from backbone outputs to heads
-        self._skip_con = config['neck']['skip_con']
-        if self._skip_con:
-            self._skip_proj = nn.Linear(
-                config['backbone']['num_feature_patches'], 
-                config['neck']['num_queries']
-            )
-
         # Get backbone
         self._backbone = build_backbone(config['backbone'])
 
+        # Get anchors and offset restriction
+        anchors, restrictions = self._generate_anchors(config['neck'], config['bbox_properties'])
+        self._anchors = anchors.cuda()
+        self._restrictions = restrictions.cuda() if config['neck']['anchor_gen_dynamic_offset'] else config['neck']['max_anchor_pred_offset']
+        self._restrictions[:, :3] /= 2
+
         # Get neck
-        self._neck = build_neck(config['neck'])
+        self._neck = build_neck(config['neck'], config['bbox_properties'])
 
         # Get heads
-        self._cls_head = nn.Linear(hidden_dim, num_classes + 1)
-        self._bbox_reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
+        self._cls_head = nn.Linear(hidden_dim, 1)
+        self._reg_head = MLP(hidden_dim, hidden_dim, 6, 3)
+
+        self._seg_proxy = config['backbone']['use_seg_proxy_loss']
+        if self._seg_proxy:
+            in_channels = config['backbone']['start_channels']
+            out_channels = 2 if config['backbone']['fg_bg'] else config['neck']['num_organs'] + 1 # inc bg
+            self._seg_head = nn.Conv3d(in_channels, out_channels, kernel_size=1, stride=1)
 
         # Get projections and embeddings
-        if 'num_feature_levels' in config['neck']:
-            self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)   # 2 -> tgt + query_pos
-
-            # Get individual input projection for each feature level
-            num_feature_levels = config['neck']['num_feature_levels']
-            if num_feature_levels > 1:
-                num_backbone_outs = len(config['backbone']['num_channels'])
-                input_proj_list = []
-                for _ in range(num_backbone_outs):
-                    in_channels = config['backbone']['num_channels'][_]
-                    input_proj_list.append(nn.Sequential(
-                        nn.Conv3d(in_channels, hidden_dim, kernel_size=1),
-                        nn.GroupNorm(32, hidden_dim),
-                    ))
-
-                self._input_proj = nn.ModuleList(input_proj_list)
-            else:
-                self._input_proj = nn.ModuleList([
-                nn.Sequential(
-                    nn.Conv3d(config['backbone']['num_channels'][0], hidden_dim, kernel_size=1),
-                    nn.GroupNorm(32, hidden_dim),
-                )])
-            
-            self._reset_parameter()
-        else:
-            self._query_embed = nn.Embedding(num_queries, hidden_dim)
-            self._input_proj = nn.Conv3d(num_channels, hidden_dim, kernel_size=1)
+        self._query_embed = nn.Embedding(num_queries, hidden_dim * 2)  # tgt + query_pos 
 
         # Get positional encoding
         self._pos_enc = build_pos_enc(config['neck'])
 
+        if self._anchor_offset:
+            self._reset_parameter()
+
     def _reset_parameter(self):
-        nn.init.constant_(self._bbox_reg_head.layers[-1].weight.data, 0)
-        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data, 0)
-        nn.init.constant_(self._bbox_reg_head.layers[-1].bias.data[2:], -2.0)
+        nn.init.constant_(self._cls_head.weight.data, 0)
+        nn.init.constant_(self._cls_head.bias.data, 0)
 
-        for proj in self._input_proj:
-            nn.init.xavier_uniform_(proj[0].weight, gain=1)
-            nn.init.constant_(proj[0].bias, 0)
+        nn.init.constant_(self._reg_head.layers[-1].weight.data, 0)
+        nn.init.constant_(self._reg_head.layers[-1].bias.data, 0)
 
-    def forward(self, x, mask):
-        out_backbone = self._backbone(x, mask)
+    def _generate_anchors(self, model_config, bbox_props):
+        #num_queries = model_config['num_queries'] / 2
+        num_queries = model_config['num_queries']
+        num_queries_per_organ = int(num_queries / model_config['num_organs'])
 
-        if len(out_backbone) > 1:   # For approaches that utilize multiple feature maps
-            srcs = []
-            masks = []
-            pos = []
-            for idx, (src, mask) in enumerate(out_backbone):
-                srcs.append(self._input_proj[idx](src))
-                masks.append(mask)
-                pos.append(self._pos_enc(mask))
-        else:
-            srcs = self._input_proj(out_backbone[0][0])
-            masks = out_backbone[0][1]
-            pos = self._pos_enc(masks)
+        def gen_offsets(pos_offsets, dyn=True):
+            if dyn:
+                all_offsets = torch.cartesian_prod(*pos_offsets.unbind(dim=-1))
+            else:
+                all_offsets = torch.cartesian_prod(pos_offsets, pos_offsets, pos_offsets)
+            return all_offsets
+
+        anchor_dict = defaultdict(dict)
+        for class_, class_bbox_props in bbox_props.items():
+            # Extract relevant info regarding size and pos
+            median_size = torch.tensor(class_bbox_props['median'])[3:]  # whd
+
+            attn_vol = torch.tensor(class_bbox_props['attn_area']) # x1y1z1x2y2z2
+            attn_vol_center = (attn_vol[:3] + attn_vol[3:]) / 2 #cxcycz
+            attn_vol_whd = attn_vol[3:] - attn_vol[:3]  # whd
+            
+            if model_config['anchor_gen_dynamic_offset']:
+                pos_offsets = ((attn_vol_whd - median_size) / 3)[None]
+                pos_offsets = torch.cat((pos_offsets, -pos_offsets, torch.zeros_like(pos_offsets)), dim=0)
+            else:
+                anchor_offset = model_config['anchor_gen_offset']
+                pos_offsets = torch.tensor([0, anchor_offset, -anchor_offset]) 
+
+            if num_queries_per_organ == 1:  # no offset
+                pos_offsets = torch.zeros(3)[None]
+            elif num_queries_per_organ == 7:   # 6 offsets
+                all_offsets = gen_offsets(pos_offsets, model_config['anchor_gen_dynamic_offset'])
+                pos_offsets = all_offsets[torch.count_nonzero(all_offsets, dim=-1) <= 1]
+            else:   # 26 offsets
+                pos_offsets = gen_offsets(pos_offsets, model_config['anchor_gen_dynamic_offset'])
+
+            anchor_dict[class_]['pos_offsets'] = pos_offsets
+            anchor_dict[class_]['base_center'] = attn_vol_center
+            anchor_dict[class_]['base_size'] = median_size
+            
+        # Generate anchors by applying offsets to median box
+        anchors = []
+        restriction_pos_offsets = []
+        for class_dict in anchor_dict.values():
+            class_anchors = torch.cat((class_dict['pos_offsets'], class_dict['base_size'][None].repeat(class_dict['pos_offsets'].shape[0], 1)), dim=-1)
+            class_anchors[:, :3] += class_dict['base_center']
+            anchors.append(class_anchors)
+            restriction_pos_offsets.append(class_dict['pos_offsets'].max(dim=0)[0][None])
+
+        # Determine offset restrictions
+        min_size_offsets = torch.tensor([v['median'] for v in bbox_props.values()])[:, 3:] - torch.tensor([v['min'] for v in bbox_props.values()])[:, 3:]
+        max_size_offsets = torch.tensor([v['max'] for v in bbox_props.values()])[:, 3:] - torch.tensor([v['median'] for v in bbox_props.values()])[:, 3:]
+        restriction_size_offsets = torch.max(min_size_offsets, max_size_offsets)   # whd
+        restriction_pos_offsets = torch.cat(restriction_pos_offsets)
+        restriction = torch.repeat_interleave(torch.cat((restriction_pos_offsets, restriction_size_offsets), dim=-1), num_queries_per_organ, dim=0)
+
+        return torch.cat(anchors).clamp(min=0, max=1), restriction
+        #return torch.repeat_interleave(torch.cat(anchors), 2, dim=0), torch.repeat_interleave(restriction, 2, dim=0)
+
+    def forward(self, x):
+        out_backbone = self._backbone(x)
+        seg_src = out_backbone['P0'] if self._seg_proxy else 0
+        det_src = out_backbone[self._input_levels]
+        pos = self._pos_enc(det_src)
 
         out_neck = self._neck(             # [Batch, Queries, HiddenDim]         
-            srcs,
-            masks,
+            det_src,
             self._query_embed.weight,
             pos
         )
 
-        if self._skip_con:
-            if isinstance(srcs, torch.Tensor):
-                out_backbone_proj = srcs.flatten(2)
-            else:
-                out_backbone_proj = torch.cat([src.flatten(2) for src in srcs], dim=-1)
-            out_backbone_skip_proj = self._skip_proj(out_backbone_proj).permute(0, 2, 1)
-            out_neck = out_neck + out_backbone_skip_proj
-
-        if len(out_neck) > 2:   # In the case of relative offset prediction to references
-            hs, init_reference_out, inter_references_out = out_neck
-
-            outputs_classes = []
-            outputs_coords = []
-            for lvl in range(hs.shape[0]):
-                if lvl == 0:
-                    reference = init_reference_out
-                else:
-                    reference = inter_references_out[lvl - 1]
-                reference = inverse_sigmoid(reference)
-                outputs_class = self._cls_head(hs[lvl])
-                tmp = self._bbox_reg_head(hs[lvl])
-
-                assert reference.shape[-1] == 3
-                tmp[..., :3] += reference
-
-                outputs_coord = tmp.sigmoid()
-                outputs_classes.append(outputs_class)
-                outputs_coords.append(outputs_coord)
-            pred_logits = torch.stack(outputs_classes)
-            pred_boxes = torch.stack(outputs_coords)
+        pred_logits = self._cls_head(out_neck)
+        pred_boxes = self._reg_head(out_neck)
+        if self._anchor_offset:
+            pred_boxes = torch.clamp((pred_boxes.tanh() * self._restrictions) + self._anchors, min=0, max=1)
         else:
-            pred_logits = self._cls_head(out_neck)
-            pred_boxes = self._bbox_reg_head(out_neck).sigmoid()
+            pred_boxes =  pred_boxes.sigmoid()
+
+        pred_seg = self._seg_head(seg_src) if self._seg_proxy else 0
 
         out = {
             'pred_logits': pred_logits[-1], # Take output of last layer
-            'pred_boxes': pred_boxes[-1]
+            'pred_boxes':pred_boxes[-1],
+            'pred_seg': pred_seg
         }
 
         if self._aux_loss:
@@ -151,7 +153,6 @@ class TransoarNet(nn.Module):
         # Hack to support dictionary with non-homogeneous values
         return [{'pred_logits': a, 'pred_boxes': b}
                 for a, b in zip(pred_logits[:-1], pred_boxes[:-1])]
-
 
 class MLP(nn.Module):
     """ Very simple multi-layer perceptron (also called FFN)"""
@@ -169,8 +170,3 @@ class MLP(nn.Module):
             x = F.relu(layer(x)) if i < self.num_layers - 1 else layer(x)
         return x
 
-def inverse_sigmoid(x, eps=1e-5):
-    x = x.clamp(min=0, max=1)
-    x1 = x.clamp(min=eps)
-    x2 = (1 - x).clamp(min=eps)
-    return torch.log(x1/x2)

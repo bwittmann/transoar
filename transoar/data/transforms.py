@@ -7,7 +7,6 @@ from monai.transforms import (
     EnsureChannelFirstd,
     LoadImaged,
     Orientationd,
-    Spacingd,
     ScaleIntensityRanged,
     Resized,
     RandSpatialCropd,
@@ -27,20 +26,29 @@ def crop_air(x):
     # To not crop fat which is -120 to -90
     return x > -500
 
+def crop_labels(x):
+    # crop based on organ boundaries
+    mask = (x == 6) | (x == 7) | (x == 15) | (x == 14)| (x == 1)
+    return mask
+
 def transform_preprocessing(
-    margin, crop_key, orientation, target_spacing
+    margin, crop_key, orientation, resize_shape
 ):
     transform_list = [
         LoadImaged(keys=["image", "label"]),
         EnsureChannelFirstd(keys=["image", "label"]),
-        Spacingd(
-            keys=["image", "label"], pixdim=target_spacing,
-            mode=("bilinear", "nearest")
-        ),
         Orientationd(keys=["image", "label"], axcodes=orientation),
+        # CropForegroundd(
+        #     keys=["image", "label"], source_key=crop_key, 
+        #     margin=margin, select_fn=crop_air
+        # ),
         CropForegroundd(
-            keys=["image", "label"], source_key=crop_key, 
-            margin=margin, select_fn=crop_air
+            keys=["image", "label"], source_key='label', 
+            margin=[2, 2, 2], select_fn=crop_labels
+        ),
+        Resized(
+            keys=['image', 'label'], spatial_size=resize_shape,
+            mode=['area', 'nearest']
         )
     ]
 
@@ -65,10 +73,10 @@ def get_transforms(split, config):
             ),
 
             # Spatial transformations
-            Resized(        # Resize
-                keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
-                mode=['area', 'nearest']
-            ),
+            # Resized(        # Resize
+            #     keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
+            #     mode=['area', 'nearest']
+            # ),
             RandRotated(    # Rotation    
                 keys=['image', 'label'], prob=config['augmentation']['p_rotate'],
                 range_x=rotate_range, range_y=rotate_range, range_z=rotate_range,
@@ -144,10 +152,10 @@ def get_transforms(split, config):
                 keys=['image'], a_min=config['foreground_voxel_statistics']['percentile_00_5'], 
                 a_max=config['foreground_voxel_statistics']['percentile_99_5'], b_min=0.0, b_max=1.0, clip=True
             ),
-            Resized(
-                keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
-                mode=['area', 'nearest']
-            ),
+            # Resized(
+            #     keys=['image', 'label'], spatial_size=config['shape_statistics']['median'],
+            #     mode=['area', 'nearest']
+            # ),
             RandSpatialCropd(
                 keys=['image', 'label'], roi_size=patch_size,
                 random_size=False, random_center=True

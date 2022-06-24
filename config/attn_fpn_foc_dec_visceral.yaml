@@ -1,0 +1,148 @@
+# Config file for AttnFPN-DETR
+
+# General training
+experiment_name: foc_dec_visceral_P3_strict_borders_red_aug
+device: cuda:5
+val_interval: 1
+debug_mode: False  # Doesn't save checkpoints
+seed: 10
+
+epochs: 4000
+lr: 2e-4
+lr_backbone: 2e-5
+weight_decay: 1e-4
+clip_max_norm: -1
+
+# Scheduler
+lr_drop: 2500 #700
+
+# Data
+dataset: visceral_160_160_256_strict_border_CT
+overfit: False # Use same set consisting of one image for train and val
+bbox_padding: 1
+
+# Dataloader
+batch_size: 2
+shuffle: True
+num_workers: 16
+
+# Matching
+anchor_matching: True
+set_cost_class: 1 #1
+set_cost_bbox: 0  #5
+set_cost_giou: 0  #2
+
+# Losses
+loss_coefs:
+  cls: 2      # Detection
+  bbox: 5
+  giou: 2
+  segce: 2    # Segmentation proxy
+  segdice: 2
+
+# Model specific params
+backbone:
+  name: attn_fpn
+  
+  # Encoder
+  use_encoder_attn: False # Activates swin encoder
+
+  # Standard params
+  conv_kernels: [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]]  # C0, C1, C2, C3, C4, C5
+  strides: [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2]]
+  in_channels: 1  #  Input channels 
+  start_channels: 24  # Channels after first encoder block
+
+  # Swin transformer params
+  depths: [2, 2, 2, 2]
+  num_heads: [3, 6, 12, 24]
+  window_size: [5, 5, 5]
+  mlp_ratio: 4
+  qkv_bias: True
+  qk_scale: null
+  drop_rate: 0.
+  attn_drop_rate: 0.
+  drop_path_rate: 0.2
+  conv_merging: False
+
+  # Decoder
+  use_decoder_attn: False # Activated def attn
+  
+  # Standard params
+  fpn_channels: 384 #384 # Final output channels
+  out_fmaps: [P3]  # P0, P1, P2, P3, P4, P5
+
+  # Def attn params
+  pos_encoding: sine
+  feature_levels: [P3, P4, P5]
+  hidden_dim: 384 #832 # 192 # prev: 256
+  dim_feedforward: 1024
+  dropout: 0.1 #0.1
+  nheads: 6
+  layers: 2 #6
+  n_points: 4 #4
+  use_cuda: False
+
+  # Segmentation proxy loss
+  use_seg_proxy_loss: False
+  fg_bg: True
+
+neck:
+  name: foc_attn
+  pos_encoding: sine
+  input_levels: P3 # [P5, P4, P3]  
+  
+  # Transformer decoder model
+  hidden_dim: 384 #512 832 # prev: 256
+  dropout: 0.1  # prev: 0.1
+  nheads: 8 #26 #6  #prev: 8
+  dim_feedforward: 1024 # prev: 1024
+  dec_layers: 3 #6
+  
+  restrict_attn: True
+  obj_self_attn: False
+
+  # Anchor generation
+  anchor_gen_dynamic_offset: True
+  anchor_gen_offset: 0.1
+
+  # Anchor offset prediction
+  anchor_offset_pred: True
+  max_anchor_pred_offset: 0.1
+
+  # Queries
+  num_queries: 540
+  num_organs: 20
+  aux_loss: True
+
+# Augmentation
+augmentation:
+  use_augmentation: True
+  patch_size: [160, 160, 256] #null #[64, 64, 64]
+
+  p_gaussian_noise: 0 #0.1
+  p_gaussian_smooth: 0 #0.1
+  p_intensity_scale: 0.5 #0.2
+  p_intensity_shift: 0.5 #0.2
+  p_adjust_contrast: 0 #0.2
+  p_rotate: 0.5
+  p_zoom: 0.5
+  p_shear: 0.0
+  p_translate: 0.5
+  p_flip: 0
+
+  gaussian_noise_mean: 0.0
+  gaussian_noise_std: 0.1
+  gaussian_smooth_sigma: [0.5, 1.0]
+
+  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_shift_offsets: 0.1
+
+  adjust_contrast_gamma: [0.7, 1.5]
+
+  rotation: [-5, 5] #[-15, 15]
+  min_zoom: 0.9 #0.8
+  max_zoom: 1.1 #1.2 
+  translate_precentage: 10
+  shear_range: [0.1, 0.1, 0.1]
+  flip_axis: [0, 1, 2]

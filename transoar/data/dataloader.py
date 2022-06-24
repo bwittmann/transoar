@@ -13,11 +13,13 @@ def get_loader(config, split, batch_size=None):
 
     # Init collator
     collator = TransoarCollator(config)
+    shuffle = False if split in ['test', 'val'] else config['shuffle']
 
     dataset = TransoarDataset(config, split)
     dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=config['shuffle'],
-        num_workers=config['num_workers'], collate_fn=collator
+        dataset, batch_size=batch_size, shuffle=shuffle,
+        num_workers=config['num_workers'], collate_fn=collator,
+        drop_last=True
     )
     return dataloader
 

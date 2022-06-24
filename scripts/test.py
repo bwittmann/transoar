@@ -1,7 +1,9 @@
 """Script to evalute performance on the val and test set."""
 
+import os
 import argparse
 from pathlib import Path
+from collections import defaultdict
 
 import torch
 from tqdm import tqdm
@@ -21,8 +23,11 @@ class Tester:
 
         self._save_preds = args.save_preds
         self._save_attn_map = args.save_attn_map
+        self._full_labeled = args.full_labeled
         self._class_dict = config['labels']
-        self._device = 'cuda:' + str(args.num_gpu) if args.num_gpu > 0 else 'cpu'
+
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.num_gpu)
+        self._device = 'cuda' if args.num_gpu >= 0 else 'cpu'
 
         # Get path to checkpoint
         avail_checkpoints = [path for path in path_to_run.iterdir() if 'model_' in str(path)]
@@ -36,7 +41,16 @@ class Tester:
         self._set_to_eval = 'val' if args.val else 'test'
         self._test_loader = get_loader(config, self._set_to_eval, batch_size=1)
 
-        self._evaluator = DetectionEvaluator(classes=list(config['labels'].values()))
+        self._evaluator = DetectionEvaluator(
+            classes=list(config['labels'].values()),
+            classes_small=config['labels_small'],
+            classes_mid=config['labels_mid'],
+            classes_large=config['labels_large'],
+            iou_range_nndet=(0.1, 0.5, 0.05),
+            iou_range_coco=(0.5, 0.95, 0.05),
+            sparse_results=False
+        )
+
         self._model = TransoarNet(config).to(device=self._device)
 
         # Load checkpoint
@@ -54,19 +68,16 @@ class Tester:
   
     def run(self):
         if self._save_attn_map:
-            backbone_features_list, enc_attn_weights_list, dec_attn_weights_list = [], [], []
+            backbone_features_list, dec_attn_weights_list = [], []
             
             # Register hooks to efficiently access relevant weights
             hooks = [
-                self._model._backbone.layers[-1].register_forward_hook(
+                self._model._backbone._decoder._out[0].register_forward_hook(
                     lambda self, input, output: backbone_features_list.append(output)
                 ),
-                self._model._neck.encoder.layers[-1].self_attn.register_forward_hook(
-                    lambda self, input, output: enc_attn_weights_list.append(output[1])
-                ),
-                self._model._neck.decoder.layers[-1].multihead_attn.register_forward_hook(
-                    lambda self, input, output: dec_attn_weights_list.append(output[1])
-                ),
+                self._model._neck.decoder.layers[-1].cross_attn.register_forward_hook(
+                    lambda self, input, output: dec_attn_weights_list.append(output[-1])
+                )
             ]
     
         with torch.no_grad():
@@ -84,10 +95,10 @@ class Tester:
                     continue
 
                 # Make prediction
-                out = self._model(data, mask)
+                out = self._model(data)
 
                 # Format out to fit evaluator and estimate best predictions per class
-                pred_boxes, pred_classes, pred_scores = inference(out)
+                pred_boxes, pred_classes, pred_scores = inference(out, len(self._class_dict))
                 gt_boxes = [targets['boxes'].detach().cpu().numpy()]
                 gt_classes = [targets['labels'].detach().cpu().numpy()]
 
@@ -109,15 +120,16 @@ class Tester:
                 if self._save_attn_map:
                     # Get current attn weights
                     backbone_features = backbone_features_list.pop(-1).squeeze()
-                    enc_attn_weights = enc_attn_weights_list.pop(-1).squeeze()
                     dec_attn_weights = dec_attn_weights_list.pop(-1).squeeze()
 
                     save_attn_visualization(
-                        out, backbone_features, enc_attn_weights, dec_attn_weights, list(data.shape[-3:]),
-                        seg_mask[0]
+                        out, backbone_features, dec_attn_weights, list(data.shape[-3:]),
+                        seg_mask[0],
+                        idx
                     )
 
             # Get and store final results
+            # [torch.tensor([id_ for score, id_ in query_info[c]]).unique().shape for c in query_info.keys()]
             metric_scores = self._evaluator.eval()
             write_json(metric_scores, self._path_to_results / ('results_' + self._set_to_eval))
 
@@ -132,6 +144,8 @@ if __name__ == "__main__":
     parser.add_argument('--last', action='store_true', help='Use model_last instead of model_best.')
     parser.add_argument('--save_preds', action='store_true', help='Save predictions.')
     parser.add_argument('--save_attn_map', action='store_true', help='Saves attention maps.')
+    parser.add_argument('--full_labeled', action='store_true', help='Use only fully labeled data.')
+    parser.add_argument('--coco_map', action='store_true', help='Use coco map.')
     args = parser.parse_args()
 
     tester = Tester(args)

@@ -12,7 +12,7 @@ class DetrTransformer(nn.Module):
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6,
                  num_decoder_layers=6, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False,
-                 return_intermediate_dec=False):
+                 return_intermediate_dec=False, use_encoder=True):
         super().__init__()
 
         encoder_layer = TransformerEncoderLayer(d_model, nhead, dim_feedforward,
@@ -30,6 +30,7 @@ class DetrTransformer(nn.Module):
 
         self.d_model = d_model
         self.nhead = nhead
+        self.use_encoder = use_encoder
 
     def _reset_parameters(self):
         for p in self.parameters():
@@ -44,7 +45,12 @@ class DetrTransformer(nn.Module):
         mask = mask.flatten(1)
 
         tgt = torch.zeros_like(query_embed) # encoder mask
-        memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+
+        if self.use_encoder:
+            memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
+        else:
+            memory = src
+
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
         return hs.transpose(1, 2) #, memory.permute(1, 2, 0).view(bs, c, h, w)

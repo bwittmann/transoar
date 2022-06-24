@@ -6,7 +6,7 @@ from pathlib import Path
 import random
 
 from transoar.utils.io import get_config, set_root_logger
-from transoar.data.preprocessor import PreProcessor
+from transoar.data.preprocessor_visceral import PreProcessor
 
 
 if __name__ == "__main__":
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
 
     # Prepare dataset based on dataset analysis
-    logging.info(f"Starting dataset preprocessing. Target spacing: {preprocessing_config['target_spacing']}.")
+    logging.info(f"Starting dataset preprocessing. Target shape: {preprocessing_config['resize_shape']}.")
     preprocessor = PreProcessor(
         train_set, val_set, test_set, path_to_splits, preprocessing_config, data_config
     )

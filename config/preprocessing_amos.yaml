@@ -1,0 +1,22 @@
+# Config file for preprocessing related params
+
+# General
+dataset_config: amos
+dataset_name: amos_256_256_128_strict_border
+modality: CT
+seed: 10
+path_to_dataset: /home/home/supro_bastian/datasets/AMOS22
+
+# Preprocessing
+train: 160
+test: 20
+val: 20
+
+fixed_size: True
+foreground_normalization: True
+resize_shape: [256, 256, 128]
+cropping: True
+key: image # [image, label]
+margin: 2
+orientation: RAS
+min_num_organs: 5

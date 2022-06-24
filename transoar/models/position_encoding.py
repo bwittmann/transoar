@@ -24,7 +24,8 @@ class PositionEmbeddingSine3D(nn.Module):
             scale = 2 * math.pi
         self.scale = scale
 
-    def forward(self, mask):
+    def forward(self, src):
+        mask = torch.zeros_like(src[:, 0], dtype=torch.bool)
         not_mask = ~mask
         x_embed = not_mask.cumsum(1, dtype=torch.float32)
         y_embed = not_mask.cumsum(2, dtype=torch.float32)
@@ -37,7 +38,7 @@ class PositionEmbeddingSine3D(nn.Module):
             z_embed = (z_embed - 0.5) / (z_embed[:, :, :, -1:] + eps) * self.scale
 
         dim_t = torch.arange(self.channels, dtype=torch.float32, device=mask.device)
-        dim_t = self.temperature ** (2 * (dim_t // 2) / self.channels)  # TODO: check 6 or something else?
+        dim_t = self.temperature ** (2 * torch.div(dim_t, 2, rounding_mode='trunc') / self.channels)  # TODO: check 6 or something else?
 
         pos_x = x_embed[..., None] / dim_t
         pos_y = y_embed[..., None] / dim_t
