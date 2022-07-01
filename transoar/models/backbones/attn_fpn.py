@@ -102,6 +102,17 @@ class Decoder(nn.Module):
                 use_cuda=config['use_cuda']
             )
 
+        self.gradients = []
+
+    def activations_hook(self, grad):
+        self.gradients.append(grad)
+
+    def get_activations_gradient(self):
+        return self.gradients
+
+    def get_activations(self, x):
+        return self.forward(x)
+
     def forward(self, x):
         # Forward lateral
         lateral_out = [lateral(fmap) for lateral, fmap in zip(self._lateral, list(x.values())[-self._lateral_levels:])]
@@ -125,6 +136,9 @@ class Decoder(nn.Module):
 
         outputs = {'P' + str(stage): self._out[idx](fmap) for idx, (fmap, stage) in enumerate(out_fmaps)}
         #outputs = {'P' + str(stage): fmap for idx, (fmap, stage) in enumerate(out_fmaps)}
+
+        for output in outputs.values():
+            h = output.register_hook(self.activations_hook)
 
         # Forward refine
         if self._refine_fmaps:

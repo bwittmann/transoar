@@ -67,7 +67,7 @@ class RetinaUNet(nn.Module):
         target_classes = targets["target_classes"]
         target_seg = targets["target_seg"]
 
-        pred_detection, anchors, pred_seg = self(img)
+        pred_detection, anchors, pred_seg, features_maps_all = self(img)
         labels, matched_gt_boxes = self.assign_targets_to_anchors(
             anchors, target_boxes, target_classes
         )
@@ -81,7 +81,7 @@ class RetinaUNet(nn.Module):
             losses.update(self.segmenter.compute_loss(pred_seg, target_seg))
 
         if evaluation:
-            prediction = self.postprocess_for_inference(
+            prediction, keep = self.postprocess_for_inference(
                 images=img,
                 pred_detection=pred_detection,
                 pred_seg=pred_seg,
@@ -90,12 +90,12 @@ class RetinaUNet(nn.Module):
         else:
             prediction = None
 
-        return losses, prediction
+        return losses, prediction, features_maps_all, keep, pred_detection
     
     @torch.no_grad()
     def postprocess_for_inference(self, images, pred_detection, pred_seg, anchors):
         image_shapes = [images.shape[2:]] * images.shape[0]
-        boxes, probs, labels = self.postprocess_detections(
+        boxes, probs, labels, keep = self.postprocess_detections(
             pred_detection=pred_detection,
             anchors=anchors,
             image_shapes=image_shapes,
@@ -104,7 +104,7 @@ class RetinaUNet(nn.Module):
 
         if self.segmenter is not None:
             prediction["pred_seg"] = self.segmenter.postprocess_for_inference(pred_seg)["pred_seg"]
-        return prediction
+        return prediction, keep
 
     def forward(self, inp):
         features_maps_all = self.attn_fpn(inp)
@@ -114,7 +114,7 @@ class RetinaUNet(nn.Module):
         anchors = self.anchor_generator(inp, feature_maps_head)
 
         pred_seg = self.segmenter(features_maps_all) if self.segmenter is not None else None
-        return pred_detection, anchors, pred_seg
+        return pred_detection, anchors, pred_seg, features_maps_all
 
     @torch.no_grad()
     def assign_targets_to_anchors(self, anchors, target_boxes, target_classes):
@@ -171,11 +171,11 @@ class RetinaUNet(nn.Module):
         all_boxes, all_probs, all_labels = [], [], []
         # iterate over images
         for boxes, probs, image_shape in zip(pred_boxes, pred_probs, image_shapes):
-            boxes, probs, labels = self.postprocess_detections_single_image(boxes, probs, image_shape)
+            boxes, probs, labels, keep = self.postprocess_detections_single_image(boxes, probs, image_shape)
             all_boxes.append(boxes)
             all_probs.append(probs)
             all_labels.append(labels)
-        return all_boxes, all_probs, all_labels
+        return all_boxes, all_probs, all_labels, keep
 
     def postprocess_detections_single_image(self, boxes, probs, image_shape):
         assert boxes.shape[0] == probs.shape[0]
@@ -206,7 +206,7 @@ class RetinaUNet(nn.Module):
         if self.detections_per_img is not None:
             keep = keep[:self.detections_per_img]
 
-        return boxes[keep], probs[keep], labels[keep]
+        return boxes[keep], probs[keep], labels[keep], anchor_idxs[keep]
 
     @torch.no_grad()
     def inference_step(self, images):
