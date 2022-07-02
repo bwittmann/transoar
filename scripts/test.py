@@ -20,6 +20,7 @@ class Tester:
     def __init__(self, args):
         path_to_run = Path('./runs/' + args.run)
         config = load_json(path_to_run / 'config.json')
+        self._config = config
 
         self._save_preds = args.save_preds
         self._save_attn_map = args.save_attn_map
@@ -77,6 +78,9 @@ class Tester:
                 ),
                 self._model._neck.decoder.layers[-1].cross_attn.register_forward_hook(
                     lambda self, input, output: dec_attn_weights_list.append(output[-1])
+                ),
+                self._model._neck.decoder.layers[-1].self_attn.register_forward_hook(
+                    lambda self, input, output: dec_attn_weights_list.append(output[-1])
                 )
             ]
     
@@ -120,12 +124,12 @@ class Tester:
                 if self._save_attn_map:
                     # Get current attn weights
                     backbone_features = backbone_features_list.pop(-1).squeeze()
-                    dec_attn_weights = dec_attn_weights_list.pop(-1).squeeze()
+                    dec_cross_attn_weights = dec_attn_weights_list.pop(-1).squeeze()
+                    dec_self_attn_weights = dec_attn_weights_list.pop(-1).squeeze()
 
                     save_attn_visualization(
-                        out, backbone_features, dec_attn_weights, list(data.shape[-3:]),
-                        seg_mask[0],
-                        idx
+                        out, backbone_features, dec_cross_attn_weights, list(data.shape[-3:]),
+                        seg_mask[0], idx, dec_self_attn_weights, self._config
                     )
 
             # Get and store final results

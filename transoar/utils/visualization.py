@@ -220,14 +220,41 @@ def rescale_bbox(bbox, original_shape):
         return bbox
 
 def save_attn_visualization(
-    model_out, backbone_features, dec_attn_weights, original_shape, seg_mask, case_id, mean_attn=True, 
-    path='/home/home/supro_bastian/download', final_shape=[160, 160, 256], num_orgs=15
+    model_out, backbone_features, dec_cross_attn_weights, original_shape, seg_mask, case_id, 
+    dec_self_attn_weights, config, mean_attn=True, path='/home/home/supro_bastian/download', 
+    final_shape=[160, 160, 256], num_orgs=20
 ):
     path = Path(path) / ('case' + str(case_id))
     path.mkdir(parents=True, exist_ok=True)
 
+    ### Process self attn weights
+    dec_self_attn_weights = F.conv2d(dec_self_attn_weights[None][None].cpu(), torch.ones((1, 1, 27, 27)), stride=27).squeeze()
+    max_weight, min_weight = dec_self_attn_weights.max(), dec_self_attn_weights.min()
+    dec_self_attn_weights = ((dec_self_attn_weights - min_weight) / (max_weight - min_weight)) * 255
+
+    # cdist = torch.cdist(torch.tensor([probs['median'] for probs in config['bbox_properties'].values()])[:, 0:3][0][None], torch.tensor([probs['median'] for probs in config['bbox_properties'].values()])[:, 0:3])
+    # max_cdist, min_cdist = cdist.max(), cdist.min()
+    # cdist = ((cdist - min_cdist) / (max_cdist - min_cdist)) * 255
+
+    dec_self_attn_weights = F.interpolate(dec_self_attn_weights[:][None, None], [1000, 1000]).squeeze()
+    # cdist = F.interpolate(cdist[None, None], [50, 1000]).squeeze()
+
+    b_channel, g_channel, r_channel = cv2.split(torch.zeros_like(dec_self_attn_weights).unsqueeze(-1).repeat(1, 1, 3).numpy())
+    r_channel.fill(255)
+    alpha_channel = dec_self_attn_weights.short().numpy()
+    img_BGRA = cv2.merge((b_channel.astype(np.int16), g_channel.astype(np.int16), r_channel.astype(np.int16), alpha_channel))
+
+    cv2.imwrite(str(path / f'{case_id}_cdist.png'), img_BGRA)
+
+    # b_channel, g_channel, r_channel = cv2.split(torch.zeros_like(cdist).unsqueeze(-1).repeat(1, 1, 3).numpy())
+    # b_channel.fill(255)
+    # alpha_channel = cdist.short().numpy()
+    # img_BGRA = cv2.merge((b_channel.astype(np.int16), g_channel.astype(np.int16), r_channel.astype(np.int16), alpha_channel))
+
+
+    ### Process cross attn weights
     # Average across attn heads
-    dec_attn_weights = dec_attn_weights.mean(dim=0)
+    dec_attn_weights = dec_cross_attn_weights.mean(dim=0)
 
     if list(seg_mask.shape[1:]) != final_shape:
         seg_mask = F.interpolate(seg_mask[None].float(), final_shape).squeeze()
