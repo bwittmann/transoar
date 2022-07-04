@@ -1,6 +1,7 @@
 """Module containing the dataset related functionality."""
 
 from pathlib import Path
+from copy import deepcopy
 
 import numpy as np
 import torch
@@ -21,12 +22,19 @@ class TransoarDataset(Dataset):
 
         self._augmentation = get_transforms(split, config)
 
+        self._val_idx_full = [0, 3, 10, 12, 13, 15, 17, 7]
+        self._sample = 0
+        self._val_idx = [0, 3, 10, 12, 13, 15, 17, 7]
+
     def __len__(self):
         return len(self._data)
 
     def __getitem__(self, idx):
-        if self._config['overfit']:
-            idx = 0
+        if self._sample % 4 == 0:
+            self._val_idx = np.random.choice(self._val_idx_full, 4, replace=False)
+        idx = self._val_idx[self._sample % 4]
+        self._sample += 1
+        # print(idx)
 
         case = self._data[idx]
         path_to_case = self._path_to_split / case
