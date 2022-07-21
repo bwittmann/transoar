@@ -1,20 +1,20 @@
 # Config file for AttnFPN-DETR
 
 # General training
-experiment_name: attn_fpn_detr_enc_P2
+experiment_name: detr_visceral
 device: cuda:6
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
 seed: 10
 
-epochs: 4000 #600 #1100
+epochs: 4000
 lr: 2e-4
 lr_backbone: 2e-5
 weight_decay: 1e-4
 clip_max_norm: -1   # Not used
 
 # Scheduler
-lr_drop: 2500 #700
+lr_drop: 2500
 
 # Data
 dataset: transoar_testing_focused_attn_160_160_256_CT
@@ -68,15 +68,15 @@ backbone:
   use_decoder_attn: False # Activated def attn
   
   # Standard params
-  fpn_channels: 384 #384 # Final output channels
+  fpn_channels: 384 # Final output channels
   out_fmaps: [P2]  # P0, P1, P2, P3, P4, P5
 
   # Def attn params
   pos_encoding: sine
   feature_levels: [P3, P4, P5]
-  hidden_dim: 384 #832 # 192 # prev: 256
+  hidden_dim: 384
   dim_feedforward: 1024
-  dropout: 0.1 #0.1
+  dropout: 0.1
   nheads: 6
   layers: 2 #6
   n_points: 4 #4
@@ -92,12 +92,12 @@ neck:
   use_encoder: False
   
   pos_encoding: sine
-  hidden_dim: 384 # prev: 256
-  dropout: 0.0 # prev: 0.1
+  hidden_dim: 384
+  dropout: 0.0
   nheads: 8
-  dim_feedforward: 1024 #1024 #2048
-  enc_layers: 3 # prev: 6
-  dec_layers: 3 # prev: 6
+  dim_feedforward: 1024
+  enc_layers: 3
+  dec_layers: 3
   pre_norm: False
   num_queries: 100
   aux_loss: True
@@ -107,13 +107,13 @@ neck:
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [160, 160, 256] #null #[64, 64, 64]
+  patch_size: [160, 160, 256]
 
-  p_gaussian_noise: 0 #0.1
-  p_gaussian_smooth: 0 #0.1
-  p_intensity_scale: 0.5 #0.2
-  p_intensity_shift: 0.5 #0.2
-  p_adjust_contrast: 0 #0.2
+  p_gaussian_noise: 0
+  p_gaussian_smooth: 0
+  p_intensity_scale: 0.5
+  p_intensity_shift: 0.5
+  p_adjust_contrast: 0
   p_rotate: 0.5
   p_zoom: 0.5
   p_shear: 0
@@ -124,7 +124,7 @@ augmentation:
   gaussian_noise_std: 0.1
   gaussian_smooth_sigma: [0.5, 1.0]
 
-  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_scale_factors: 0.1
   intensity_shift_offsets: 0.1
 
   adjust_contrast_gamma: [0.7, 1.5]
