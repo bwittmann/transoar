@@ -1,6 +1,5 @@
-# transoar
+# Usage
+Please refer to the [main branch](https://github.com/bwittmann/transoar) for detailed instructions.
 
-This branch contains code of the AttnFPN-RetinaNet architecture.
-
-## Installation
-`pip install -e .`
+# Configs
+Training details and hyperparameters are listed in the config files stored under `./config`.

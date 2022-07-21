@@ -1,13 +1,13 @@
 # Config file for AttnFPN backbone and RetinaNet head
 
 # General training
-experiment_name: retina_unet_384_192 
+experiment_name: retina_unet_visceral 
 device: cuda:7
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
 seed: 10
 
-epochs: 4000 #2500 # prev: 50
+epochs: 4000
 lr: 2e-4
 lr_backbone: 2e-5
 weight_decay: 1e-4
@@ -17,7 +17,7 @@ clip_max_norm: -1 # Deactivated
 lr_drop: 2500
 
 # Data
-dataset: transoar_test_160160256_CT #transoar_testing_focused_attn_320_320_512_CT
+dataset: transoar_test_160160256_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
@@ -60,12 +60,12 @@ backbone:
   # Def attn params
   pos_encoding: sine
   feature_levels: [P2, P3, P4, P5]
-  hidden_dim: 192 # 384 #832 #192 # prev: 256
-  dim_feedforward: 512 #1024
-  dropout: 0.1 #0.1
+  hidden_dim: 192
+  dim_feedforward: 512
+  dropout: 0.1
   nheads: 6
-  layers: 3 #6
-  n_points: 4 #4
+  layers: 3
+  n_points: 4
   use_cuda: False
 
   # Use segmentation proxy loss
@@ -85,13 +85,13 @@ neck:
   learnabel_scale: True # for reg head
 
   # Matcher
-  num_candidates: 4 # matches per class and fmap (108 = 4 * 27)
+  num_candidates: 4
   center_in_gt: False
 
   # Sampler
   batch_size_per_image: 32
   positive_fraction: 0.33
-  pool_size: 20 # randomly select negatives from pool of highest scoring negatives
+  pool_size: 20
   min_neg: 1
 
   # Post-processing
@@ -105,37 +105,31 @@ neck:
   anchors_per_position: 27
   stride: 1
 
-  # 48bg giga 160 160 256 - new conf
   depth: [[6.0, 10.0, 32.0], [12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0]]  # TODO 512?
   height: [[8.0, 11.0, 16.0], [16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0]]
   width: [[6.0, 8.0, 11.0], [12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0]]
 
-  # 320 320 512 whd
-  # depth: [[12.0, 20.0, 64.0], [24.0, 40.0, 128.0], [48.0, 80.0, 256.0], [96.0, 160.0, 512.0], [192.0, 320.0, 1024.0]]
-  # height: [[16.0, 22.0, 32.0], [32.0, 44.0, 64.0], [64.0, 88.0, 128.0], [128.0, 176.0, 256.0], [128.0, 176.0, 256.0]]
-  # width: [[12.0, 16.0, 22.0], [24.0, 32.0, 44.0], [48.0, 64.0, 88.0], [48.0, 64.0, 88.0], [96.0, 128.0, 176.0]] # TODO
-
 # Augmentation
 augmentation:
   use_augmentation: True
-  patch_size: [160, 160, 256] #null #[64, 64, 64]
+  patch_size: [160, 160, 256]
 
-  p_gaussian_noise: 0 #0.1
-  p_gaussian_smooth: 0 #0.1
-  p_intensity_scale: 0.5 #0.2
-  p_intensity_shift: 0.5 #0.2
-  p_adjust_contrast: 0 #0.2
+  p_gaussian_noise: 0
+  p_gaussian_smooth: 0
+  p_intensity_scale: 0.5
+  p_intensity_shift: 0.5
+  p_adjust_contrast: 0
   p_rotate: 0.5
   p_zoom: 0.5
   p_shear: 0
-  p_translate: 0.5 # 0
+  p_translate: 0.5
   p_flip: 0
 
   gaussian_noise_mean: 0.0
   gaussian_noise_std: 0.1
   gaussian_smooth_sigma: [0.5, 1.0]
 
-  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_scale_factors: 0.1
   intensity_shift_offsets: 0.1
 
   adjust_contrast_gamma: [0.7, 1.5]
