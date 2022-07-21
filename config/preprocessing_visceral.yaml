@@ -14,6 +14,6 @@ foreground_normalization: True
 resize_shape: [160, 160, 256]
 cropping: True
 key: image # [image, label]
-margin: 2
+margin: 5
 orientation: RAS
 min_num_organs: 12

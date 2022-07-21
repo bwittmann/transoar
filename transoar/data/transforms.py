@@ -31,7 +31,28 @@ def crop_labels(x):
     mask = (x == 6) | (x == 7) | (x == 15) | (x == 14)| (x == 1)
     return mask
 
-def transform_preprocessing(
+def crop_fg(x):
+    return x > 0
+
+def transform_preprocessing_amos(
+    margin, crop_key, orientation, resize_shape
+):
+    transform_list = [
+        LoadImaged(keys=["image", "label"]),
+        EnsureChannelFirstd(keys=["image", "label"]),
+        Orientationd(keys=["image", "label"], axcodes=orientation),
+        CropForegroundd(
+            keys=["image", "label"], source_key='label', 
+            margin=[2, 2, 2], select_fn=crop_labels
+        ),
+        Resized(
+            keys=['image', 'label'], spatial_size=resize_shape,
+            mode=['area', 'nearest']
+        )
+    ]
+    return Compose(transform_list)
+
+def transform_preprocessing_visceral(
     margin, crop_key, orientation, resize_shape
 ):
     transform_list = [
@@ -44,14 +65,13 @@ def transform_preprocessing(
         # ),
         CropForegroundd(
             keys=["image", "label"], source_key='label', 
-            margin=[2, 2, 2], select_fn=crop_labels
+            margin=margin, select_fn=crop_fg
         ),
         Resized(
             keys=['image', 'label'], spatial_size=resize_shape,
             mode=['area', 'nearest']
         )
     ]
-
     return Compose(transform_list)
 
 def get_transforms(split, config):

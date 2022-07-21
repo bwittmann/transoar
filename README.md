@@ -22,10 +22,12 @@ The usage remains the same for all branches and, therefore, all featured detecto
 
 #### Installation
 Create a new virtual environment and run:
-`pip install -e .`
+
+    pip install -e .
 
 #### Datasets
-We provide preprocessing scripts for two datasets.
+We provide exemplary preprocessing scripts for two publicly available datasets.
+It should be mentioned that these preprocessing scripts should act as templates to experiment with additional datasets.
 
 ##### AMOSS22 challenge [[7]](#7)
 1) Download the training data of the challenge's [first stage](https://amos22.grand-challenge.org/). The structure should be as follows:
@@ -57,12 +59,12 @@ GC/SC subset/
 
 #### Training
 First, set the `dataset` flag in the respective config file to the name of the preprocessed dataset.\
-To train on the two datasets run:
+To train on a specific dataset, run:
     
     python CUDA_VISIBLE_DEVICE=<gpu_id> scripts/train.py --config attn_fpn_<detector>_<dataset>.yaml
 
 #### Testing
-To evaluate performances of created checkpoints on the test sets run:
+To evaluate performances of created checkpoints on the test sets, run:
 
     python CUDA_VISIBLE_DEVICE=<gpu_id> scripts/test.py --run <name of checkpoint in folder runs> --full_labeled
 

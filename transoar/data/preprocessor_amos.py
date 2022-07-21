@@ -7,7 +7,7 @@ from collections import defaultdict
 import torch
 import numpy as np
 
-from transoar.data.transforms import transform_preprocessing
+from transoar.data.transforms import transform_preprocessing_amos
 from transoar.utils.io import write_json
 from transoar.utils.bboxes import segmentation2bbox, box_cxcyczwhd_to_xyzxyz
 
@@ -30,7 +30,7 @@ class PreProcessor:
         self._preprocessing_config = preprocessing_config
         self._data_config = data_config
 
-        self._preprocessing_transform = transform_preprocessing(
+        self._preprocessing_transform = transform_preprocessing_amos(
             margin=preprocessing_config['margin'],
             crop_key=preprocessing_config['key'], 
             orientation=preprocessing_config['orientation'],
