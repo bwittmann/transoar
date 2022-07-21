@@ -1,7 +1,7 @@
 # Config file for AttnFPN-def-DETR
 
 # General training
-experiment_name: def_detr_amos_P3
+experiment_name: def_detr_amos
 device: cuda:6
 val_interval: 1
 debug_mode: False  # Doesn't save checkpoints
@@ -75,12 +75,12 @@ backbone:
   # Def attn params
   pos_encoding: sine
   feature_levels: [P2, P3, P4, P5]
-  hidden_dim: 384 #832 # 192 # prev: 256
+  hidden_dim: 384
   dim_feedforward: 1024
-  dropout: 0.1 #0.1
+  dropout: 0.1
   nheads: 6
-  layers: 2 #6
-  n_points: 4 #4
+  layers: 2
+  n_points: 4 
   use_cuda: False
 
   # Segmentation proxy loss
@@ -94,9 +94,9 @@ neck:
   num_feature_levels: 3
 
   pos_encoding: sine
-  hidden_dim: 384 #832 # 192 # prev: 256
+  hidden_dim: 384
   dropout: 0.1
-  nheads: 6 #26  #prev: 8
+  nheads: 6
   dim_feedforward: 1024
   enc_layers: 3
   dec_layers: 3
@@ -104,18 +104,18 @@ neck:
   dec_n_points: 4
   num_queries: 100
   aux_loss: True
-  use_cuda: False #True
+  use_cuda: False
 
 # Augmentation
 augmentation:
   use_augmentation: True
   patch_size: [256, 256, 128] 
 
-  p_gaussian_noise: 0 #0.1
-  p_gaussian_smooth: 0 #0.1
-  p_intensity_scale: 0.5 #0.2
-  p_intensity_shift: 0.5 #0.2
-  p_adjust_contrast: 0 #0.2
+  p_gaussian_noise: 0
+  p_gaussian_smooth: 0
+  p_intensity_scale: 0.5
+  p_intensity_shift: 0.5
+  p_adjust_contrast: 0
   p_rotate: 0.5
   p_zoom: 0.5
   p_shear: 0
@@ -126,7 +126,7 @@ augmentation:
   gaussian_noise_std: 0.1
   gaussian_smooth_sigma: [0.5, 1.0]
 
-  intensity_scale_factors: 0.1 #[0.75, 1.25]
+  intensity_scale_factors: 0.1
   intensity_shift_offsets: 0.1
 
   adjust_contrast_gamma: [0.7, 1.5]
