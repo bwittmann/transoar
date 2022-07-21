@@ -1,13 +1,5 @@
-# transoar
+# Usage
+Please refer to the [main branch](https://github.com/bwittmann/transoar) for detailed instructions.
 
-## Installation
-`pip install -e .`
-
-## Datasets
-
-info: cropped zero regions already
-
-### Setup
-- create splits via `scripts/create_splits.py` (change PATH_TO_GC_DATASET and PATH_TO_SC_DATASET)
-
-### Structure
+# Configs
+Training details and hyperparameters are listed in the config files stored under `./config`.
