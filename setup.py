@@ -20,7 +20,7 @@ requirements = resolve_requirements(
 setup(
     name='transoar',
     version='0.1',
-    description='3D organs at risk detection based on a Transformer.',
+    description='Medical Vision Transformer Library.',
     author='Bastian Wittmann',
     author_email='bastian.wittmann@tum.de',
     url='https://github.com/bwittmann/transoar',
