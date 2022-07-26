@@ -11,3 +11,4 @@ tensorboard==2.7.0
 timm==0.4.12
 protobuf==3.19.1
 tqdm
+nibabel
