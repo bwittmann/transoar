@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
-from transoar.models.backbones.attn_fpn.decoder_blocks import DecoderDefAttnBlock
-from transoar.models.backbones.attn_fpn.encoder_blocks import (
+from transoar.models.backbones.decoder_blocks import DecoderDefAttnBlock
+from transoar.models.backbones.encoder_blocks import (
     EncoderCnnBlock,
     EncoderSwinBlock,
     PatchMerging,
@@ -29,7 +29,7 @@ class AttnFPN(nn.Module):
         return up
 
     def init_weights(self):
-        pass    # TODO
+        pass
 
 class Decoder(nn.Module):
     def __init__(self, config, debug):

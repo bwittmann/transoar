@@ -1,4 +1,4 @@
-# Config file of visceral multi-organ dataset
+# Config file of visceral dataset
 
 num_classes: 20
 labels:

@@ -1,12 +1,12 @@
-# Config file for preprocessing related params
+# Config file for preprocessing related params for visceral
 
 # General
 dataset_config: visceral
-dataset_name: visceral_160_160_256_strict_border
+dataset_name: visceral_160_160_256
 modality: CT
 seed: 10
-path_to_gc_dataset: /home/bastian/datasets/visceral3/CT_GC
-path_to_sc_dataset: /home/bastian/datasets/visceral3/CT_SC
+path_to_gc_dataset: TODO
+path_to_sc_dataset: TODO
 
 # Preprocessing
 fixed_size: True

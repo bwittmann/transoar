@@ -1,8 +1,8 @@
-"""Module containing functionality to build different parts of the model."""
+"""Module containing functionality to build different parts of the pipeline."""
 
-from transoar.models.matcher import HungarianMatcher
+from transoar.models.matcher import Matcher
 from transoar.models.criterion import TransoarCriterion
-from transoar.models.backbones.attn_fpn.attn_fpn import AttnFPN
+from transoar.models.backbones.attn_fpn import AttnFPN
 from transoar.models.necks.focused_decoder import FocusedDecoder
 from transoar.models.position_encoding import PositionEmbeddingSine3D, PositionEmbeddingLearned3D
 
@@ -29,7 +29,7 @@ def build_neck(config, bbox_props):
     return model
 
 def build_criterion(config):
-    matcher = HungarianMatcher(
+    matcher = Matcher(
         cost_class=config['set_cost_class'],
         cost_bbox=config['set_cost_bbox'],
         cost_giou=config['set_cost_giou'],

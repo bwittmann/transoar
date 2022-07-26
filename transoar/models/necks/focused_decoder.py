@@ -107,12 +107,6 @@ class FocusedDecoderLayer(nn.Module):
             }
         else:
             shapes = {
-                # 'P0': [256, 256, 96],
-                # 'P1': [128, 128, 48],
-                # 'P2': [64, 64, 24],
-                # 'P3': [32, 32, 12],
-                # 'P4': [16, 16, 6],
-                # 'P5': [8, 8, 3],
                 'P0': [256, 256, 128],
                 'P1': [128, 128, 64],
                 'P2': [64, 64, 32],
@@ -157,15 +151,12 @@ class FocusedDecoderLayer(nn.Module):
         
         # init full attn mask
         attn_mask = torch.ones(self.config['num_queries'], *self.input_shape.tolist()).bool()
-        #attn_mask = torch.ones(int(self.config['num_queries']/2), *self.input_shape.tolist()).bool()
 
         # mask out regions not in desired attn volume
         for q in range(self.config['num_queries']):
-        # for q in range(int(self.config['num_queries']/2)):
             attn_mask[q, attn_volumes[q, 0]:attn_volumes[q, 3], attn_volumes[q, 1]:attn_volumes[q, 4], attn_volumes[q, 2]:attn_volumes[q, 5]] = False
 
         return attn_mask.flatten(1) if self.config['restrict_attn'] else torch.zeros_like(attn_mask.flatten(1), dtype=torch.bool)
-        #return torch.repeat_interleave(attn_mask, 2, dim=0).flatten(1)
 
     @staticmethod
     def with_pos_embed(tensor, pos):

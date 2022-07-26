@@ -1,4 +1,4 @@
-"""Module to analyze properties of the dataset and preprocess raw cases."""
+"""Module to analyze properties of the visceral dataset and preprocess raw cases."""
 
 import os
 import logging

@@ -9,7 +9,7 @@ from transoar.utils.bboxes import generalized_bbox_iou_3d, box_cxcyczwhd_to_xyzx
 class TransoarCriterion(nn.Module):
     """ This class computes the loss for TransoarNet.
     The process happens in two steps:
-        1) we compute hungarian assignment between ground truth boxes and the outputs of the model
+        1) we compute assignment between ground truth boxes and the outputs of the model
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
     def __init__(self, num_classes, matcher, seg_proxy, seg_fg_bg):

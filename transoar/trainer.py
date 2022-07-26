@@ -44,7 +44,6 @@ class Trainer:
 
     def _train_one_epoch(self, num_epoch):
         self._model.train()
-        # self._criterion.train()
 
         loss_agg = 0
         loss_bbox_agg = 0
@@ -56,14 +55,6 @@ class Trainer:
             # Put data to gpu
             data, seg_targets = data.to(device=self._device), seg_targets.to(device=self._device)
 
-            # from transoar.utils.io import write_nifti
-            # meta_data = {
-            #     'itk_spacing': [4, 1, 1]
-            # }
-            # write_nifti(data.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/train_{idx}_data.nii.gz')
-            # write_nifti(seg_targets.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/train_{idx}_seg.nii.gz')
-            # continue
-        
             det_targets = []
             for item in bboxes:
                 target = {
@@ -121,7 +112,6 @@ class Trainer:
     @torch.no_grad()
     def _validate(self, num_epoch):
         self._model.eval()
-        # self._criterion.eval()
 
         loss_agg = 0
         loss_bbox_agg = 0
@@ -133,14 +123,6 @@ class Trainer:
             # Put data to gpu
             data, seg_targets = data.to(device=self._device), seg_targets.to(device=self._device)
 
-            # from transoar.utils.io import write_nifti
-            # meta_data = {
-            #     'itk_spacing': [4, 1, 1]
-            # }
-            # write_nifti(data.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/val_{idx}_data.nii.gz')
-            # write_nifti(seg_targets.squeeze().cpu().numpy(), meta_data, f'/home/home/supro_bastian/download/val_{idx}_seg.nii.gz')
-            # continue
-        
             det_targets = []
             for item in bboxes:
                 target = {

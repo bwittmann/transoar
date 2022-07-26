@@ -1,11 +1,11 @@
-# Config file for preprocessing related params
+# Config file for preprocessing related params for amos
 
 # General
 dataset_config: amos
-dataset_name: amos_256_256_128_strict_border
+dataset_name: amos_256_256_128
 modality: CT
 seed: 10
-path_to_dataset: /home/home/supro_bastian/datasets/AMOS22
+path_to_dataset: TODO
 
 # Preprocessing
 train: 160

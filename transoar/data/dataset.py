@@ -19,10 +19,6 @@ class TransoarDataset(Dataset):
         self._path_to_split = data_dir / self._config['dataset'] / split
         self._data = [data_path.name for data_path in self._path_to_split.iterdir()]
 
-        # if split == 'train':
-        #     self._data = self._data[:12]
-        #     self._data = self._data[:60]
-
         self._augmentation = get_transforms(split, config)
 
     def __len__(self):

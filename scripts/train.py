@@ -1,4 +1,4 @@
-"""Script for training the transoar project."""
+"""Script for training."""
 
 import argparse
 import os
@@ -7,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 import monai
 
 from transoar.trainer import Trainer

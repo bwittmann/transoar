@@ -1,4 +1,4 @@
-"""Script to prepare dataset."""
+"""Script to prepare visceral dataset."""
 
 import logging
 
@@ -40,7 +40,6 @@ if __name__ == "__main__":
 
     logging.info(f'Preparing dataset {dataset_name}_{modality}.')
     logging.info(f'len train: {len(train_set)}, len val: {len(val_set)}, len test: {len(test_set)}.')
-
 
     # Prepare dataset based on dataset analysis
     logging.info(f"Starting dataset preprocessing. Target shape: {preprocessing_config['resize_shape']}.")

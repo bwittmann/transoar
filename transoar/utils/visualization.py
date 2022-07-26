@@ -221,7 +221,7 @@ def rescale_bbox(bbox, original_shape):
 
 def save_attn_visualization(
     model_out, backbone_features, dec_cross_attn_weights, original_shape, seg_mask, case_id, 
-    dec_self_attn_weights, config, mean_attn=True, path='/home/home/supro_bastian/download', 
+    dec_self_attn_weights, config, mean_attn=True, path='path_to_store_visualizations', 
     final_shape=[160, 160, 256], num_orgs=20
 ):
     path = Path(path) / ('case' + str(case_id))

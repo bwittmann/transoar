@@ -3,7 +3,6 @@
 import os
 import argparse
 from pathlib import Path
-from collections import defaultdict
 
 import torch
 from tqdm import tqdm
@@ -133,7 +132,6 @@ class Tester:
                     )
 
             # Get and store final results
-            # [torch.tensor([id_ for score, id_ in query_info[c]]).unique().shape for c in query_info.keys()]
             metric_scores = self._evaluator.eval()
             write_json(metric_scores, self._path_to_results / ('results_' + self._set_to_eval))
 

@@ -1,4 +1,4 @@
-"""Module containing the hungarian matcher, adapted from https://github.com/facebookresearch/detr."""
+"""Module containing the matcher."""
 
 import torch
 from torch import nn
@@ -6,7 +6,7 @@ from torch import nn
 from transoar.utils.bboxes import box_cxcyczwhd_to_xyzxyz, generalized_bbox_iou_3d
 
 
-class HungarianMatcher(nn.Module):
+class Matcher(nn.Module):
     def __init__(
         self, cost_class=1, cost_bbox=1, cost_giou=1, anchor_matching=True, num_organs=None
     ):

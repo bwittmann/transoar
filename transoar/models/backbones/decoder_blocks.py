@@ -1,7 +1,6 @@
 """Module containing code of the backbones decoder blocks."""
 
 import copy
-from numpy import ones_like
 
 import torch
 import torch.nn as nn
