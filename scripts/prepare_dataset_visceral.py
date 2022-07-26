@@ -15,7 +15,7 @@ if __name__ == "__main__":
     logging.info('Started preparing dataset.')
     
     # Load data config
-    preprocessing_config = get_config('preprocessing')
+    preprocessing_config = get_config('preprocessing_visceral')
     data_config = get_config(preprocessing_config['dataset_config'])
 
     random.seed(preprocessing_config['seed'])  # Set arbitrary seed to make experiments reproducible
