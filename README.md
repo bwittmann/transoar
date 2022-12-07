@@ -95,7 +95,28 @@ For visualization of results and attention maps, please check additional flags i
 coming soon.
 
 ## SwinFPN [[5]](#5)
+[![DOI](https://img.shields.io/badge/MIDL-https%3A%2F%2Fopenreview.net%2Fforum%3Fid=yiIz7DhgRU5-B31B1B)](https://openreview.net/forum?id=yiIz7DhgRU5)
+
 This repository also contains code for SwinFPN. To include 3D Swin Transformer blocks in the FPN backbone, please activate the flag `use_encoder_attn` in the respective config files.\
+## Citation
+If you find our repository useful in your research, please cite the following papers:
+```bibtex
+@article{wittmann2022focused,
+    title={Focused Decoding Enables 3D Anatomical Detection by Transformers},
+    author={Wittmann, Bastian and Navarro, Fernando and Shit, Suprosanna and Menze, Bjoern},
+    journal={arXiv preprint arXiv:2207.10774},
+    year={2022}
+}
+@inproceedings{
+    wittmann2022swinfpn,
+    title={Swin{FPN}: Leveraging Vision Transformers for 3D Organs-At-Risk Detection},
+    author={Bastian Wittmann and Suprosanna Shit and Fernando Navarro and Jan C. Peeken and Stephanie E. Combs and Bjoern Menze},
+    booktitle={Medical Imaging with Deep Learning},
+    year={2022},
+    url={https://openreview.net/forum?id=yiIz7DhgRU5}
+}
+```
+
 We additionally experimented with 3D Deformable DETR encoder blocks as additional refinement stages after the FPN backbone. To activate these 3D Deformable DETR encoder blocks activate the flag `use_encoder_attn`.
 
 ## References
@@ -119,6 +140,3 @@ Jimenez-del Toro et al., "Cloud-based evaluation of anatomical structure segment
 
 <a id="7">[7]</a> 
 AMOS 2022: Multi-Modality Abdominal Multi-Organ Segmentation Challenge 2022, MICCAI, 2022, https://amos22.grand-challenge.org/.
-
-
-
