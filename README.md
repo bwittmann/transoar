@@ -1,3 +1,4 @@
+[![DOI](https://img.shields.io/badge/arXiv-https%3A%2F%2Fdoi.org%2F10.48550%2FarXiv.2207.10774-B31B1B)](https://doi.org/10.48550/arXiv.2207.10774) 
 <img src="docs/detectors.png">
 
 # A 3D medical Detection Transformer library 
