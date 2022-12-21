@@ -1,8 +1,8 @@
 # Config file for AttnFPN backbone and RetinaNet head
 
 # General training
-experiment_name: retina_unet_visceral 
-device: cuda:7
+experiment_name: graph_retina_unet_visceral_gnn_v2_skip_gnn
+device: cuda:5
 val_interval: 1
 debug_mode: False  # doesn't save checkpoints
 seed: 10
@@ -17,7 +17,7 @@ clip_max_norm: -1 # Deactivated
 lr_drop: 2500
 
 # Data
-dataset: transoar_test_160160256_CT
+dataset: transoar_testing_focused_attn_160_160_256_CT #transoar_test_160160256_CT
 overfit: False # use same set consisting of one image for train and val
 bbox_padding: 1
 
@@ -82,7 +82,10 @@ neck:
   classifier_classes: 20
   loss_weight: 1.0  # for bce and giou
   prior_prob: 0.01 # for weight init of cls head
-  learnabel_scale: True # for reg head
+  learnabel_scale: False #True # for reg head
+
+  # Graph
+  use_graph: True
 
   # Matcher
   num_candidates: 4
@@ -95,7 +98,7 @@ neck:
   min_neg: 1
 
   # Post-processing
-  detections_per_img: 100
+  detections_per_img: 20
   score_thresh: 0
   topk_candidates: 10000
   remove_small_boxes: 0.01

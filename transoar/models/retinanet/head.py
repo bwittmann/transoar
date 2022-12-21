@@ -85,18 +85,18 @@ class RegHead(nn.Module):
             nn.ReLU(inplace=True)
         ]
 
-        # block_2 = [
-        #     nn.Conv3d(config['head_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
-        #     nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
-        #     nn.ReLU(inplace=True)
-        # ]
+        block_2 = [
+            nn.Conv3d(config['head_channels'], config['head_channels'], kernel_size=3, stride=1, padding=1, bias=False),
+            nn.GroupNorm(8, config['head_channels'], eps=1e-05, affine=True),
+            nn.ReLU(inplace=True)
+        ]
 
         block_3 = [
-            nn.Conv3d(config['head_channels'], out_channels, kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(config['head_channels'], out_channels, kernel_size=1, stride=1, padding=0),
         ]
 
         # Regression head
-        self._body = nn.Sequential(*block_1) #, *block_2)
+        self._body = nn.Sequential(*block_1, *block_2)
         self._out = nn.Sequential(*block_3)
         self._init_weights()
 
@@ -116,16 +116,16 @@ class RegHead(nn.Module):
                     torch.nn.init.constant_(layer.bias, 0)
 
     def forward(self, x, level):
-        reg_logits = self._out(self._body(x))   # [N, C, Y, X, Z]
+        features = self._body(x)   # [N, C, Y, X, Z]
+        reg_logits = self._out(features)
 
         if self._learnable_scale:
             reg_logits = self._scales[level](reg_logits)
 
-        reg_logits = reg_logits.permute((0, 2, 3, 4, 1))
-        reg_logits = reg_logits.contiguous()
-        reg_logits = reg_logits.view(x.size()[0], -1, 6)    # [N, anchors, 6] 
+        reg_logits = reg_logits.permute((0, 2, 3, 4, 1)).contiguous().view(x.size()[0], -1, 6) # [N, anchors, 6]
+        features = features.permute((0, 2, 3, 4, 1)).contiguous().view(x.size()[0], -1, 192).repeat_interleave(27, dim=1)
 
-        return reg_logits
+        return reg_logits, features
 
     def compute_loss(self, pred_deltas, target_deltas):
         return self._loss(pred_deltas, target_deltas)
@@ -186,15 +186,18 @@ class DetectionHeadHNMNative(nn.Module):
         self.fg_bg_sampler = sampler
 
     def forward(self, fmaps):
-        logits, offsets = [], []
+        logits, offsets, features = [], [], []
         for level, p in enumerate(fmaps):
             logits.append(self.classifier(p))
-            offsets.append(self.regressor(p, level=level))
+            fmap_offsets, fmap_features = self.regressor(p, level=level)
+            offsets.append(fmap_offsets)
+            features.append(fmap_features)
 
-        sdim = fmaps[0].ndim - 2
+        sdim, fdim = fmaps[0].ndim - 2, fmap_features.shape[-1]
         box_deltas = torch.cat(offsets, dim=1).reshape(-1, sdim * 2)
+        box_features = torch.cat(features, dim=1).reshape(-1, fdim)
         box_logits = torch.cat(logits, dim=1).flatten(0, -2)
-        return {"box_deltas": box_deltas, "box_logits": box_logits}
+        return {"box_deltas": box_deltas, "box_logits": box_logits, "box_features": box_features}
 
 
     def postprocess_for_inference(self, prediction, anchors):
@@ -205,13 +208,19 @@ class DetectionHeadHNMNative(nn.Module):
         return postprocess_predictions
     
 
-    def compute_loss(self, prediction, target_labels, matched_gt_boxes, anchors):
+    def compute_loss(self, prediction, target_labels, matched_gt_boxes, anchors, gnn=False):
+        gnn_tag = '_gnn' if gnn else '' 
         box_logits, box_deltas = prediction["box_logits"], prediction["box_deltas"]
 
         with torch.no_grad():
             losses = {}
             sampled_pos_inds, sampled_neg_inds = self.select_indices(target_labels, box_logits)
-            sampled_inds = torch.cat([sampled_pos_inds, sampled_neg_inds], dim=0)
+
+            if not gnn:
+                sampled_inds = torch.cat([sampled_pos_inds, sampled_neg_inds], dim=0)
+            else:
+                sampled_inds = torch.arange(box_logits.shape[0])    # all boxes
+                sampled_pos_inds = torch.arange(box_logits.shape[0])
 
         target_labels = torch.cat(target_labels, dim=0)
         batch_anchors = torch.cat(anchors, dim=0)
@@ -221,13 +230,14 @@ class DetectionHeadHNMNative(nn.Module):
         target_boxes_sampled = torch.cat(matched_gt_boxes, dim=0)[sampled_pos_inds]
 
         if sampled_pos_inds.numel() > 0:
-            losses["reg"] = self.regressor.compute_loss(
+            losses["reg" + gnn_tag] = self.regressor.compute_loss(
                 pred_boxes_sampled,
                 target_boxes_sampled,
                 ) / max(1, sampled_pos_inds.numel())
 
-        losses["cls"] = self.classifier.compute_loss(
-            box_logits[sampled_inds], target_labels[sampled_inds])
+        if not gnn:
+            losses["cls"] = self.classifier.compute_loss(
+                box_logits[sampled_inds], target_labels[sampled_inds])
         return losses, sampled_pos_inds, sampled_neg_inds
 
     def select_indices(self, target_labels, boxes_scores):

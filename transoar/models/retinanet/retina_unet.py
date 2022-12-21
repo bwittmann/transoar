@@ -1,7 +1,12 @@
 import torch
 import torch.nn as nn
+from torch_geometric.data import Data, Batch
+from torch_cluster import knn_graph
+
 
 from transoar.models.retinanet.head import DetectionHeadHNMNative, ClsHead, RegHead, SegHead
+from transoar.models.retinanet.gnn import GCN
+from transoar.models.retinanet.loss import GIoULoss
 from transoar.models.backbones.attn_fpn import AttnFPN
 from transoar.models.anchors.anchor_gen import AnchorGenerator3DS
 from transoar.models.sampler import HardNegativeSamplerBatched
@@ -19,6 +24,17 @@ class RetinaUNet(nn.Module):
 
         # Build AttnFPN backbone
         self.attn_fpn = AttnFPN(config_backbone)
+
+        # Build GNN
+        self.gnn = GCN(
+            in_dim=config['neck']['head_channels'],
+            h_dim=config['neck']['head_channels'],
+            out_dim=6,
+            num_gnn_layers=2,
+            p_drop=0.0
+        )
+        self.gnn_loss = GIoULoss()
+        self.use_graph = config_neck['use_graph']
 
         # Build detection and segmentation head
         cls_head = ClsHead(config_neck)
@@ -72,23 +88,81 @@ class RetinaUNet(nn.Module):
             anchors, target_boxes, target_classes
         )
 
+        # general detection losses
         losses = {}
         head_losses, _, _ = self.head.compute_loss(
             pred_detection, labels, matched_gt_boxes, anchors)
         losses.update(head_losses)
 
-        if self.segmenter is not None:
-            losses.update(self.segmenter.compute_loss(pred_seg, target_seg))
+        # just return best pred with hightest score per class to circumvent non diff nms
+        preds_per_batch = int(pred_detection['box_logits'].shape[0] / img.shape[0])
 
-        if evaluation:
-            prediction = self.postprocess_for_inference(
-                images=img,
-                pred_detection=pred_detection,
-                pred_seg=pred_seg,
-                anchors=anchors,
-            )
+        batch_logits = torch.split(pred_detection['box_logits'], preds_per_batch)
+        batch_deltas = torch.split(pred_detection['box_deltas'], preds_per_batch)
+        batch_features = torch.split(pred_detection['box_features'], preds_per_batch)
+
+        best_ids = [logits_batch.softmax(dim=1).argmax(dim=0) for logits_batch in batch_logits]
+        best_anchors = [anchors[ids] for anchors, ids in zip(anchors, best_ids)]
+        best_logits = [logits[ids] for logits, ids in zip(batch_logits, best_ids)]
+        best_deltas = [batch_delta[ids] for batch_delta, ids in zip(batch_deltas, best_ids)]
+        best_features = [batch_feature[ids] for batch_feature, ids in zip(batch_features, best_ids)]
+        
+        if self.use_graph:
+            # graph construction
+            graphs = []
+            for boxes, anchors, features in zip(best_deltas, best_anchors, best_features):
+                boxes_cpos = self.head.coder.decode_single(boxes, anchors)[:, :3]   # TODO
+                edge_index = knn_graph(boxes_cpos, k=10).to(device=features.device)
+                graphs.append(Data(x=features.float(), edge_index=edge_index.long()))
+            graph_batch = Batch().from_data_list(graphs)
+
+            best_deltas = self.gnn(graph_batch)
+            gnn_pred_detection = {
+                'box_deltas': torch.cat([deltas[classes] for deltas, classes in zip(torch.split(best_deltas, 20), target_classes)]),
+                'box_logits': torch.cat([logits[classes] for logits, classes in zip(best_logits, target_classes)])
+            }
+            best_anchors = [anchors[classes] for anchors, classes in zip(best_anchors, target_classes)]
+
+            # graph losses
+            gnn_loss, _, _ = self.head.compute_loss(
+                gnn_pred_detection, target_classes, target_boxes, best_anchors, gnn=True)
+            losses.update(gnn_loss)
+
+            pred_detection_final = self.head.postprocess_for_inference(gnn_pred_detection, best_anchors)
+            prediction = {
+                'pred_boxes': [pred_detection_final['pred_boxes'][:target_classes[0].shape[0]], pred_detection_final['pred_boxes'][target_classes[0].shape[0]:]],
+                'pred_scores': [pred_detection_final['pred_probs'].max(dim=1)[0][:target_classes[0].shape[0]], pred_detection_final['pred_probs'].max(dim=1)[0][target_classes[0].shape[0]:]],
+                'pred_labels': target_classes # TODO
+            }
+
+            # graph loss
+            # proc_boxes = torch.cat([preds[classes] for preds, classes in zip(prediction['pred_boxes'], target_classes)])
+            # losses['gnn'] = self.gnn_loss(proc_boxes, torch.cat(target_boxes))
         else:
-            prediction = None
+            pred_detection_mod = {
+                'box_deltas': torch.cat(best_deltas),
+                'box_logits': torch.cat(best_logits)
+            }
+
+            pred_detection_final = self.head.postprocess_for_inference(pred_detection_mod, best_anchors)
+            prediction = {
+                'pred_boxes': torch.split(pred_detection_final['pred_boxes'], 20), # TODO
+                'pred_scores': [scores.max(dim=1)[0] for scores in torch.split(pred_detection_final['pred_probs'], 20)],
+                'pred_labels': [torch.arange(0, 20) for _ in range(img.shape[0])] # TODO
+            }
+
+        # if self.segmenter is not None:
+        #     losses.update(self.segmenter.compute_loss(pred_seg, target_seg))
+
+        # if evaluation:
+        #     prediction = self.postprocess_for_inference(
+        #         images=img,
+        #         pred_detection=pred_detection,
+        #         pred_seg=pred_seg,
+        #         anchors=anchors,
+        #     )
+        # else:
+        #     prediction = None
 
         return losses, prediction
     

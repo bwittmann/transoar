@@ -50,6 +50,7 @@ class Trainer:
         loss_agg = 0
         loss_bbox_agg = 0
         loss_cls_agg = 0
+        loss_gnn_agg = 0
         loss_seg_ce_agg = 0
         loss_seg_dice_agg = 0
         for data, _, bboxes, seg_mask in tqdm(self._train_loader):
@@ -81,6 +82,7 @@ class Trainer:
             self._scaler.update()
 
             loss_agg += loss_abs.item()
+            loss_gnn_agg = loss_gnn_agg + losses['reg_gnn'].item() if 'reg_gnn' in losses else 0
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
 
@@ -90,6 +92,7 @@ class Trainer:
 
 
         loss = loss_agg / len(self._train_loader)
+        loss_gnn = loss_gnn_agg / len(self._val_loader)
         loss_bbox = loss_bbox_agg / len(self._train_loader)
         loss_cls =  loss_cls_agg / len(self._train_loader)
         loss_seg_ce = loss_seg_ce_agg / len(self._train_loader)
@@ -98,6 +101,7 @@ class Trainer:
         self._write_to_logger(
             num_epoch, 'train', 
             total_loss=loss,
+            gnn_loss=loss_gnn,
             bbox_loss=loss_bbox,
             cls_loss=loss_cls,
             seg_ce_loss=loss_seg_ce,
@@ -110,6 +114,7 @@ class Trainer:
         # self._criterion.eval()
 
         loss_agg = 0
+        loss_gnn_agg = 0
         loss_bbox_agg = 0
         loss_cls_agg = 0
         loss_seg_ce_agg = 0
@@ -132,6 +137,7 @@ class Trainer:
                 loss_abs = sum(losses.values())
 
             loss_agg += loss_abs.item()
+            loss_gnn_agg = loss_gnn_agg + losses['reg_gnn'].item() if 'reg_gnn' in losses else 0
             loss_bbox_agg += losses['reg'].item()
             loss_cls_agg += losses['cls'].item()
 
@@ -149,6 +155,7 @@ class Trainer:
             )
 
         loss = loss_agg / len(self._val_loader)
+        loss_gnn = loss_gnn_agg / len(self._val_loader)
         loss_bbox = loss_bbox_agg / len(self._val_loader)
         loss_cls =  loss_cls_agg / len(self._val_loader)
         loss_seg_ce = loss_seg_ce_agg / len(self._val_loader)
@@ -170,6 +177,7 @@ class Trainer:
         self._write_to_logger(
             num_epoch, 'val', 
             total_loss=loss,
+            gnn_loss=loss_gnn,
             bbox_loss=loss_bbox,
             cls_loss=loss_cls,
             seg_ce_loss=loss_seg_ce,
