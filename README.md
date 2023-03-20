@@ -1,9 +1,14 @@
-[![DOI](https://img.shields.io/badge/arXiv-https%3A%2F%2Fdoi.org%2F10.48550%2FarXiv.2207.10774-B31B1B)](https://doi.org/10.48550/arXiv.2207.10774) 
+<!-- [![DOI](https://img.shields.io/badge/arXiv-https%3A%2F%2Fdoi.org%2F10.48550%2FarXiv.2207.10774-B31B1B)](https://doi.org/10.48550/arXiv.2207.10774)
+[![DOI](https://img.shields.io/badge/MIDL-https%3A%2F%2Fopenreview.net%2Fforum%3Fid=yiIz7DhgRU5-B31B1B)](https://openreview.net/forum?id=yiIz7DhgRU5) -->
+<!-- [![MELBA](https://img.shields.io/badge/MELBA-Focused_Decoding_Enables_3D_Anatomical_Detection_by_Transformers-red.svg)](https://www.melba-journal.org/papers/2023:003.html)
+[![MIDL](https://img.shields.io/badge/MIDL-SwinFPN%3A_Leveraging_Vision_Transformers_for_3D_Organs--At--Risk_Detection-red.svg)](https://openreview.net/forum?id=yiIz7DhgRU5) -->
+[![GitHub Stars](https://img.shields.io/github/stars/bwittmann/transoar?style=social)](https://github.com/bwittmann/transoar)
+![visitors](https://visitor-badge.glitch.me/badge?page_id=bwittmann.transoar)
+
+
 <img src="docs/detectors.png">
 
-# A 3D medical Detection Transformer library 
-
-The TransOAR project was initially developed for Transformer-based organs-at-risk detection and contains code of three 3D Detection Transformers, namely Focused Decoder, DETR, and Deformable DETR. Additionally, we adopted RetinaNet/Retina U-Net from nnDetection [[3]](#3) into our training pipeline to ensure comparability of results with traditional CNN-based detectors.
+The TransOAR project was initially developed for Transformer-based organs-at-risk detection and contains code of three 3D Detection Transformers, namely Focused Decoder, DETR, and Deformable DETR. Additionally, we adopted RetinaNet/Retina U-Net from nnDetection into our training pipeline to ensure comparability of results with traditional CNN-based detectors.
 
 To access the featured detectors and their detailed configs, please checkout the linked branches:
 
@@ -12,11 +17,15 @@ To access the featured detectors and their detailed configs, please checkout the
 [Deformable DETR](https://github.com/bwittmann/transoar/tree/attn-fpn-def-detr) [[2]](#2): A 3D implementation of Deformable DETR.\
 [RetinaNet/Retina U-Net](https://github.com/bwittmann/transoar/tree/retina-unet) [[3]](#3)[[4]](#4): Adapted from the cited sources to fit our training pipeline.
 
-In the following, we will introduce our main contribution, namely Focused Decoder, and describe the usage of this repository.
 
-## Focused Decoder
-<img src="docs/focused_decoder.png">\
-**TL;DR:** Focused Decoder leverages information from an anatomical region atlas to simultaneously deploy query anchors and restrict the cross-attention’s field of view to regions of interest. Focused Decoder not only delivers competitive results but also facilitates the accessibility of explainable results via attention weights.
+# News
+**February 23**: [*Focused Decoding Enables 3D Anatomical Detection by Transformers*](https://www.melba-journal.org/papers/2023:003.html) has been accepted at MELBA!\
+**May 22**: [*SwinFPN: Leveraging Vision Transformers for 3D Organs-At-Risk Detection*](https://openreview.net/forum?id=yiIz7DhgRU5) has been accepted at MIDL 22!
+
+# Focused Decoder  [![MELBA](https://img.shields.io/badge/MELBA-Focused_Decoding_Enables_3D_Anatomical_Detection_by_Transformers-red.svg)](https://www.melba-journal.org/papers/2023:003.html)
+<img src="docs/foc_dec.png">\
+**TL;DR**: Focused Decoder leverages information from an anatomical region atlas to simultaneously deploy query anchors and restrict the cross-attention’s field of view to RoIs, alleviating the need for large-scale annotated datasets. Focused Decoder not only delivers competitive results but also facilitates the accessibility of explainable results via attention weights.
+
 
 ## Usage
 The usage remains the same for all branches and, therefore, all featured detectors.
@@ -51,7 +60,7 @@ To compile NMS used in RetinaNet/Retina U-Net, checkout this [branch](https://gi
 We provide exemplary preprocessing scripts for two publicly available datasets.
 It should be mentioned that these preprocessing scripts should act as templates to experiment with additional datasets.
 
-#### AMOSS22 challenge [[7]](#7)
+#### AMOSS22 challenge [[5]](#5)
 1) Download the training data of the challenge's [first stage](https://amos22.grand-challenge.org/). The structure should be as follows:
 ```
 AMOS22/
@@ -91,35 +100,35 @@ To evaluate performances of created checkpoints on the test sets, run:
 
 For visualization of results and attention maps, please check additional flags in `scripts/test.py`.
 
-### Checkpoints
-coming soon.
 
-## SwinFPN [[5]](#5)
-[![DOI](https://img.shields.io/badge/MIDL-https%3A%2F%2Fopenreview.net%2Fforum%3Fid=yiIz7DhgRU5-B31B1B)](https://openreview.net/forum?id=yiIz7DhgRU5)
-
+# SwinFPN [![MIDL](https://img.shields.io/badge/MIDL-SwinFPN%3A_Leveraging_Vision_Transformers_for_3D_Organs--At--Risk_Detection-red.svg)](https://openreview.net/forum?id=yiIz7DhgRU5)
 This repository also contains code for SwinFPN. To include 3D Swin Transformer blocks in the FPN backbone, please activate the flag `use_encoder_attn` in the respective config files.\
-## Citation
-If you find our repository useful in your research, please cite the following papers:
+We additionally experimented with 3D Deformable DETR encoder blocks as additional refinement stages after the FPN backbone. To activate these 3D Deformable DETR encoder blocks activate the flag `use_encoder_attn`.
+
+# Citation
+If you find our repository useful in your research, please consider citing::
 ```bibtex
 @article{wittmann2022focused,
     title={Focused Decoding Enables 3D Anatomical Detection by Transformers},
     author={Wittmann, Bastian and Navarro, Fernando and Shit, Suprosanna and Menze, Bjoern},
-    journal={arXiv preprint arXiv:2207.10774},
-    year={2022}
+    journal={Machine Learning for Biomedical Imaging},
+    volume={2},
+    issue={February 2023 issue},
+    year={2023},
+    pages={72--95},
+    issn={2766-905X},
+    url={https://melba-journal.org/2023:003}
 }
-@inproceedings{
-    wittmann2022swinfpn,
+@inproceedings{wittmann2022swinfpn,
     title={Swin{FPN}: Leveraging Vision Transformers for 3D Organs-At-Risk Detection},
-    author={Bastian Wittmann and Suprosanna Shit and Fernando Navarro and Jan C. Peeken and Stephanie E. Combs and Bjoern Menze},
+    author={Wittmann, Bastian and Shit, Suprosanna and Navarro, Fernando and Peeken, Jan C and Combs, Stephanie E and Menze, Bjoern},
     booktitle={Medical Imaging with Deep Learning},
     year={2022},
     url={https://openreview.net/forum?id=yiIz7DhgRU5}
 }
 ```
 
-We additionally experimented with 3D Deformable DETR encoder blocks as additional refinement stages after the FPN backbone. To activate these 3D Deformable DETR encoder blocks activate the flag `use_encoder_attn`.
-
-## References
+# References
 <a id="1">[1]</a> 
 Carion et al., "End-to-end object detection with transformers," EVVC, 2020, https://github.com/facebookresearch/detr.
 
@@ -132,11 +141,9 @@ Baumgartner et al., "nnDetection: A self-configuring method for medical object d
 <a id="4">[4]</a> 
 Jaeger et al., "Retina U-Net: Embarrassingly simple exploitation of segmentation supervision for medical object detection," PMLR ML4H, 2020, https://github.com/MIC-DKFZ/medicaldetectiontoolkit.
 
-<a id="5">[5]</a> 
-Wittmann et al., "SwinFPN: Leveraging Vision Transformers for 3D Organs-At-Risk Detection," MIDL, 2022.
+<a id="6">[5]</a> 
+AMOS 2022: Multi-Modality Abdominal Multi-Organ Segmentation Challenge 2022, MICCAI, 2022, https://amos22.grand-challenge.org/.
 
-<a id="6">[6]</a> 
+<a id="5">[6]</a> 
 Jimenez-del Toro et al., "Cloud-based evaluation of anatomical structure segmentation and landmark detection algorithms: VISCERAL anatomy benchmarks," IEEE TMI, 2016, https://visceral.eu/benchmarks.
 
-<a id="7">[7]</a> 
-AMOS 2022: Multi-Modality Abdominal Multi-Organ Segmentation Challenge 2022, MICCAI, 2022, https://amos22.grand-challenge.org/.
