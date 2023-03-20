@@ -108,7 +108,7 @@ We additionally experimented with 3D Deformable DETR encoder blocks as additiona
 # Citation
 If you find our repository useful in your research, please consider citing::
 ```bibtex
-@article{wittmann2022focused,
+@article{wittmann2023focused,
     title={Focused Decoding Enables 3D Anatomical Detection by Transformers},
     author={Wittmann, Bastian and Navarro, Fernando and Shit, Suprosanna and Menze, Bjoern},
     journal={Machine Learning for Biomedical Imaging},
